@@ -223,6 +223,18 @@ export const SETTINGS_SEARCH_ITEMS = [
     to: "/settings/appearance",
   },
   {
+    id: "animation-style",
+    title: "Animation style",
+    to: "/settings/appearance",
+    searchTerms: ["Motion", "Standard", "animations", "framer"],
+  },
+  {
+    id: "background-enabled",
+    title: "New chat background",
+    to: "/settings/appearance",
+    searchTerms: ["wallpaper", "image", "picture", "background"],
+  },
+  {
     id: "environment-identification",
     title: "Environment identification",
     to: "/settings/appearance",

@@ -1,0 +1,984 @@
+/*
+ * SimpleT3Code: Codex desktop look.
+ *
+ * Loaded after index.css and kept unlayered, so these rules win over Tailwind
+ * utilities without touching upstream component markup. Keep fork styling in
+ * this file so upstream merges stay conflict-free.
+ */
+
+:root {
+  --codex-chrome-height: 44px;
+  --codex-rail-width: 52px;
+  --codex-card-radius: 12px;
+  --codex-chrome: #e9edf0;
+  --codex-chrome-hover: #dde2e5;
+  --codex-chrome-icon: #838688;
+  --codex-hairline: #d9dce0;
+  --codex-text: #1a1c1f;
+  --codex-sidebar-text: #36383b;
+  --codex-label: #a5a7a8;
+  --codex-row-hover: #eff0f2;
+  --codex-row-active: #ebecee;
+  --codex-tray: #f4f4f4;
+  --codex-composer-border: #e7e7e7;
+  --codex-placeholder: #b9babc;
+  --codex-danger-access: #d25e28;
+}
+
+:root.dark {
+  --codex-chrome: #1b1c1e;
+  --codex-chrome-hover: #2a2b2e;
+  --codex-chrome-icon: #8d9095;
+  --codex-hairline: #2c2d30;
+  --codex-text: #ececed;
+  --codex-sidebar-text: #d4d5d7;
+  --codex-label: #75777b;
+  --codex-row-hover: #26272a;
+  --codex-row-active: #2c2d31;
+  --codex-tray: #26272a;
+  --codex-composer-border: #34353a;
+  --codex-placeholder: #6e7074;
+  --codex-danger-access: #f0864f;
+}
+
+/* Default palette only: user-selected themes keep their own colors. */
+html:not([data-theme-id]):root,
+html[data-theme-id=""]:root {
+  --background: #ffffff;
+  --foreground: var(--codex-text);
+  --card: #ffffff;
+  --card-foreground: var(--codex-text);
+  --popover: #ffffff;
+  --popover-foreground: var(--codex-text);
+  --primary: #0d0d0d;
+  --primary-foreground: #ffffff;
+  --message-action: #0d0d0d;
+  --message-action-foreground: #ffffff;
+  --message-action-hover: #303030;
+  --message-surface: #f4f4f4;
+  --accent: #f3f3f3;
+  --muted: #f9f9f9;
+  --muted-foreground: #8e8f90;
+  --border: #ececec;
+  --input: #e3e3e3;
+  --ring: #8e8f90;
+  --app-chrome-background: #ffffff;
+  --toolbar-background: #ffffff;
+}
+
+html:not([data-theme-id]):root.dark,
+html[data-theme-id=""]:root.dark {
+  --background: #181818;
+  --foreground: var(--codex-text);
+  --card: #1f1f1f;
+  --card-foreground: var(--codex-text);
+  --popover: #232323;
+  --popover-foreground: var(--codex-text);
+  --primary: #ececec;
+  --primary-foreground: #0d0d0d;
+  --message-action: #ececec;
+  --message-action-foreground: #0d0d0d;
+  --message-action-hover: #d4d4d4;
+  --message-surface: #2a2a2a;
+  --accent: #262626;
+  --muted: #202020;
+  --muted-foreground: #8f8f8f;
+  --border: #2c2c2c;
+  --input: #3a3a3a;
+  --ring: #8f8f8f;
+  --app-chrome-background: #181818;
+  --toolbar-background: #181818;
+}
+
+html:not([data-theme-id]) [data-app-sidebar],
+html[data-theme-id=""] [data-app-sidebar] {
+  --sidebar: #f7f8fa;
+  --sidebar-foreground: var(--codex-sidebar-text);
+  --sidebar-muted-foreground: var(--codex-label);
+  --sidebar-row-hover: var(--codex-row-hover);
+  --sidebar-row-active: var(--codex-row-active);
+  --sidebar-row-selected: var(--codex-row-active);
+  --sidebar-border: var(--codex-hairline);
+}
+
+html:not([data-theme-id]).dark [data-app-sidebar],
+html[data-theme-id=""].dark [data-app-sidebar] {
+  --sidebar: #141415;
+}
+
+/* ---------------------------------------------------------------------------
+ * App shell: gray window chrome, icon rail, and inset rounded cards.
+ * ------------------------------------------------------------------------- */
+
+[data-codex-part="chrome-bar"],
+[data-codex-part="icon-rail"] {
+  display: none;
+}
+
+@media (min-width: 768px) {
+  [data-slot="sidebar-wrapper"] {
+    --workspace-titlebar-content-left: 0.75rem !important;
+    --workspace-topbar-height: 46px;
+    padding-top: var(--codex-chrome-height);
+    padding-left: var(--codex-rail-width);
+    background: var(--codex-chrome);
+  }
+
+  [data-codex-part="chrome-bar"] {
+    position: fixed;
+    inset: 0 0 auto 0;
+    z-index: 30;
+    display: flex;
+    height: var(--codex-chrome-height);
+    align-items: center;
+    padding-left: var(--workspace-controls-left);
+  }
+
+  [data-codex-part="chrome-bar-controls"] {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+
+  [data-codex-part="chrome-button"] {
+    position: relative;
+    display: inline-flex;
+    width: 30px;
+    height: 30px;
+    align-items: center;
+    justify-content: center;
+    border-radius: 8px;
+    color: var(--codex-chrome-icon);
+  }
+
+  [data-codex-part="chrome-toggle-slot"] {
+    width: 28px;
+    flex-shrink: 0;
+  }
+
+  [data-codex-part="chrome-button"]:hover {
+    background: var(--codex-chrome-hover);
+    color: var(--codex-text);
+  }
+
+  [data-codex-part="chrome-button"] svg {
+    width: 18px;
+    height: 18px;
+    stroke-width: 1.75;
+  }
+
+  /* The upstream sidebar toggle sits right after the history arrows. */
+  [data-sidebar-control] {
+    top: 0 !important;
+    left: calc(var(--workspace-controls-left) + 68px) !important;
+    height: var(--codex-chrome-height) !important;
+    margin-left: 0 !important;
+  }
+
+  [data-sidebar-control] button {
+    color: var(--codex-chrome-icon);
+  }
+
+  [data-sidebar-control] button:hover {
+    background: var(--codex-chrome-hover);
+    color: var(--codex-text);
+  }
+
+  [data-codex-part="icon-rail"] {
+    position: fixed;
+    top: var(--codex-chrome-height);
+    bottom: 0;
+    left: 0;
+    z-index: 20;
+    display: flex;
+    width: var(--codex-rail-width);
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    padding-top: 8px;
+  }
+
+  [data-codex-part="rail-button"] {
+    display: inline-flex;
+    width: 36px;
+    height: 36px;
+    flex-shrink: 0;
+    align-items: center;
+    justify-content: center;
+    border-radius: 10px;
+    color: var(--codex-chrome-icon);
+    outline: none;
+  }
+
+  [data-codex-part="rail-button"]:hover {
+    background: var(--codex-chrome-hover);
+  }
+
+  [data-codex-part="rail-button"][data-active="true"] {
+    background: var(--codex-chrome-hover);
+    color: var(--codex-text);
+  }
+
+  [data-codex-part="rail-button"]:focus-visible {
+    box-shadow: 0 0 0 2px var(--ring);
+  }
+
+  [data-codex-part="rail-button"] svg {
+    width: 20px;
+    height: 20px;
+    stroke-width: 1.75;
+  }
+
+  [data-app-sidebar][data-slot="sidebar-container"] {
+    top: var(--codex-chrome-height);
+    height: auto;
+    bottom: 0;
+    border-right: 0;
+  }
+
+  [data-slot="sidebar"][data-state="expanded"] [data-app-sidebar][data-slot="sidebar-container"] {
+    left: var(--codex-rail-width);
+  }
+
+  [data-app-sidebar] [data-slot="sidebar-inner"] {
+    border-top-left-radius: var(--codex-card-radius);
+    background-image: none;
+    box-shadow:
+      inset 0.5px 0.5px 0 var(--codex-hairline),
+      inset -0.5px 0 0 var(--codex-hairline);
+  }
+
+  [data-slot="sidebar-wrapper"] main[data-slot="sidebar-inset"] {
+    height: auto !important;
+    min-height: 0 !important;
+    overflow: hidden;
+    border-top-right-radius: var(--codex-card-radius);
+    background-image: none;
+    box-shadow: 0 -0.5px 0 var(--codex-hairline);
+  }
+
+  [data-slot="sidebar"][data-state="collapsed"] ~ main[data-slot="sidebar-inset"] {
+    border-top-left-radius: var(--codex-card-radius);
+    box-shadow:
+      0 -0.5px 0 var(--codex-hairline),
+      -0.5px 0 0 var(--codex-hairline);
+  }
+}
+
+/* Thread status: a 7px dot per state, colors matching upstream's pills
+   (sky working, amber approval, indigo input). Only "working" animates, via
+   upstream's stepped animate-status-pulse (opacity only, compositor-drawn). */
+[data-codex-part="thread-mark"] {
+  display: block;
+  width: 7px;
+  height: 7px;
+  flex-shrink: 0;
+  border-radius: 999px;
+  background: var(--codex-label);
+}
+
+[data-codex-part="thread-mark"][data-tone="working"] {
+  background: #0ea5e9;
+  will-change: opacity;
+}
+
+[data-codex-part="thread-mark"][data-tone="monitoring"] {
+  background: transparent;
+  box-shadow: inset 0 0 0 1.5px #0ea5e9;
+}
+
+[data-codex-part="thread-mark"][data-tone="approval"],
+[data-codex-part="thread-mark"][data-tone="woke"] {
+  background: #f59e0b;
+}
+
+[data-codex-part="thread-mark"][data-tone="input"] {
+  background: #6366f1;
+}
+
+[data-codex-part="thread-mark"][data-tone="failed"] {
+  background: #ef4444;
+}
+
+[data-codex-part="thread-mark"][data-tone="done"] {
+  background: #10b981;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [data-codex-part="thread-mark"][data-tone="working"] {
+    animation: none;
+  }
+}
+
+/* ---------------------------------------------------------------------------
+ * Draft hero: headline above the centered new-chat composer.
+ * ------------------------------------------------------------------------- */
+
+[data-codex-hero-headline] h1,
+[data-codex-hero-headline] h2 {
+  color: var(--codex-text);
+  font-size: 28px;
+  font-weight: 400;
+  letter-spacing: -0.02em;
+}
+
+/* ---------------------------------------------------------------------------
+ * Composer: white card with a tray for project, machine, and worktree.
+ * ------------------------------------------------------------------------- */
+
+:root {
+  --chat-max-width: 46rem;
+}
+
+[data-slot="composer-shell"] {
+  display: flex;
+  flex-direction: column-reverse;
+}
+
+[data-slot="composer-shell"]::before {
+  display: none;
+}
+
+/* The composer's solid fill is a ::before layer so the centered (new-chat)
+   composer can be frosted glass and fade to solid by opacity alone, which the
+   compositor animates without repainting. */
+[data-slot="composer-host"] {
+  isolation: isolate;
+  border-radius: 24px;
+  box-shadow: 0 4px 16px rgb(0 0 0 / 3%);
+}
+
+[data-slot="composer-host"]::before {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-radius: inherit;
+  background: var(--card);
+  content: "";
+  pointer-events: none;
+}
+
+[data-chat-composer-overlay="true"][data-draft-hero="true"] [data-slot="composer-host"] {
+  background: color-mix(in srgb, var(--card) 72%, transparent);
+}
+
+[data-chat-composer-overlay="true"][data-draft-hero="true"] [data-slot="composer-host"]::before {
+  opacity: 0;
+}
+
+/* The tray tucks 20px under the composer; while the composer is see-through
+   that tucked part is clipped so it does not show as a band. */
+[data-chat-composer-overlay="true"][data-draft-hero="true"] [data-slot="composer-context-strip"] {
+  -webkit-mask-image: linear-gradient(black calc(100% - 20px), transparent calc(100% - 20px));
+  mask-image: linear-gradient(black calc(100% - 20px), transparent calc(100% - 20px));
+  background: color-mix(in srgb, var(--codex-tray) 72%, transparent);
+}
+
+html[data-codex-animations="motion"] [data-slot="composer-host"]::before {
+  transition: opacity 0.5s cubic-bezier(0.19, 1, 0.22, 1);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html[data-codex-animations="motion"] [data-slot="composer-host"]::before {
+    transition: none;
+  }
+}
+
+[data-slot="composer-host"]::after {
+  border-color: var(--codex-composer-border) !important;
+  clip-path: none !important;
+}
+
+[data-chat-composer-main-surface="true"] {
+  border-radius: 24px;
+}
+
+[data-slot="composer-context-strip"] {
+  width: calc(100% - 28px);
+  margin: 0 auto -20px;
+  padding: 7px 14px 27px 16px;
+  border-radius: 16px 16px 0 0;
+  background: var(--codex-tray);
+  color: var(--codex-text);
+  font-size: 14px;
+}
+
+[data-slot="composer-context-strip"]::before {
+  display: none;
+}
+
+[data-slot="composer-context-strip"] [data-composer-context-control],
+[data-slot="composer-context-strip"] button {
+  color: var(--codex-text);
+  font-size: 14px;
+}
+
+[data-codex-part="composer-tray"] {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  align-items: center;
+  gap: 20px;
+}
+
+[data-codex-part="composer-tray-item"] {
+  display: inline-flex;
+  min-width: 0;
+  align-items: center;
+  gap: 8px;
+  color: var(--codex-text);
+  font-size: 14px;
+  white-space: nowrap;
+}
+
+[data-codex-part="composer-tray-item"] svg {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+  stroke-width: 1.75;
+}
+
+[data-codex-part="composer-tray-worktree"] {
+  display: inline-flex;
+  margin-left: auto;
+  align-items: center;
+  gap: 10px;
+  color: var(--codex-text);
+  font-size: 14px;
+  cursor: pointer;
+}
+
+[data-codex-part="composer-tray-worktree"] input {
+  width: 16px;
+  height: 16px;
+  appearance: none;
+  border: 1px solid #d0d0d0;
+  border-radius: 5px;
+  background: #fff;
+}
+
+[data-codex-part="composer-tray-worktree"] input:checked {
+  border-color: #0d0d0d;
+  background:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M4 8.5 6.8 11 12 5.5' fill='none' stroke='white' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E")
+      center / 14px no-repeat,
+    #0d0d0d;
+}
+
+[data-codex-part="composer-tray-worktree"] input:disabled {
+  opacity: 0.5;
+}
+
+[data-testid="composer-editor"] [data-placeholder]::before,
+[data-testid="composer-editor"] .is-editor-empty::before {
+  color: var(--codex-placeholder) !important;
+}
+
+/* Footer order: + and access mode on the left; model, effort, send on the right. */
+[data-chat-composer-footer="true"] {
+  gap: 4px;
+}
+
+[data-chat-composer-controls="left"] > * {
+  order: 2;
+}
+
+[data-chat-composer-controls="left"] > [data-resting-block="mode"] {
+  order: 1;
+}
+
+/* A pseudo-element spacer: real margins would count toward the measured
+   control widths and push the labels into icon-only mode. */
+[data-chat-composer-controls="left"]::after {
+  order: 1;
+  flex: 1 1 0;
+  content: "";
+}
+
+[data-chat-composer-controls="left"] > [data-resting-block="traits"] {
+  order: 3;
+}
+
+[data-chat-composer-controls="left"] > [data-resting-controls-overflow] {
+  order: 4;
+}
+
+[data-chat-composer-controls="left"] [data-resting-block] [data-slot="separator"],
+[data-chat-composer-controls="left"] > [data-slot="separator"] {
+  display: none;
+}
+
+[data-chat-composer-actions="right"] {
+  display: contents;
+}
+
+[data-chat-composer-footer="true"] button[aria-label="Attach files"] {
+  order: -1;
+}
+
+[data-chat-composer-footer="true"] button[aria-label="Attach files"] svg {
+  width: 20px;
+  height: 20px;
+}
+
+[data-runtime-mode="full-access"],
+[data-runtime-mode="full-access"] * {
+  color: var(--codex-danger-access) !important;
+}
+
+[data-slot="composer-context-strip"] [data-codex-hidden] {
+  display: none !important;
+}
+
+[data-slot="composer-context-strip"] [data-codex-part="composer-tray"] {
+  display: contents;
+}
+
+[data-slot="composer-context-strip"] [data-codex-part="composer-tray-item"] {
+  margin-right: 12px;
+}
+
+[data-slot="composer-context-strip"]
+  > :not([data-codex-part="composer-tray"], [data-chat-resting-composer-controls-host]) {
+  order: 5;
+  margin-left: auto;
+  color: var(--muted-foreground);
+}
+
+[data-slot="composer-context-strip"] [data-codex-part="composer-tray-worktree"] {
+  order: 10;
+  margin-left: 16px;
+}
+
+/* Model and effort read as one control: "GPT-5 Codex High ⌄". */
+[data-chat-composer-controls="left"] [data-chat-provider-model-picker="true"] {
+  color: var(--codex-text);
+}
+
+[data-chat-composer-controls="left"]
+  [data-chat-provider-model-picker="true"]
+  svg.lucide-chevron-down {
+  display: none;
+}
+
+[data-chat-composer-controls="left"] [data-resting-block="traits"] button {
+  padding-inline-start: 2px;
+  color: var(--muted-foreground);
+}
+
+/* A new chat is an empty canvas, as in Codex: the thread header appears once
+   the thread exists. */
+main[data-slot="sidebar-inset"]:has([data-draft-hero="true"]) [data-chat-header] > * {
+  visibility: hidden;
+}
+
+:root.dark [data-codex-part="composer-tray-worktree"] input {
+  border-color: #4a4b50;
+  background-color: transparent;
+}
+
+/* ---------------------------------------------------------------------------
+ * Views (components/codex/codexView.ts): Activity, Projects, Tabs.
+ * ------------------------------------------------------------------------- */
+
+/* The top bar already carries window controls; the upstream brand row would
+   repeat them inside the sidebar card. */
+[data-app-sidebar] [class*="@container/sidebar-header"] {
+  display: none;
+}
+
+/* Activity: keep upstream's status pills but drop the "Working" word. The
+   dashed icon turns in 8 discrete steps per second-and-a-half: a transform
+   the compositor applies without repainting, a few times a second. */
+[data-app-sidebar] span:has(> svg.lucide-circle-dashed) > span[role="status"] {
+  display: none;
+}
+
+[data-app-sidebar] svg.lucide-circle-dashed {
+  animation: codex-working-turn 1.6s steps(8) infinite;
+  will-change: transform;
+}
+
+@keyframes codex-working-turn {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [data-app-sidebar] svg.lucide-circle-dashed {
+    animation: none;
+  }
+}
+
+@media (min-width: 768px) {
+  /* Tabs: no sidebar outside Settings, whose navigation lives there. */
+  html[data-codex-view="tabs"][data-codex-settings="false"] [data-slot="sidebar"],
+  html[data-codex-view="tabs"][data-codex-settings="false"] [data-sidebar-control] {
+    display: none !important;
+  }
+
+  html[data-codex-view="tabs"][data-codex-settings="false"] main[data-slot="sidebar-inset"] {
+    border-top-left-radius: var(--codex-card-radius);
+    box-shadow:
+      0 -0.5px 0 var(--codex-hairline),
+      -0.5px 0 0 var(--codex-hairline);
+  }
+
+  [data-codex-part="tab-strip"] {
+    display: flex;
+    min-width: 0;
+    flex: 1;
+    align-self: flex-end;
+    align-items: flex-end;
+    gap: 2px;
+    height: 36px;
+    margin-left: 10px;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+
+  [data-codex-part="tab"] {
+    -webkit-app-region: no-drag;
+    position: relative;
+    display: flex;
+    min-width: 96px;
+    max-width: 220px;
+    height: 32px;
+    flex: 0 1 220px;
+    align-items: center;
+    border-radius: 10px 10px 0 0;
+    color: var(--codex-sidebar-text);
+    font-size: 13px;
+  }
+
+  [data-codex-part="tab"]:hover {
+    background: var(--codex-chrome-hover);
+  }
+
+  /* The active tab is cut from the same card as the chat below it. */
+  [data-codex-part="tab"][data-active="true"] {
+    z-index: 1;
+    background: var(--background);
+    box-shadow:
+      0 -0.5px 0 var(--codex-hairline),
+      0.5px 0 0 var(--codex-hairline),
+      -0.5px 0 0 var(--codex-hairline);
+    color: var(--codex-text);
+  }
+
+  [data-codex-part="tab"][data-active="true"]::after {
+    position: absolute;
+    right: 0;
+    bottom: -2px;
+    left: 0;
+    height: 3px;
+    background: var(--background);
+    content: "";
+  }
+
+  [data-codex-part="tab-main"] {
+    display: flex;
+    height: 100%;
+    min-width: 0;
+    flex: 1;
+    align-items: center;
+    gap: 7px;
+    padding: 0 4px 0 12px;
+    text-align: left;
+  }
+
+  [data-codex-part="tab-title"] {
+    min-width: 0;
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  [data-codex-part="tab-close"] {
+    display: inline-flex;
+    width: 20px;
+    height: 20px;
+    flex-shrink: 0;
+    align-items: center;
+    justify-content: center;
+    margin-right: 6px;
+    border-radius: 6px;
+    color: var(--codex-chrome-icon);
+    opacity: 0;
+  }
+
+  [data-codex-part="tab"]:hover [data-codex-part="tab-close"],
+  [data-codex-part="tab"][data-active="true"] [data-codex-part="tab-close"],
+  [data-codex-part="tab-close"]:focus-visible {
+    opacity: 1;
+  }
+
+  [data-codex-part="tab-close"]:hover {
+    background: var(--codex-row-active);
+    color: var(--codex-text);
+  }
+
+  [data-codex-part="tab-close"] svg {
+    width: 13px;
+    height: 13px;
+  }
+}
+
+/* One search: the top bar's. Projects (upstream's legacy sidebar) repeats it
+   as a row above the list. */
+[data-app-sidebar]
+  [data-slot="sidebar-group"]:has(
+    > [data-slot="sidebar-menu"] [data-testid="command-palette-trigger"]
+  ) {
+  display: none;
+}
+
+/* Motion animation style (components/codex/motion): one moving surface per
+   selection. Until Motion's chunk mounts, the static backgrounds above stay. */
+[data-codex-part="rail-button"] {
+  position: relative;
+}
+
+[data-codex-part="rail-button"] svg {
+  position: relative;
+}
+
+[data-codex-part="rail-button"]:has(> [data-codex-part="rail-active-bg"]) {
+  background: transparent;
+}
+
+[data-codex-part="rail-active-bg"] {
+  position: absolute;
+  inset: 0;
+  border-radius: 10px;
+  background: var(--codex-chrome-hover);
+}
+
+[data-codex-part="tab"]:has(> [data-codex-part="tab-active-bg"]) {
+  isolation: isolate;
+  background: transparent;
+  box-shadow: none;
+}
+
+[data-codex-part="tab"]:has(> [data-codex-part="tab-active-bg"])::after {
+  display: none;
+}
+
+[data-codex-part="tab-active-bg"] {
+  position: absolute;
+  inset: 0 0 -2px;
+  z-index: -1;
+  border-radius: 10px 10px 0 0;
+  background: var(--background);
+  box-shadow:
+    0 -0.5px 0 var(--codex-hairline),
+    0.5px 0 0 var(--codex-hairline),
+    -0.5px 0 0 var(--codex-hairline);
+}
+
+/* ---------------------------------------------------------------------------
+ * New-chat background (components/codex/CodexHeroBackground.tsx). The image
+ * sits under a theme-colored scrim, so the same pictures work in light and
+ * dark themes and the headline and composer stay readable.
+ * ------------------------------------------------------------------------- */
+
+main[data-slot="sidebar-inset"]:has([data-draft-hero="true"]) {
+  isolation: isolate;
+}
+
+html[data-codex-hero-background]
+  main[data-slot="sidebar-inset"]:has([data-draft-hero="true"])::before {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background-image:
+    radial-gradient(
+      ellipse 70% 60% at 50% 48%,
+      color-mix(in srgb, var(--background) 78%, transparent) 0%,
+      color-mix(in srgb, var(--background) 42%, transparent) 70%,
+      color-mix(in srgb, var(--background) 30%, transparent) 100%
+    ),
+    var(--codex-hero-image);
+  background-position: center;
+  background-size: cover;
+  content: "";
+  pointer-events: none;
+}
+
+html[data-codex-animations="motion"][data-codex-hero-background]
+  main[data-slot="sidebar-inset"]:has([data-draft-hero="true"])::before {
+  animation: codex-hero-background-in 0.9s cubic-bezier(0.19, 1, 0.22, 1) both;
+}
+
+@keyframes codex-hero-background-in {
+  from {
+    opacity: 0;
+    transform: scale(1.04);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html[data-codex-hero-background]
+    main[data-slot="sidebar-inset"]:has([data-draft-hero="true"])::before {
+    animation: none;
+  }
+}
+
+/* The chat view's full-bleed containers paint the theme background; on a new
+   chat they stay see-through so the image shows. */
+html[data-codex-hero-background]
+  main[data-slot="sidebar-inset"]:has([data-draft-hero="true"])
+  :is([data-chat-header], [class~="bg-background"]) {
+  background-color: transparent;
+}
+
+[data-codex-part="background-grid"] {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(104px, 1fr));
+  gap: 10px;
+  padding: 4px 16px 16px;
+}
+
+[data-codex-part="background-tile"] {
+  position: relative;
+  aspect-ratio: 16 / 10;
+  overflow: hidden;
+  border-radius: 10px;
+  box-shadow: 0 0 0 1px var(--border);
+}
+
+[data-codex-part="background-tile"][data-selected="true"] {
+  box-shadow:
+    0 0 0 2px var(--background),
+    0 0 0 4px var(--foreground);
+}
+
+[data-codex-part="background-tile"] > button:first-child {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+[data-codex-part="background-tile"] img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+[data-codex-part="background-tile-action"] {
+  display: flex !important;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  background: var(--muted);
+  color: var(--muted-foreground);
+  font-size: 12px;
+}
+
+[data-codex-part="background-tile-action"]:hover {
+  color: var(--foreground);
+}
+
+[data-codex-part="background-tile-action"] svg {
+  width: 18px;
+  height: 18px;
+}
+
+[data-codex-part="background-tile-remove"] {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  display: inline-flex;
+  width: 20px;
+  height: 20px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  background: rgb(0 0 0 / 55%);
+  color: white;
+  opacity: 0;
+}
+
+[data-codex-part="background-tile"]:hover [data-codex-part="background-tile-remove"],
+[data-codex-part="background-tile-remove"]:focus-visible {
+  opacity: 1;
+}
+
+[data-codex-part="background-tile-remove"] svg {
+  width: 12px;
+  height: 12px;
+}
+
+/* Projects view (upstream LegacySidebar). A collapsed project keeps an empty
+   thread list whose left border draws a short tick under the row. */
+[data-app-sidebar] [data-slot="sidebar-menu-sub"]:empty {
+  display: none;
+}
+
+/* The "Projects" heading reads like Codex's section labels. */
+[data-app-sidebar] [data-slot="sidebar-group"] > div[class~="justify-between"]:first-child {
+  height: 32px;
+  margin: 6px 0 2px;
+  padding-left: 8px;
+}
+
+[data-app-sidebar] [data-slot="sidebar-group"] > div[class~="justify-between"]:first-child > span {
+  color: var(--codex-label);
+  font-size: 14px;
+  font-weight: 400;
+}
+
+/* Tab labels: the project's icon, or its name when it has none, then the chat. */
+[data-codex-part="tab-project-icon"] {
+  display: inline-flex;
+  flex-shrink: 0;
+}
+
+[data-codex-part="tab-project-name"] {
+  max-width: 45%;
+  flex-shrink: 0;
+  overflow: hidden;
+  color: var(--codex-label);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+[data-codex-part="tab-new-slot"] {
+  display: flex;
+  flex-shrink: 0;
+}
+
+[data-codex-part="tab-new"] {
+  -webkit-app-region: no-drag;
+  display: inline-flex;
+  width: 28px;
+  height: 28px;
+  flex-shrink: 0;
+  align-self: center;
+  align-items: center;
+  justify-content: center;
+  margin-left: 4px;
+  border-radius: 8px;
+  color: var(--codex-chrome-icon);
+}
+
+[data-codex-part="tab-new"]:hover {
+  background: var(--codex-chrome-hover);
+  color: var(--codex-text);
+}
+
+[data-codex-part="tab-new"] svg {
+  width: 17px;
+  height: 17px;
+  stroke-width: 1.75;
+}
+
+/* Motion drives the sidebar's open and close (CodexMotion.tsx), so upstream's
+   left/width transition stays off; it would relayout the chat every frame. */
+html[data-codex-animations="motion"]
+  :is([data-slot="sidebar-container"], [data-slot="sidebar-gap"]) {
+  transition: none !important;
+}

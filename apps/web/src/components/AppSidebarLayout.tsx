@@ -32,7 +32,8 @@ import {
   usePanelNavigationSuppression,
 } from "../panelAnimations";
 import LegacyThreadSidebar from "./LegacySidebar";
-import ThreadSidebar from "./Sidebar";
+import { CodexChromeBar, CodexIconRail } from "./codex/CodexChrome";
+import CodexViewSidebar from "./codex/CodexViewSidebar";
 import { SettingsSidebarNav } from "./settings/SettingsSidebarNav";
 import { SidebarChromeHeader } from "./sidebar/SidebarChrome";
 import { MainAppLocationTracker } from "./sidebar/mainAppLocation";
@@ -300,6 +301,8 @@ export function AppSidebarLayout({ children }: { children: ReactNode }) {
         style={sidebarProviderStyle}
       >
         <ProjectProjectionRetention />
+        <CodexChromeBar />
+        <CodexIconRail />
         <Sidebar
           side="left"
           collapsible="offcanvas"
@@ -324,7 +327,7 @@ export function AppSidebarLayout({ children }: { children: ReactNode }) {
           ) : legacySidebarEnabled ? (
             <LegacyThreadSidebar />
           ) : (
-            <ThreadSidebar />
+            <CodexViewSidebar />
           )}
           <SidebarRail onDoubleClick={resetSidebarWidth} />
         </Sidebar>

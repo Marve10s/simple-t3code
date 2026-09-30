@@ -168,3 +168,43 @@ Full glossary with file links: `docs/internals/glossary.md`
 
 - Don't verify with browsers or computer use unless the user explicitly agrees or requests it.
 - Security is important, but should not be over-indexed on, especially for dev mode/maintainer-only features.
+
+## SimpleT3Code fork
+
+This checkout is SimpleT3Code, a personal fork of T3 Code restyled after the Codex desktop app. Upstream (`pingdotgg/t3code`) owns the product and we merge its `main` often, so the fork's first rule is to keep those merges cheap. These notes override the upstream guidance above where they conflict.
+
+### Keep upstream merges cheap
+
+- Put fork code in fork-owned files: `apps/web/src/simple-codex.css`, `apps/web/src/components/codex/`, `apps/desktop/src/app/DesktopT3CodeHistoryImport.ts`, `assets/simple/`, and `apps/web/public/backgrounds/`.
+- Touch upstream files only with small hooks: a data attribute, a one-line mount, a swapped import. Never reformat, reorder, or restructure upstream code, and run `vp fmt` only on the files you changed.
+- Restyle upstream components from `simple-codex.css`, keyed on upstream `data-slot` attributes or our own `data-codex-part` attributes. The lint rule rejects class names Tailwind does not know, so fork hooks use `data-codex-part`, not classes. Keep the CSS unlayered so it wins over Tailwind utilities.
+- Store fork-only preferences in local storage under `simplet3code:` keys (see `codexView.ts`, `codexAnimations.ts`, `codexBackgrounds.ts`) rather than adding fields to upstream settings contracts.
+
+### Identity and data
+
+- The desktop app is `SimpleT3Code` (`com.marve10s.simplet3code`) with the URL scheme `simplet3code`. It stores data in `~/.simplet3` and its Electron profile in `~/Library/Application Support/simplet3code`, and has no update feed, so it can never update itself into upstream T3 Code.
+- On first launch, when `~/.simplet3/userdata/state.sqlite` does not exist yet, it copies T3 Code's history from `~/.t3/userdata` with `VACUUM INTO`. Two servers must never share one live event store, so never point SimpleT3Code at `~/.t3`.
+- Desktop tests assert SimpleT3Code names and paths. When upstream adds identity tests, update the expected strings instead of reverting the identity.
+
+### Layout
+
+- Three sidebar views, chosen from the rail's "…" menu: Activity (upstream `Sidebar`), Projects (upstream `LegacySidebar`), and Tabs (no sidebar; open chats as tabs in the top bar, see `CodexTabStrip.tsx`).
+- The top bar, icon rail, composer tray, and new-chat background are fork components mounted from `AppSidebarLayout`, `BranchToolbar`, and `CodexChrome`.
+- The composer's model picker (`components/codex/picker/`) follows Synara's original design: providers in a column with a flyout of models, plus effort, fast mode, and the other model options in one control. It swaps in for upstream's `ProviderModelPicker` in `ChatComposer`, reads and saves options through the same draft-store call as upstream's `TraitsMenuContent`, and falls back to upstream's picker while several models are selected.
+
+### Animations
+
+- Settings → Appearance → Motion → Animation style has two options. Standard runs upstream's animations only. Motion, the default, adds transitions built with the `motion` library.
+- Import `motion` only from `components/codex/motion/`, and load that folder only through the lazy imports in `codexAnimations.ts`. With Standard selected the Motion chunk is never downloaded, parsed, or run; keep it that way and check it after changes (the Motion chunk must not appear in the main bundle).
+- Animate transform and opacity only, honor reduced motion, and leave nothing animating when idle. When upstream code runs its own Web Animation, feed it Motion's timing (`codexMotionTiming.ts`) instead of replacing it.
+
+### New-chat backgrounds
+
+- Bundled images live in `apps/web/public/backgrounds` as 1920px WebP plus a 360px thumbnail, with titles and credits in `codexBackgrounds.ts`. Use only public-domain works (for example The Met Open Access) or photos under the Unsplash License, and credit them.
+- User images stay on the device in IndexedDB (`codexBackgroundStore.ts`), downscaled on import.
+
+### Building, installing, and testing
+
+- Package with `node scripts/build-desktop-artifact.ts --platform mac --target zip --arch arm64 --output-dir <dir>`, then copy `SimpleT3Code.app` into `/Applications`. Do not replace the installed app while it is running; ask the developer to quit it first.
+- To test a build, launch `apps/desktop` with `T3CODE_HOME` pointing at a `VACUUM INTO` snapshot. Never override `HOME`: macOS then cannot find the login keychain and shows the developer a keychain prompt. The test app shares the installed app's Electron profile, so run it only while the installed app is closed, and restore any `simplet3code:` local storage keys you change.
+- Shells started by T3 Code set `ELECTRON_RUN_AS_NODE=1`; unset it before launching any Electron app, or it runs as plain Node and exits.

@@ -172,6 +172,8 @@ import {
 import { searchableSetting } from "./settingsSearch";
 import { ProjectFavicon } from "../ProjectFavicon";
 import { PanelAnimationsPreview } from "./PanelAnimationsPreview";
+import { CodexAnimationSetting } from "../codex/CodexAnimationSetting";
+import { CodexBackgroundSettings } from "../codex/CodexBackgroundSettings";
 
 const ENVIRONMENT_IDENTIFICATION_LABELS: Record<EnvironmentIdentificationMode, string> = {
   artwork: "Artwork",
@@ -1428,6 +1430,7 @@ export function AppearanceSettingsPanel() {
       </SettingsSection>
 
       <SettingsSection id="motion" title="Motion">
+        <CodexAnimationSetting />
         <SettingsRow
           {...searchableSetting("panel-animations")}
           description="Set how fast panels open and close."
@@ -1480,6 +1483,8 @@ export function AppearanceSettingsPanel() {
           }
         />
       </SettingsSection>
+
+      <CodexBackgroundSettings />
 
       <TypographySection />
     </SettingsPageContainer>

@@ -369,6 +369,8 @@ import { ChatComposer, type ChatComposerHandle } from "./chat/ChatComposer";
 import { createPageScrollController, type PageScrollKey } from "./chat/pageScrollController";
 import { isTimelineScrollTarget } from "./chat/timelineScrollTarget";
 import { DraftHeroHeadline } from "./chat/DraftHeroHeadline";
+import { useCodexHeroMotion } from "./codex/codexAnimations";
+import { getCodexHeroTransitionTiming } from "./codex/codexMotionTiming";
 import { ExpandedImageDialog } from "./chat/ExpandedImageDialog";
 import { PullRequestThreadDialog } from "./PullRequestThreadDialog";
 import { MessagesTimeline } from "./chat/MessagesTimeline";
@@ -584,14 +586,15 @@ function useDraftHeroLayoutTransition(
       const translateX = previousComposerRect.left - nextComposerRect.left;
       const translateY = previousComposerRect.top - nextComposerRect.top;
       if (Math.abs(translateX) >= 0.5 || Math.abs(translateY) >= 0.5) {
+        const motionTiming = getCodexHeroTransitionTiming();
         const animation = transitionGroup.animate(
           [
             { transform: `translate3d(${translateX}px, ${translateY}px, 0)` },
             { transform: "translate3d(0, 0, 0)" },
           ],
           {
-            duration: animationDurationMs,
-            easing: DRAFT_HERO_TRANSITION_EASING,
+            duration: motionTiming?.durationMs ?? animationDurationMs,
+            easing: motionTiming?.easing ?? DRAFT_HERO_TRANSITION_EASING,
           },
         );
         animation.id = DRAFT_HERO_TRANSITION_ANIMATION_ID;
@@ -2057,6 +2060,8 @@ export default function ChatView(props: ChatViewProps) {
   const rightPanelOpen = rightPanelState.isOpen;
   const { active: panelAnimationsActive, durationMs: panelAnimationDurationMs } =
     usePanelAnimationSettings();
+  // SimpleT3Code: the new-chat composer glides down only with Motion animations on.
+  const codexHeroMotion = useCodexHeroMotion();
   const activeTerminalDrawerPresence = usePanelPresence(
     Boolean(activeThreadKey && terminalUiState.terminalOpen),
     true,
@@ -3617,11 +3622,7 @@ export default function ChatView(props: ChatViewProps) {
     attachDraftHeroTransitionGroupRef,
     attachDraftHeroComposerAnchorRef,
     captureDraftHeroComposerRect,
-  ] = useDraftHeroLayoutTransition(
-    isDraftHeroState,
-    panelAnimationsActive,
-    panelAnimationDurationMs,
-  );
+  ] = useDraftHeroLayoutTransition(isDraftHeroState, codexHeroMotion, panelAnimationDurationMs);
 
   const gitCwd = activeProject
     ? projectScriptCwd({
@@ -9936,6 +9937,7 @@ export default function ChatView(props: ChatViewProps) {
               ref={setComposerOverlayElement}
               inert={isRevertingCheckpoint}
               data-chat-composer-overlay="true"
+              data-draft-hero={isDraftHeroState ? "true" : undefined}
               className={
                 isDraftHeroState
                   ? "pointer-events-none absolute inset-0 z-20 flex items-center"
@@ -9951,7 +9953,7 @@ export default function ChatView(props: ChatViewProps) {
                   className="group/composer-stack pointer-events-auto relative z-10 mx-auto w-full max-w-(--chat-max-width)"
                 >
                   {isDraftHeroState ? (
-                    <div className="absolute inset-x-0 bottom-full z-0">
+                    <div className="absolute inset-x-0 bottom-full z-0" data-codex-hero-headline="">
                       <div
                         className="pb-8 group-has-data-[composer-shoulder-tab]/composer-stack:pb-4"
                         style={

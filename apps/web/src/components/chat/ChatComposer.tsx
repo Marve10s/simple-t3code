@@ -243,7 +243,7 @@ import {
 } from "~/state/pullRequests";
 import { useEnvironmentQuery } from "~/state/query";
 import { useDebouncedValue } from "~/state/queries";
-import { ProviderModelPicker } from "./ProviderModelPicker";
+import { CodexModelPicker } from "../codex/picker/CodexModelPicker";
 import { resolveModelPickerSelectedModel } from "./ModelPickerContent";
 import { type ComposerCommandItem, ComposerCommandMenu } from "./ComposerCommandMenu";
 import { ComposerPendingApprovalActions } from "./ComposerPendingApprovalActions";
@@ -936,7 +936,7 @@ import {
   FileIcon,
   BotIcon,
   CircleAlertIcon,
-  PaperclipIcon,
+  PlusIcon,
   PencilRulerIcon,
   PlayIcon,
   ShieldIcon,
@@ -1148,6 +1148,7 @@ const ComposerFooterModeControls = memo(function ComposerFooterModeControls(prop
                 data-composer-shortcut="composer.mode"
                 size={size}
                 aria-label="Runtime mode"
+                data-runtime-mode={props.runtimeMode}
               />
             }
           >
@@ -5016,7 +5017,12 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
           data-resting-controls-separator="true"
         />
       ) : null}
-      <ProviderModelPicker
+      <CodexModelPicker
+        traits={
+          "threadRef" in providerTraitsPickerInput || "draftId" in providerTraitsPickerInput
+            ? providerTraitsPickerInput
+            : null
+        }
         isComposerOwned
         disabled={providerCatalogPending || isSendBusy}
         {...(routeKind === "draft" && supportsMultipleModels
@@ -7006,7 +7012,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
                             />
                           }
                         >
-                          <PaperclipIcon />
+                          <PlusIcon />
                         </TooltipTrigger>
                         <TooltipPopup>Attach files</TooltipPopup>
                       </Tooltip>

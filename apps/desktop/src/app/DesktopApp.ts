@@ -28,6 +28,7 @@ import * as DesktopServerExposure from "../backend/DesktopServerExposure.ts";
 import * as DesktopAppSettings from "../settings/DesktopAppSettings.ts";
 import * as DesktopShellEnvironment from "../shell/DesktopShellEnvironment.ts";
 import * as DesktopState from "./DesktopState.ts";
+import { importT3CodeHistory } from "./DesktopT3CodeHistoryImport.ts";
 import * as DesktopRemoteUpdates from "../updates/DesktopRemoteUpdates.ts";
 import * as DesktopUpdates from "../updates/DesktopUpdates.ts";
 import * as DesktopSnapShot from "../snapShot/DesktopSnapShot.ts";
@@ -242,6 +243,20 @@ const bootstrap = Effect.gen(function* () {
     // primary, so no splash there.)
     if (settings.wslOnly === true && settings.wslBackendEnabled === true) {
       yield* desktopWindow.showConnectingSplash;
+    }
+    if (
+      !environment.isDevelopment &&
+      environment.baseDir === environment.path.join(environment.homeDirectory, ".simplet3")
+    ) {
+      yield* Effect.try(() =>
+        importT3CodeHistory({
+          homeDirectory: environment.homeDirectory,
+          stateDir: environment.stateDir,
+        }),
+      ).pipe(
+        Effect.flatMap((result) => logBootstrapInfo("T3 Code history import", result)),
+        Effect.catch((error) => logBootstrapWarning("T3 Code history import failed", { error })),
+      );
     }
     yield* primaryBackend.start;
     yield* logBootstrapInfo("bootstrap backend start requested");

@@ -1,0 +1,344 @@
+/* SimpleT3Code model picker (CodexModelPicker.tsx). Plain, unlayered CSS keyed
+   on data-codex-part so upstream Tailwind classes never collide with it. */
+
+[data-codex-model-picker] {
+  gap: 6px;
+}
+
+[data-codex-part="picker-trigger-model"] {
+  overflow: hidden;
+  color: var(--foreground);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+[data-codex-part="picker-trigger-effort"] {
+  color: var(--muted-foreground);
+  white-space: nowrap;
+}
+
+[data-codex-part="picker-trigger-fast"] {
+  width: 13px;
+  height: 13px;
+  flex-shrink: 0;
+  fill: currentColor;
+  color: #f59e0b;
+}
+
+/* The picker takes over effort, so the separate effort pill stays hidden. */
+[data-chat-composer-controls]:has([data-codex-model-picker]) [data-resting-block="traits"],
+[data-chat-resting-composer-controls-host]:has([data-codex-model-picker])
+  [data-resting-block="traits"] {
+  display: none !important;
+}
+
+/* The popover's own chrome is replaced by the picker's cards, so the flyout
+   can sit beside the main panel instead of being clipped by it. */
+[data-slot="popover-popup"]:has([data-codex-part="picker"]) {
+  border: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  -webkit-backdrop-filter: none !important;
+  backdrop-filter: none !important;
+}
+
+[data-slot="popover-viewport"]:has([data-codex-part="picker"]) {
+  overflow: visible !important;
+}
+
+[data-codex-part="picker-column"] {
+  border: 1px solid var(--border);
+  border-radius: var(--picker-radius);
+  background: var(--popover);
+  box-shadow:
+    0 16px 40px -18px rgb(0 0 0 / 35%),
+    0 2px 6px rgb(0 0 0 / 5%);
+}
+
+[data-codex-part="picker"] {
+  --picker-row: 30px;
+  --picker-radius: 14px;
+  position: relative;
+  color: var(--popover-foreground);
+  font-size: 13px;
+}
+
+/* Rows shared by every design. */
+[data-codex-part="picker-row"] {
+  position: relative;
+  display: flex;
+  width: 100%;
+  min-height: var(--picker-row);
+  align-items: center;
+  gap: 8px;
+  border-radius: 8px;
+  padding: 0 8px;
+  text-align: left;
+}
+
+[data-codex-part="picker-row"]:is(button, label):hover,
+[data-codex-part="picker-row"][data-kind="model"]:hover,
+[data-codex-part="picker-row"][data-active="true"][data-kind="provider"] {
+  background: var(--accent);
+}
+
+[data-codex-part="picker-row"][data-muted="true"] {
+  color: var(--muted-foreground);
+}
+
+[data-codex-part="picker-row"][data-kind="option"] {
+  min-height: 0;
+  padding-block: 6px;
+}
+
+[data-codex-part="picker-row"][data-kind="model"] {
+  padding: 0 4px 0 0;
+}
+
+[data-codex-part="picker-row-main"] {
+  display: flex;
+  height: var(--picker-row);
+  min-width: 0;
+  flex: 1;
+  align-items: center;
+  gap: 8px;
+  border-radius: inherit;
+  padding: 0 4px 0 8px;
+  text-align: left;
+}
+
+[data-codex-part="picker-row-main"]:disabled {
+  cursor: not-allowed;
+}
+
+[data-codex-part="picker-row-label"] {
+  min-width: 0;
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+[data-codex-part="picker-row-text"] {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  flex-direction: column;
+  gap: 1px;
+}
+
+[data-codex-part="picker-row-text"] [data-codex-part="picker-row-label"] {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+[data-codex-part="picker-row-description"] {
+  color: var(--muted-foreground);
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+[data-codex-part="picker-row-value"] {
+  color: var(--muted-foreground);
+}
+
+[data-codex-part="picker-row-icon"] {
+  width: 15px;
+  height: 15px;
+  flex-shrink: 0;
+  color: var(--muted-foreground);
+  stroke-width: 1.75;
+}
+
+[data-codex-part="picker-row-icon"][data-on="true"] {
+  fill: currentColor;
+  color: #f59e0b;
+}
+
+[data-codex-part="picker-chevron"] {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+  color: var(--muted-foreground);
+}
+
+[data-codex-part="picker-check"] {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+  color: var(--foreground);
+}
+
+[data-codex-part="picker-dot"] {
+  width: 6px;
+  height: 6px;
+  flex-shrink: 0;
+  border-radius: 999px;
+  background: var(--foreground);
+  opacity: 0.55;
+}
+
+[data-codex-part="picker-tag"] {
+  flex-shrink: 0;
+  border-radius: 5px;
+  padding: 1px 5px;
+  background: color-mix(in srgb, var(--foreground) 7%, transparent);
+  color: var(--muted-foreground);
+  font-size: 10.5px;
+  font-weight: 500;
+}
+
+[data-codex-part="picker-star"] {
+  display: inline-flex;
+  width: 24px;
+  height: 24px;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  color: var(--muted-foreground);
+  opacity: 0;
+}
+
+[data-codex-part="picker-row"]:hover [data-codex-part="picker-star"],
+[data-codex-part="picker-star"][data-on="true"],
+[data-codex-part="picker-star"]:focus-visible {
+  opacity: 1;
+}
+
+[data-codex-part="picker-star"][data-on="true"] {
+  color: #f59e0b;
+}
+
+[data-codex-part="picker-star"][data-on="true"] svg {
+  fill: currentColor;
+}
+
+[data-codex-part="picker-star"] svg {
+  width: 13px;
+  height: 13px;
+}
+
+[data-codex-part="picker-divider"] {
+  height: 1px;
+  margin: 4px 8px;
+  background: var(--border);
+}
+
+[data-codex-part="picker-group-label"] {
+  padding: 8px 8px 4px;
+  color: var(--muted-foreground);
+  font-size: 11.5px;
+}
+
+[data-codex-part="picker-note"] {
+  margin: 0;
+  padding: 2px 8px 6px;
+  color: var(--muted-foreground);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+[data-codex-part="picker-search"] {
+  display: flex;
+  height: 32px;
+  flex: 1;
+  align-items: center;
+  gap: 7px;
+  margin: 6px;
+  border-radius: 9px;
+  padding: 0 9px;
+  background: color-mix(in srgb, var(--foreground) 5%, transparent);
+  color: var(--muted-foreground);
+}
+
+[data-codex-part="picker-search"] svg {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+}
+
+[data-codex-part="picker-search"] input {
+  min-width: 0;
+  flex: 1;
+  background: transparent;
+  color: var(--foreground);
+  outline: none;
+}
+
+[data-codex-part="picker-scroll"] {
+  max-height: 260px;
+  overflow-y: auto;
+  padding: 2px 6px 6px;
+  overscroll-behavior: contain;
+}
+
+[data-codex-part="picker-extras"] {
+  display: flex;
+  flex-direction: column;
+}
+
+[data-codex-part="picker-segmented"] {
+  display: inline-flex;
+  flex-shrink: 0;
+  gap: 2px;
+  border-radius: 8px;
+  padding: 2px;
+  background: color-mix(in srgb, var(--foreground) 6%, transparent);
+}
+
+[data-codex-part="picker-segmented"] button {
+  border-radius: 6px;
+  padding: 2px 8px;
+  color: var(--muted-foreground);
+  font-size: 12px;
+}
+
+[data-codex-part="picker-segmented"] button[data-active="true"] {
+  background: var(--popover);
+  box-shadow: 0 1px 2px rgb(0 0 0 / 12%);
+  color: var(--foreground);
+}
+
+[data-codex-part="picker-classic"] {
+  position: relative;
+}
+
+[data-codex-part="picker-column"] {
+  width: 244px;
+  padding: 4px;
+}
+
+/* The trigger sits at the composer's right edge, so the flyout opens to the left. */
+[data-codex-part="picker-flyout"] {
+  position: absolute;
+  right: calc(100% + 6px);
+  width: 268px;
+  border: 1px solid var(--border);
+  border-radius: var(--picker-radius);
+  padding-bottom: 4px;
+  background: var(--popover);
+  box-shadow:
+    0 12px 32px -12px rgb(0 0 0 / 28%),
+    0 2px 6px rgb(0 0 0 / 6%);
+}
+
+/* Popups enter with a short rise when Motion animations are on. */
+html[data-codex-animations="motion"] [data-codex-part="picker-flyout"] {
+  animation: codex-picker-pop 0.16s cubic-bezier(0.19, 1, 0.22, 1);
+}
+
+@keyframes codex-picker-pop {
+  from {
+    opacity: 0;
+    transform: translateX(4px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [data-codex-part="picker-flyout"] {
+    animation: none !important;
+    transition: none !important;
+  }
+}

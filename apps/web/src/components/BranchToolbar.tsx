@@ -55,6 +55,7 @@ import { Separator } from "./ui/separator";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "./ui/tooltip";
 import { MiddleTruncate } from "./ui/middle-truncate";
 import { ComposerSurface } from "./chat/ComposerSurface";
+import { CodexComposerTray } from "./codex/CodexComposerTray";
 import { useComposerMenuProps } from "./chat/composerEventScope";
 import { measureRestingComposerControls } from "./chat/restingComposerControlsMeasurement";
 import { resolveRestingComposerControlsNaturalWidth } from "./composerFooterLayout";
@@ -629,8 +630,21 @@ export const BranchToolbar = memo(function BranchToolbar({
         !contextStripVisible && "pointer-events-none invisible absolute inset-x-0 top-full",
       )}
     >
+      <CodexComposerTray
+        projectTitle={activeProject.title}
+        environmentLabel={
+          activeEnvironmentOption && !activeEnvironmentOption.isPrimary
+            ? activeEnvironmentOption.label
+            : null
+        }
+        isRemoteEnvironment={activeEnvironmentOption?.isPrimary === false}
+        showWorktreeToggle={showGitControls}
+        worktreeChecked={effectiveEnvMode === "worktree"}
+        worktreeLocked={envModeLocked || forceNewWorktree}
+        onWorktreeChange={onEnvModeChange}
+      />
       {showGitControls ? (
-        <div className="contents @3xl/composer-surface:hidden">
+        <div className="contents @3xl/composer-surface:hidden" data-codex-hidden="">
           <MobileRunContextSelector
             forceNewWorktree={forceNewWorktree}
             autoEnvironmentLabel={autoEnvironmentLabel}
@@ -653,6 +667,7 @@ export const BranchToolbar = memo(function BranchToolbar({
       ) : null}
       {showGitControls || showEnvironmentIndicator ? (
         <div
+          data-codex-hidden=""
           className={cn(
             "min-h-7 min-w-10 items-center gap-1 sm:min-h-6",
             showGitControls ? "hidden @3xl/composer-surface:flex" : "flex",
