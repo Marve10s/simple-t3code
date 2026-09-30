@@ -7,6 +7,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { isLocalEnvironmentDisabled } from "../localEnvironment";
 import { isElectron } from "../env";
 import { NoProjectsHero } from "../components/NoProjectsHero";
+import { CodexIndexLanding } from "../components/codex/CodexIndexLanding";
 import { sortScopedProjectsForSidebar } from "../components/Sidebar.logic";
 import { Button } from "../components/ui/button";
 import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from "../components/ui/empty";
@@ -31,7 +32,11 @@ function ChatIndexRouteView() {
     if (environments.length === 0) return <HostedStaticOnboardingState />;
   }
 
-  return <IndexDraftLanding />;
+  return (
+    <CodexIndexLanding>
+      <IndexDraftLanding />
+    </CodexIndexLanding>
+  );
 }
 
 function IndexDraftLanding() {

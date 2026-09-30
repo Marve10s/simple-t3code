@@ -17,7 +17,7 @@ import { openCommandPalette } from "../../commandPaletteBus";
 import { isElectron } from "../../env";
 import { cn } from "../../lib/utils";
 import { readPullRequestListPreferences } from "../pullRequest/pullRequestListPreferences";
-import { isSidebarUtilityPage } from "../sidebar/mainAppLocation";
+import { isSidebarUtilityPage, useNavigateToMainApp } from "../sidebar/mainAppLocation";
 import { SidebarUpdatePill } from "../sidebar/SidebarUpdatePill";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
 import {
@@ -178,6 +178,7 @@ function RailViewToggle() {
 
 export function CodexIconRail() {
   const navigate = useNavigate();
+  const navigateToMainApp = useNavigateToMainApp();
   const pathname = useLocation({ select: (location) => location.pathname });
 
   return (
@@ -186,7 +187,7 @@ export function CodexIconRail() {
         icon={HouseIcon}
         label="Home"
         active={!isSidebarUtilityPage(pathname)}
-        onClick={() => void navigate({ to: "/" })}
+        onClick={() => void navigateToMainApp()}
       />
       <RailItem
         icon={LibraryBigIcon}

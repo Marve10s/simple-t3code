@@ -24,6 +24,7 @@ import { Menu, MenuGroup, MenuGroupLabel, MenuItem, MenuPopup, MenuTrigger } fro
 import { resolveThreadRouteTarget } from "../../threadRoutes";
 import { type CodexTab, closeCodexTab, openCodexTab, useCodexTabsStore } from "./codexTabs";
 import { ThreadMark, useThreadMarkTones } from "./CodexThreadStatus";
+import { useCodexTabShortcuts } from "./useCodexTabShortcuts";
 
 export function useCodexTabStrip() {
   const navigate = useNavigate();
@@ -101,23 +102,23 @@ export function useCodexTabStrip() {
 
   const openTab = (tab: CodexTab) => {
     if (tab.kind === "thread") {
-      void navigate({
+      return navigate({
         to: "/$environmentId/$threadId",
         params: { environmentId: tab.environmentId, threadId: tab.threadId },
       });
     } else {
-      void navigate({ to: "/draft/$draftId", params: { draftId: tab.draftId } });
+      return navigate({ to: "/draft/$draftId", params: { draftId: tab.draftId } });
     }
   };
 
-  const closeTab = (event: MouseEvent, tab: CodexTab) => {
+  const closeTab = async (event: MouseEvent, tab: CodexTab) => {
     event.stopPropagation();
     event.preventDefault();
     const { tabs: next, neighbor } = closeCodexTab(useCodexTabsStore.getState().tabs, tab.key);
     setTabs(next);
     if (tab.key === activeKey) {
-      if (neighbor) openTab(neighbor);
-      else void navigate({ to: "/" });
+      if (neighbor) await openTab(neighbor);
+      else await navigate({ to: "/", state: { codexTabsClosed: true } });
     }
     if (tab.kind === "draft") {
       const { getComposerDraft, clearDraftThread } = useComposerDraftStore.getState();
@@ -126,6 +127,8 @@ export function useCodexTabStrip() {
       }
     }
   };
+
+  useCodexTabShortcuts(activeKey, openTab);
 
   const titleFor = (tab: CodexTab) =>
     (tab.kind === "thread" ? threadByKey.get(tab.key)?.title : undefined) ?? "New chat";
