@@ -100,7 +100,7 @@ T3 Code changes every day and we merge it often. Every line we change in an upst
 - Store fork-only preferences in local storage under `simplet3code:` keys instead of changing upstream settings.
 - Don't write comments or tests. The codebase has neither, and the merge script removes any that arrive.
 
-[AGENTS.md](./AGENTS.md#simplet3code-fork) has the full set of rules, which also apply to coding agents.
+[AGENTS.md](./AGENTS.md) has the full set of rules, which also apply to coding agents.
 
 <br>
 
@@ -114,7 +114,7 @@ pnpm merge-upstream
 The script fetches T3 Code's `main` and merges it without committing. It then:
 
 1. Keeps test files and anything else the fork deleted out of the tree.
-2. Keeps our README and CONTRIBUTING when upstream edits them.
+2. Leaves documentation conflicts for manual resolution. Keep fork-specific policies and incorporate useful new upstream guidance.
 3. Strips comments and formats the code.
 4. Lists the conflicts left to resolve by hand.
 

@@ -16,8 +16,6 @@ function isTestPath(path: string): boolean {
   return !path.startsWith(".repos/") && TEST_PATH.test(path);
 }
 
-const FORK_OWNED = new Set(["README.md", "CONTRIBUTING.md"]);
-
 const ref =
   process.argv[2] ?? (lines(git("remote")).includes("upstream") ? "upstream/main" : "origin/main");
 const remote = ref.includes("/") ? ref.slice(0, ref.indexOf("/")) : "origin";
@@ -37,13 +35,6 @@ const addedTests = lines(git("diff", "--cached", "--name-only", "--diff-filter=A
 );
 const dropped = [...new Set([...deletedByUs, ...testConflicts, ...addedTests])];
 if (dropped.length > 0) git("rm", "-q", "-f", "--", ...dropped);
-const forkOwned = lines(git("diff", "--name-only", "--diff-filter=U")).filter((path) =>
-  FORK_OWNED.has(path),
-);
-if (forkOwned.length > 0) {
-  git("checkout", "--ours", "--", ...forkOwned);
-  git("add", "--", ...forkOwned);
-}
 
 NodeChildProcess.execFileSync("node", ["scripts/strip-comments.ts", "--write"], {
   stdio: "inherit",
