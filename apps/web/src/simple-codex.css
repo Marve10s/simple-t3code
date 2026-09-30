@@ -286,6 +286,23 @@ html[data-theme-id=""].dark [data-app-sidebar] {
   }
 }
 
+[data-codex-part="notification-row"] {
+  display: flex;
+  align-items: center;
+}
+
+[data-codex-part="notification-open"] {
+  min-width: 0;
+  flex: 1;
+}
+
+[data-codex-part="notification-dismiss"] {
+  width: 28px;
+  flex-shrink: 0;
+  justify-content: center;
+  padding-inline: 4px;
+}
+
 [data-codex-part="thread-mark"] {
   display: block;
   width: 7px;

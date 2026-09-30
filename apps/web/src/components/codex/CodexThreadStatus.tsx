@@ -2,15 +2,17 @@ import { scopedThreadKey, scopeThreadRef } from "@t3tools/client-runtime/environ
 import type { EnvironmentThreadShell } from "@t3tools/client-runtime/state/models";
 import { threadWokeAt } from "@t3tools/client-runtime/state/thread-settled";
 import { useNavigate } from "@tanstack/react-router";
-import { BellIcon } from "lucide-react";
+import * as Schema from "effect/Schema";
+import { BellIcon, XIcon } from "lucide-react";
 import { useMemo } from "react";
 
+import { useLocalStorage } from "../../hooks/useLocalStorage";
 import { useNowMinute } from "../../hooks/useNowMinute";
 import { useThreadShells } from "../../state/entities";
 import { buildThreadRouteParams } from "../../threadRoutes";
 import { useUiStateStore } from "../../uiStateStore";
 import { hasUnseenCompletion, resolveSidebarThreadStatus } from "../Sidebar.logic";
-import { Menu, MenuItem, MenuPopup, MenuTrigger } from "../ui/menu";
+import { Menu, MenuItem, MenuPopup, MenuSeparator, MenuTrigger } from "../ui/menu";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
 
 export type ThreadMarkTone =
@@ -100,21 +102,55 @@ const ATTENTION_TONES: ReadonlySet<ThreadMarkTone | null> = new Set([
   "woke",
 ]);
 
+const DismissedNotifications = Schema.Record(Schema.String, Schema.String);
+const EMPTY_DISMISSED_NOTIFICATIONS = Object.freeze<Record<string, string>>({});
+
+function notificationVersion(thread: EnvironmentThreadShell, tone: ThreadMarkTone) {
+  return JSON.stringify([
+    tone,
+    thread.session?.activeTurnId ?? thread.latestTurn?.turnId,
+    tone === "woke"
+      ? thread.snoozedUntil
+      : tone === "failed"
+        ? thread.session?.updatedAt
+        : thread.updatedAt,
+    tone === "woke" ? thread.snoozedAt : null,
+    tone === "woke" ? thread.latestTurn?.completedAt : null,
+  ]);
+}
+
 export function CodexNotificationsMenu() {
   const navigate = useNavigate();
   const threads = useThreadShells();
   const tones = useThreadMarkTones();
+  const [dismissedNotifications, setDismissedNotifications] = useLocalStorage(
+    "simplet3code:dismissed-notifications",
+    EMPTY_DISMISSED_NOTIFICATIONS,
+    DismissedNotifications,
+  );
   const attentionThreads = useMemo(
     () =>
-      threads.filter(
-        (thread) =>
-          thread.archivedAt === null &&
-          ATTENTION_TONES.has(
-            tones.get(scopedThreadKey(scopeThreadRef(thread.environmentId, thread.id))) ?? null,
-          ),
-      ),
-    [threads, tones],
+      threads.flatMap((thread) => {
+        const threadRef = scopeThreadRef(thread.environmentId, thread.id);
+        const threadKey = scopedThreadKey(threadRef);
+        const tone = tones.get(threadKey) ?? null;
+        if (thread.archivedAt !== null || tone === null || !ATTENTION_TONES.has(tone)) return [];
+        const version = notificationVersion(thread, tone);
+        if (dismissedNotifications[threadKey] === version) return [];
+        return [{ thread, threadRef, threadKey, tone, version }];
+      }),
+    [dismissedNotifications, threads, tones],
   );
+
+  const dismiss = (notifications: typeof attentionThreads) => {
+    setDismissedNotifications((current) => {
+      const next = { ...current };
+      for (const { threadKey, version } of notifications) {
+        next[threadKey] = version;
+      }
+      return next;
+    });
+  };
 
   return (
     <Menu>
@@ -131,25 +167,46 @@ export function CodexNotificationsMenu() {
         <BellIcon />
       </MenuTrigger>
       <MenuPopup align="start">
+        {attentionThreads.length > 1 ? (
+          <>
+            <MenuItem closeOnClick={false} onClick={() => dismiss(attentionThreads)}>
+              Clear all
+            </MenuItem>
+            <MenuSeparator />
+          </>
+        ) : null}
         {attentionThreads.length === 0 ? (
           <MenuItem disabled>No notifications</MenuItem>
         ) : (
-          attentionThreads.map((thread) => {
-            const threadRef = scopeThreadRef(thread.environmentId, thread.id);
-            const threadKey = scopedThreadKey(threadRef);
+          attentionThreads.map((notification) => {
+            const { thread, threadRef, threadKey, tone } = notification;
             return (
-              <MenuItem
-                key={threadKey}
-                onClick={() =>
-                  void navigate({
-                    to: "/$environmentId/$threadId",
-                    params: buildThreadRouteParams(threadRef),
-                  })
-                }
-              >
-                <ThreadMark tone={tones.get(threadKey) ?? null} />
-                <span className="max-w-64 truncate">{thread.title}</span>
-              </MenuItem>
+              <div key={threadKey} data-codex-part="notification-row">
+                <MenuItem
+                  data-codex-part="notification-open"
+                  onClick={() =>
+                    void navigate({
+                      to: "/$environmentId/$threadId",
+                      params: buildThreadRouteParams(threadRef),
+                    })
+                  }
+                >
+                  <ThreadMark tone={tone} />
+                  <span className="max-w-64 truncate">{thread.title}</span>
+                </MenuItem>
+                <MenuItem
+                  nativeButton
+                  render={<button type="button" />}
+                  closeOnClick={false}
+                  aria-label={`Dismiss notification for ${thread.title}`}
+                  label={`Dismiss notification for ${thread.title}`}
+                  title="Dismiss notification"
+                  data-codex-part="notification-dismiss"
+                  onClick={() => dismiss([notification])}
+                >
+                  <XIcon aria-hidden />
+                </MenuItem>
+              </div>
             );
           })
         )}
