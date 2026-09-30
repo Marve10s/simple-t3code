@@ -3,8 +3,9 @@ import type { ScopedThreadRef } from "@t3tools/contracts";
 import { useRef, useState } from "react";
 
 import { ensureLocalApi } from "../../localApi";
+import { useThreadActions } from "../../hooks/useThreadActions";
 import { appAtomRegistry } from "../../rpc/atomRegistry";
-import { readThreadShell } from "../../state/entities";
+import { readEnvironmentSupportsSettlement, readThreadShell } from "../../state/entities";
 import { terminalEnvironment } from "../../state/terminal";
 import { environmentThreadShells, threadEnvironment } from "../../state/threads";
 import { useAtomCommand } from "../../state/use-atom-command";
@@ -36,6 +37,7 @@ function waitForStoppedThread(threadRef: ScopedThreadRef) {
 }
 
 export function useCodexTabClose() {
+  const { settleThread } = useThreadActions();
   const stopSession = useAtomCommand(threadEnvironment.stopSession, { reportFailure: false });
   const closeTerminals = useAtomCommand(terminalEnvironment.close, { reportFailure: false });
   const pending = useRef(new Set<string>());
@@ -46,13 +48,17 @@ export function useCodexTabClose() {
     if (pending.current.has(key)) return;
     pending.current.add(key);
     setClosingKeys(new Set(pending.current));
+    const settles = tab.kind === "thread" && readEnvironmentSupportsSettlement(tab.environmentId);
     try {
       const { warning } = readCodexTabActivity(tab);
       if (
         warning &&
-        !(await ensureLocalApi().dialogs.confirm(`${warning}\n\nStop and close this tab?`, {
-          variant: "destructive",
-        }))
+        !(await ensureLocalApi().dialogs.confirm(
+          `${warning}\n\nStop and ${settles ? "settle this chat" : "close this tab"}?`,
+          {
+            variant: "destructive",
+          },
+        ))
       )
         return;
 
@@ -72,12 +78,18 @@ export function useCodexTabClose() {
           input: { threadId: threadRef.threadId, deleteHistory: false },
         });
         if (result._tag === "Failure") throw squashAtomCommandFailure(result);
+        if (settles) {
+          const settled = await settleThread(threadRef);
+          if (settled._tag === "Failure") throw squashAtomCommandFailure(settled);
+        }
       }
       await close();
     } catch (error) {
       toastManager.add({
         type: "error",
-        title: "Could not stop and close this tab",
+        title: settles
+          ? "Could not stop and settle this chat"
+          : "Could not stop and close this tab",
         description:
           error instanceof Error ? error.message : "The tab was kept open. Please try again.",
       });

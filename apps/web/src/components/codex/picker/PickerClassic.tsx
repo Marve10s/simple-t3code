@@ -8,7 +8,7 @@ import {
   SearchIcon,
   StarIcon,
 } from "lucide-react";
-import { type SyntheticEvent, useState } from "react";
+import { useState } from "react";
 
 import type { ModelEsque } from "../../chat/providerIconUtils";
 
@@ -26,28 +26,24 @@ import {
   ProviderGlyph,
 } from "./pickerShared";
 
-type Flyout =
-  | { kind: "provider"; instanceId: ProviderInstanceId; top: number }
-  | { kind: "effort"; top: number }
-  | null;
+type Flyout = { kind: "provider"; instanceId: ProviderInstanceId } | { kind: "effort" } | null;
 
 export function PickerClassic(props: PickerDesignProps) {
   const navigate = useNavigate();
   const [flyout, setFlyout] = useState<Flyout>(() =>
     props.providers.some((provider) => provider.entry.instanceId === props.activeInstanceId)
-      ? { kind: "provider", instanceId: props.activeInstanceId, top: 0 }
+      ? { kind: "provider", instanceId: props.activeInstanceId }
       : null,
   );
   const [query, setQuery] = useState("");
   const [openSections, setOpenSections] = useState<ReadonlyMap<string, boolean>>(new Map());
-  const openAt = (event: SyntheticEvent<HTMLElement>, next: NonNullable<Flyout>) => {
-    const top = event.currentTarget.offsetTop;
+  const openFlyout = (next: NonNullable<Flyout>) => {
     setFlyout((current) =>
       current?.kind === next.kind &&
       (next.kind !== "provider" ||
         (current.kind === "provider" && current.instanceId === next.instanceId))
         ? current
-        : { ...next, top },
+        : next,
     );
     if (next.kind === "provider") {
       setQuery("");
@@ -79,12 +75,10 @@ export function PickerClassic(props: PickerDesignProps) {
                 : undefined
             }
             data-muted={provider.unavailableReason ? "true" : undefined}
-            onMouseEnter={(event) =>
-              openAt(event, { kind: "provider", instanceId: provider.entry.instanceId, top: 0 })
+            onMouseEnter={() =>
+              openFlyout({ kind: "provider", instanceId: provider.entry.instanceId })
             }
-            onFocus={(event) =>
-              openAt(event, { kind: "provider", instanceId: provider.entry.instanceId, top: 0 })
-            }
+            onFocus={() => openFlyout({ kind: "provider", instanceId: provider.entry.instanceId })}
             onClick={() => {
               if (provider.unavailableReason) props.openProviderSetup(provider.entry.instanceId);
             }}
@@ -110,8 +104,8 @@ export function PickerClassic(props: PickerDesignProps) {
             data-codex-part="picker-row"
             data-kind="provider"
             data-active={flyout?.kind === "effort" ? "true" : undefined}
-            onMouseEnter={(event) => openAt(event, { kind: "effort", top: 0 })}
-            onFocus={(event) => openAt(event, { kind: "effort", top: 0 })}
+            onMouseEnter={() => openFlyout({ kind: "effort" })}
+            onFocus={() => openFlyout({ kind: "effort" })}
           >
             <GaugeIcon data-codex-part="picker-row-icon" />
             <span data-codex-part="picker-row-label">Effort</span>
@@ -135,7 +129,7 @@ export function PickerClassic(props: PickerDesignProps) {
       </div>
 
       {flyout ? (
-        <div data-codex-part="picker-flyout" style={{ top: Math.max(0, flyout.top - 6) }}>
+        <div data-codex-part="picker-flyout">
           {flyoutProvider ? (
             <>
               <label data-codex-part="picker-search">

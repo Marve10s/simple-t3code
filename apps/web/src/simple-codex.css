@@ -704,6 +704,7 @@ main[data-slot="sidebar-inset"]:has([data-draft-hero="true"]) [data-chat-header]
     display: inline-flex;
     width: 20px;
     height: 20px;
+    cursor: pointer;
     flex-shrink: 0;
     align-items: center;
     justify-content: center;

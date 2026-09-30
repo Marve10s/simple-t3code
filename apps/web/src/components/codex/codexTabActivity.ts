@@ -6,7 +6,12 @@ import { AsyncResult } from "effect/unstable/reactivity";
 
 import { useComposerDraftStore } from "../../composerDraftStore";
 import { appAtomRegistry } from "../../rpc/atomRegistry";
-import { readThreadShell, useThreadShell } from "../../state/entities";
+import {
+  readEnvironmentSupportsSettlement,
+  readThreadShell,
+  useServerConfigs,
+  useThreadShell,
+} from "../../state/entities";
 import { useEnvironmentQuery } from "../../state/query";
 import { terminalEnvironment } from "../../state/terminal";
 import type { CodexTab } from "./codexTabs";
@@ -24,7 +29,9 @@ function tabCloseWarning(
   thread: EnvironmentThreadShell | null,
   terminals: ReadonlyArray<TerminalSummary> | null,
   threadId: string,
+  settles: boolean,
 ) {
+  const action = settles ? "Settling" : "Closing";
   const ongoing =
     thread?.session?.status === "starting" ||
     thread?.session?.status === "running" ||
@@ -35,14 +42,14 @@ function tabCloseWarning(
     (terminal) => terminal.threadId === threadId && terminal.hasRunningSubprocess,
   );
   if (ongoing && running?.length) {
-    return "This thread is still working and has running commands or servers. Closing stops the thread and its terminals.";
+    return `This thread is still working and has running commands or servers. ${action} stops the thread and its terminals.`;
   }
-  if (ongoing) return "This thread is still ongoing. Closing stops it and its terminals.";
+  if (ongoing) return `This thread is still ongoing. ${action} stops it and its terminals.`;
   if (running?.length) {
-    return "This thread has running commands or servers. Closing stops its terminals.";
+    return `This thread has running commands or servers. ${action} stops its terminals.`;
   }
   return terminals === null
-    ? "Terminal activity is unavailable or still loading. Closing stops this thread and its terminals."
+    ? `Terminal activity is unavailable or still loading. ${action} stops this thread and its terminals.`
     : null;
 }
 
@@ -54,16 +61,35 @@ export function readCodexTabActivity(tab: CodexTab) {
     terminalEnvironment.metadata({ environmentId: threadRef.environmentId, input: null }),
   );
   const terminals = Option.getOrNull(AsyncResult.value(metadata));
-  return { threadRef, thread, warning: tabCloseWarning(thread, terminals, tab.threadId) };
+  return {
+    threadRef,
+    thread,
+    warning: tabCloseWarning(
+      thread,
+      terminals,
+      tab.threadId,
+      tab.kind === "thread" && readEnvironmentSupportsSettlement(threadRef.environmentId),
+    ),
+  };
 }
 
 export function useCodexTabCloseWarning(tab: CodexTab) {
   const threadRef = codexTabThreadRef(tab);
+  const serverConfigs = useServerConfigs();
   const thread = useThreadShell(threadRef);
   const metadata = useEnvironmentQuery(
     threadRef
       ? terminalEnvironment.metadata({ environmentId: threadRef.environmentId, input: null })
       : null,
   );
-  return threadRef ? tabCloseWarning(thread, metadata.data, tab.threadId) : null;
+  return threadRef
+    ? tabCloseWarning(
+        thread,
+        metadata.data,
+        tab.threadId,
+        tab.kind === "thread" &&
+          serverConfigs.get(threadRef.environmentId)?.environment.capabilities.threadSettlement ===
+            true,
+      )
+    : null;
 }

@@ -7,7 +7,7 @@ import {
 import type { EnvironmentProject } from "@t3tools/client-runtime/state/shell";
 import { isProjectFaviconFallbackUrl } from "@t3tools/shared/projectFavicon";
 import { useNavigate, useParams } from "@tanstack/react-router";
-import { EllipsisIcon, PlusIcon, TriangleAlertIcon, XIcon } from "lucide-react";
+import { CheckIcon, EllipsisIcon, PlusIcon, TriangleAlertIcon, XIcon } from "lucide-react";
 import { type MouseEvent, useEffect, useMemo, useRef } from "react";
 
 import { composerDraftHasUserContent, useComposerDraftStore } from "../../composerDraftStore";
@@ -17,6 +17,7 @@ import { projectFaviconUrlAtom } from "../../state/assets";
 import {
   useAllEnvironmentShellsBootstrapped,
   useProjects,
+  useServerConfigs,
   useThreadShells,
 } from "../../state/entities";
 import { ProjectFavicon } from "../ProjectFavicon";
@@ -34,12 +35,15 @@ import { useCodexTabCloseWarning } from "./codexTabActivity";
 import { ThreadMark, useThreadMarkTones } from "./CodexThreadStatus";
 import { useCodexTabShortcuts } from "./useCodexTabShortcuts";
 import { useCodexTabClose } from "./useCodexTabClose";
+import { useCodexActivityThreads } from "./codexActivityThreads";
 
 export function useCodexTabStrip() {
   const navigate = useNavigate();
   const tabs = useCodexTabsStore((store) => store.tabs);
   const setTabs = useCodexTabsStore((store) => store.setTabs);
   const threads = useThreadShells();
+  const activityThreads = useCodexActivityThreads();
+  const serverConfigs = useServerConfigs();
   const shellsBootstrapped = useAllEnvironmentShellsBootstrapped();
   const tones = useThreadMarkTones();
   const { closingKeys, stopTab } = useCodexTabClose();
@@ -106,14 +110,25 @@ export function useCodexTabStrip() {
   useEffect(() => {
     if (!shellsBootstrapped) return;
     const current = useCodexTabsStore.getState().tabs;
-    const next = current.filter((tab) => {
-      if (tab.key === activeKey) return true;
+    let next = current;
+    const activityKeys = new Set<string>();
+    for (const thread of activityThreads) {
+      const key = scopedThreadKey(scopeThreadRef(thread.environmentId, thread.id));
+      activityKeys.add(key);
+      next = openCodexTab(
+        next,
+        { kind: "thread", key, environmentId: thread.environmentId, threadId: thread.id },
+        null,
+      );
+    }
+    next = next.filter((tab) => {
       if (tab.kind === "draft") return getDraftSession(tab.draftId) !== null;
-      const thread = threadByKey.get(tab.key);
-      return thread !== undefined && thread.archivedAt === null;
+      return activityKeys.has(tab.key);
     });
-    if (next.length !== current.length) setTabs(next);
-  }, [activeKey, getDraftSession, setTabs, shellsBootstrapped, threadByKey]);
+    if (next.length !== current.length || next.some((tab, index) => tab !== current[index])) {
+      setTabs(next);
+    }
+  }, [activeKey, activityThreads, getDraftSession, setTabs, shellsBootstrapped]);
 
   const openTab = (tab: CodexTab) => {
     if (tab.kind === "thread") {
@@ -129,12 +144,15 @@ export function useCodexTabStrip() {
   const closeTab = async (event: MouseEvent, tab: CodexTab) => {
     event.stopPropagation();
     event.preventDefault();
+    const originalNeighbor = closeCodexTab(useCodexTabsStore.getState().tabs, tab.key).neighbor;
     await stopTab(tab, async () => {
-      const current = useCodexTabsStore
-        .getState()
-        .tabs.find((entry) => codexTabRenderKey(entry) === codexTabRenderKey(tab));
-      if (!current) return;
-      const { neighbor } = closeCodexTab(useCodexTabsStore.getState().tabs, current.key);
+      const currentTabs = useCodexTabsStore.getState().tabs;
+      const current =
+        currentTabs.find((entry) => codexTabRenderKey(entry) === codexTabRenderKey(tab)) ?? tab;
+      const neighbor =
+        closeCodexTab(currentTabs, current.key).neighbor ??
+        currentTabs.find((entry) => entry.key === originalNeighbor?.key) ??
+        currentTabs.find((entry) => entry.key !== current.key);
       if (current.key === activeKeyRef.current) {
         if (neighbor) await openTab(neighbor);
         else await navigate({ to: "/", state: { codexTabsClosed: true } });
@@ -185,6 +203,9 @@ export function useCodexTabStrip() {
     projectFor,
     openTab,
     closeTab,
+    settlesTab: (tab: CodexTab) =>
+      tab.kind === "thread" &&
+      serverConfigs.get(tab.environmentId)?.environment.capabilities.threadSettlement === true,
     newChat,
     newChatIn,
   };
@@ -249,6 +270,8 @@ export function CodexTabContents({ strip, tab }: { strip: CodexTabStripState; ta
   const title = strip.titleFor(tab);
   const project = strip.projectFor(tab);
   const warning = useCodexTabCloseWarning(tab);
+  const settles = tab.kind === "thread";
+  const settlementUnavailable = settles && !strip.settlesTab(tab);
   const closing = strip.closingKeys.has(codexTabRenderKey(tab));
   return (
     <>
@@ -269,15 +292,30 @@ export function CodexTabContents({ strip, tab }: { strip: CodexTabStripState; ta
           <TooltipPopup>{warning}</TooltipPopup>
         </Tooltip>
       ) : null}
-      <button
-        type="button"
-        aria-label={closing ? `Stopping ${title}` : `Close ${title}`}
-        disabled={closing}
-        data-codex-part="tab-close"
-        onClick={(event) => strip.closeTab(event, tab)}
-      >
-        <XIcon />
-      </button>
+      <Tooltip>
+        <TooltipTrigger
+          render={
+            <button
+              type="button"
+              aria-label={
+                closing ? `Stopping ${title}` : `${settles ? "Settle" : "Close"} ${title}`
+              }
+              disabled={closing || settlementUnavailable}
+              data-codex-part="tab-close"
+              onClick={(event) => strip.closeTab(event, tab)}
+            />
+          }
+        >
+          {settles ? <CheckIcon /> : <XIcon />}
+        </TooltipTrigger>
+        <TooltipPopup>
+          {settlementUnavailable
+            ? "Update this environment to settle chats"
+            : settles
+              ? "Settle chat"
+              : "Close tab"}
+        </TooltipPopup>
+      </Tooltip>
     </>
   );
 }

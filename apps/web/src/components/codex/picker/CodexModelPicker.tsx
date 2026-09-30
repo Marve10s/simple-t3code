@@ -117,7 +117,7 @@ function CodexModelPickerPopover(props: UpstreamPickerProps & { traits: CodexPic
       </PopoverTrigger>
       <PopoverPopup
         {...(props.isComposerOwned ? composerFloatingLayerProps : {})}
-        align="start"
+        align="end"
         side="top"
         sideOffset={8}
         padding="none"

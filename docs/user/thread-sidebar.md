@@ -86,6 +86,11 @@ their default order until the server is updated.
 
 ## Settle finished work
 
+Tabs include the unsettled chats shown in Activity, including chats waiting for
+your attention. The checkmark on a tab settles its chat in both views. If the
+chat or its terminals are still running, confirm to stop them first. **Undo** or
+**Un-settle thread** brings the tab back. Empty drafts use a close button.
+
 Choose **Settle thread** from its menu to move finished work out of the active list
 without deleting the conversation. **Un-settle thread** restores it to active work
 and prevents automatic settlement until new activity resumes the usual rules.

@@ -30,6 +30,7 @@ import {
   type EnvironmentThreadSearchMatch,
 } from "@t3tools/client-runtime/state/thread-search";
 import type { EnvironmentThreadShell } from "@t3tools/client-runtime/state/models";
+import { resolveCodexActivitySection } from "./codex/codexActivityThreads";
 import {
   parseScopedThreadKey,
   scopeProjectRef,
@@ -2335,6 +2336,11 @@ export default function Sidebar() {
       const capabilities = serverConfigs.get(thread.environmentId)?.environment.capabilities;
       const supportsSettlement = capabilities?.threadSettlement === true;
       const supportsSnooze = capabilities?.threadSnooze === true;
+      const section = resolveCodexActivitySection(thread, {
+        now: preciseNow,
+        supportsSettlement,
+        supportsSnooze,
+      });
       const threadKey = scopedThreadKey(scopeThreadRef(thread.environmentId, thread.id));
       if (capabilities?.threadActiveReorder === true) activeReorderable.add(threadKey);
       if (capabilities?.threadPinning === true && capabilities.threadPinReorder === true) {
@@ -2357,11 +2363,11 @@ export default function Sidebar() {
             ? projected
             : { ...projected, snoozedAt: thread.snoozedAt, snoozedUntil: thread.snoozedUntil },
         );
-      } else if (supportsSnooze && effectiveSnoozed(thread, { now: preciseNow })) {
+      } else if (section === "snoozed") {
         snoozed.push(thread);
-      } else if (supportsSettlement && thread.settledOverride === "settled") {
+      } else if (section === "settled") {
         settled.push(thread);
-      } else if (thread.pinnedAt != null) {
+      } else if (section === "pinned") {
         pinned.push(thread);
       } else {
         active.push(thread);

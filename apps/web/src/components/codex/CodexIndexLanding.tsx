@@ -24,7 +24,7 @@ export function CodexIndexLanding({ children }: { children: ReactNode }) {
       {isElectron ? <WorkspacePageHeader electron /> : null}
       <Empty size="hero" className="flex-1">
         <EmptyHeader>
-          <EmptyTitle>No open chats</EmptyTitle>
+          <EmptyTitle>No chat selected</EmptyTitle>
           <EmptyDescription>Open a chat or create a new one to get started.</EmptyDescription>
         </EmptyHeader>
       </Empty>
