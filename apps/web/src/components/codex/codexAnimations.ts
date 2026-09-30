@@ -23,6 +23,14 @@ export function useCodexHeroMotion() {
   return style === "motion" && !reducedMotion;
 }
 
+const CODEX_COMPOSER_TRANSITION_MS = 280;
+
+export function useCodexComposerAnimation(panel: { active: boolean; durationMs: number }) {
+  const motion = useCodexHeroMotion();
+  if (!motion || panel.durationMs > 0) return panel;
+  return { active: true, durationMs: CODEX_COMPOSER_TRANSITION_MS };
+}
+
 const loadMotion = () => import("./motion/CodexMotion");
 
 export const LazyMotionTabStrip = lazy(() =>

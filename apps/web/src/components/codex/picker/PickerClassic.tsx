@@ -10,7 +10,14 @@ import {
 } from "lucide-react";
 import { type SyntheticEvent, useState } from "react";
 
-import { matchesQuery, modelDisplayName } from "./codexPickerData";
+import type { ModelEsque } from "../../chat/providerIconUtils";
+
+import {
+  type CodexPickerProvider,
+  matchesQuery,
+  modelDisplayName,
+  sectionPickerModels,
+} from "./codexPickerData";
 import {
   EffortList,
   ExtraOptions,
@@ -32,6 +39,7 @@ export function PickerClassic(props: PickerDesignProps) {
       : null,
   );
   const [query, setQuery] = useState("");
+  const [openSections, setOpenSections] = useState<ReadonlyMap<string, boolean>>(new Map());
   const openAt = (event: SyntheticEvent<HTMLElement>, next: NonNullable<Flyout>) => {
     const top = event.currentTarget.offsetTop;
     setFlyout((current) =>
@@ -41,7 +49,10 @@ export function PickerClassic(props: PickerDesignProps) {
         ? current
         : { ...next, top },
     );
-    if (next.kind === "provider") setQuery("");
+    if (next.kind === "provider") {
+      setQuery("");
+      setOpenSections(new Map());
+    }
   };
 
   const flyoutProvider =
@@ -138,49 +149,56 @@ export function PickerClassic(props: PickerDesignProps) {
               </label>
               <div data-codex-part="picker-group-label">{flyoutProvider.entry.displayName}</div>
               <div data-codex-part="picker-scroll">
-                {flyoutProvider.models
-                  .filter((model) => matchesQuery(query, model.name, model.shortName, model.slug))
-                  .map((model) => {
-                    const instanceId = flyoutProvider.entry.instanceId;
-                    const active =
-                      instanceId === props.activeInstanceId && model.slug === props.activeModel;
-                    const disabledReason =
-                      flyoutProvider.unavailableReason ??
-                      props.isModelDisabled(instanceId, model.slug);
-                    const favorite = props.favorites.isFavorite(instanceId, model.slug);
-                    return (
-                      <div
-                        key={model.slug}
-                        data-codex-part="picker-row"
-                        data-kind="model"
-                        data-active={active ? "true" : undefined}
-                        data-muted={disabledReason ? "true" : undefined}
-                      >
+                {sectionPickerModels({
+                  driverKind: flyoutProvider.entry.driverKind,
+                  models: flyoutProvider.models.filter((model) =>
+                    matchesQuery(query, model.name, model.shortName, model.slug, model.subProvider),
+                  ),
+                  pinned: (slug) =>
+                    (flyoutProvider.entry.instanceId === props.activeInstanceId &&
+                      slug === props.activeModel) ||
+                    props.favorites.isFavorite(flyoutProvider.entry.instanceId, slug),
+                }).map((section) => {
+                  const expanded =
+                    section.label === null ||
+                    query.trim().length > 0 ||
+                    (openSections.get(section.id) ??
+                      section.models.some(
+                        (model) =>
+                          flyoutProvider.entry.instanceId === props.activeInstanceId &&
+                          model.slug === props.activeModel,
+                      ));
+                  return (
+                    <div key={section.id} data-codex-part="picker-section">
+                      {section.label === null ? null : (
                         <button
                           type="button"
-                          data-codex-part="picker-row-main"
-                          disabled={disabledReason !== null}
-                          onClick={() => props.selectModel(instanceId, model.slug)}
+                          data-codex-part="picker-section-toggle"
+                          aria-expanded={expanded}
+                          onClick={() =>
+                            setOpenSections((current) =>
+                              new Map(current).set(section.id, !expanded),
+                            )
+                          }
                         >
-                          <span data-codex-part="picker-row-label">{modelDisplayName(model)}</span>
-                          {model.badge === "new" ? (
-                            <span data-codex-part="picker-tag">New</span>
-                          ) : null}
-                          {active ? <CheckIcon data-codex-part="picker-check" /> : null}
+                          <ChevronRightIcon data-codex-part="picker-section-chevron" />
+                          <span data-codex-part="picker-row-label">{section.label}</span>
+                          <span data-codex-part="picker-row-value">{section.models.length}</span>
                         </button>
-                        <button
-                          type="button"
-                          aria-label={favorite ? "Remove from starred" : "Star model"}
-                          aria-pressed={favorite}
-                          data-codex-part="picker-star"
-                          data-on={favorite ? "true" : undefined}
-                          onClick={() => props.favorites.toggle(instanceId, model.slug)}
-                        >
-                          <StarIcon />
-                        </button>
-                      </div>
-                    );
-                  })}
+                      )}
+                      {expanded
+                        ? section.models.map((model) => (
+                            <ModelRow
+                              key={model.slug}
+                              {...props}
+                              provider={flyoutProvider}
+                              model={model}
+                            />
+                          ))
+                        : null}
+                    </div>
+                  );
+                })}
               </div>
             </>
           ) : flyout.kind === "effort" ? (
@@ -191,6 +209,43 @@ export function PickerClassic(props: PickerDesignProps) {
           ) : null}
         </div>
       ) : null}
+    </div>
+  );
+}
+
+function ModelRow(props: PickerDesignProps & { provider: CodexPickerProvider; model: ModelEsque }) {
+  const instanceId = props.provider.entry.instanceId;
+  const active = instanceId === props.activeInstanceId && props.model.slug === props.activeModel;
+  const disabledReason =
+    props.provider.unavailableReason ?? props.isModelDisabled(instanceId, props.model.slug);
+  const favorite = props.favorites.isFavorite(instanceId, props.model.slug);
+  return (
+    <div
+      data-codex-part="picker-row"
+      data-kind="model"
+      data-active={active ? "true" : undefined}
+      data-muted={disabledReason ? "true" : undefined}
+    >
+      <button
+        type="button"
+        data-codex-part="picker-row-main"
+        disabled={disabledReason !== null}
+        onClick={() => props.selectModel(instanceId, props.model.slug)}
+      >
+        <span data-codex-part="picker-row-label">{modelDisplayName(props.model)}</span>
+        {props.model.badge === "new" ? <span data-codex-part="picker-tag">New</span> : null}
+        <CheckIcon data-codex-part="picker-check" data-on={active ? "true" : undefined} />
+      </button>
+      <button
+        type="button"
+        aria-label={favorite ? "Remove from starred" : "Star model"}
+        aria-pressed={favorite}
+        data-codex-part="picker-star"
+        data-on={favorite ? "true" : undefined}
+        onClick={() => props.favorites.toggle(instanceId, props.model.slug)}
+      >
+        <StarIcon />
+      </button>
     </div>
   );
 }

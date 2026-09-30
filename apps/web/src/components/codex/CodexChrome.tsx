@@ -1,14 +1,14 @@
 import { useLocation, useNavigate } from "@tanstack/react-router";
 import {
+  ActivityIcon,
   ArrowLeftIcon,
   ArrowRightIcon,
-  ChartNoAxesColumnIcon,
-  ClockIcon,
-  EllipsisIcon,
+  FolderTreeIcon,
   HouseIcon,
   LibraryBigIcon,
-  RadioTowerIcon,
+  PanelTopIcon,
   SearchIcon,
+  SettingsIcon,
   type LucideIcon,
 } from "lucide-react";
 import { type ReactNode, Suspense, useEffect } from "react";
@@ -18,17 +18,7 @@ import { isElectron } from "../../env";
 import { cn } from "../../lib/utils";
 import { readPullRequestListPreferences } from "../pullRequest/pullRequestListPreferences";
 import { isSidebarUtilityPage } from "../sidebar/mainAppLocation";
-import {
-  Menu,
-  MenuGroup,
-  MenuGroupLabel,
-  MenuItem,
-  MenuPopup,
-  MenuRadioGroup,
-  MenuRadioItem,
-  MenuSeparator,
-  MenuTrigger,
-} from "../ui/menu";
+import { SidebarUpdatePill } from "../sidebar/SidebarUpdatePill";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
 import {
   LazyMotionEffects,
@@ -39,7 +29,7 @@ import {
 import { CodexHeroBackground } from "./CodexHeroBackground";
 import { CodexTabStrip } from "./CodexTabStrip";
 import { CodexNotificationsMenu } from "./CodexThreadStatus";
-import { CODEX_VIEW_LABELS, CodexView, decodeCodexView, useCodexView } from "./codexView";
+import { CODEX_VIEW_LABELS, CodexView, useCodexView } from "./codexView";
 
 function ChromeButton({
   label,
@@ -166,29 +156,37 @@ function RailItem({
   );
 }
 
+const VIEW_ICONS: Record<CodexView, LucideIcon> = {
+  activity: ActivityIcon,
+  projects: FolderTreeIcon,
+  tabs: PanelTopIcon,
+};
+
+function RailViewToggle() {
+  const [view, setView] = useCodexView();
+  const views = CodexView.literals;
+  const next = views[(views.indexOf(view) + 1) % views.length] ?? view;
+  return (
+    <RailItem
+      icon={VIEW_ICONS[view]}
+      label={`${CODEX_VIEW_LABELS[view]} view. Switch to ${CODEX_VIEW_LABELS[next]}`}
+      active={false}
+      onClick={() => setView(next)}
+    />
+  );
+}
+
 export function CodexIconRail() {
   const navigate = useNavigate();
-  const [view, setView] = useCodexView();
   const pathname = useLocation({ select: (location) => location.pathname });
-  const onMainApp = !isSidebarUtilityPage(pathname);
-  const settingsActive =
-    pathname.startsWith("/settings") &&
-    pathname !== "/settings/archived" &&
-    pathname !== "/settings/connections";
 
   return (
     <nav data-codex-part="icon-rail" aria-label="App">
       <RailItem
         icon={HouseIcon}
         label="Home"
-        active={onMainApp}
+        active={!isSidebarUtilityPage(pathname)}
         onClick={() => void navigate({ to: "/" })}
-      />
-      <RailItem
-        icon={ClockIcon}
-        label="History"
-        active={pathname === "/settings/archived"}
-        onClick={() => void navigate({ to: "/settings/archived" })}
       />
       <RailItem
         icon={LibraryBigIcon}
@@ -198,56 +196,17 @@ export function CodexIconRail() {
           void navigate({ to: "/pull-requests", search: readPullRequestListPreferences() })
         }
       />
+      <span data-codex-part="rail-spacer" />
+      <RailViewToggle />
+      <ul data-codex-part="rail-update">
+        <SidebarUpdatePill />
+      </ul>
       <RailItem
-        icon={ChartNoAxesColumnIcon}
-        label="Usage"
-        active={pathname === "/usage"}
-        onClick={() => void navigate({ to: "/usage" })}
+        icon={SettingsIcon}
+        label="Settings"
+        active={pathname.startsWith("/settings")}
+        onClick={() => void navigate({ to: "/settings" })}
       />
-      <RailItem
-        icon={RadioTowerIcon}
-        label="Connections"
-        active={pathname === "/settings/connections"}
-        onClick={() => void navigate({ to: "/settings/connections" })}
-      />
-      <Menu>
-        <MenuTrigger
-          render={
-            <button
-              type="button"
-              aria-label="More"
-              data-codex-part="rail-button"
-              data-active={settingsActive ? "true" : undefined}
-            />
-          }
-        >
-          <RailActiveIndicator active={settingsActive} />
-          <EllipsisIcon />
-        </MenuTrigger>
-        <MenuPopup side="right" align="start">
-          <MenuGroup>
-            <MenuGroupLabel>View</MenuGroupLabel>
-            <MenuRadioGroup value={view} onValueChange={(value) => setView(decodeCodexView(value))}>
-              {CodexView.literals.map((option) => (
-                <MenuRadioItem key={option} value={option}>
-                  {CODEX_VIEW_LABELS[option]}
-                </MenuRadioItem>
-              ))}
-            </MenuRadioGroup>
-          </MenuGroup>
-          <MenuSeparator />
-          <MenuItem onClick={() => void navigate({ to: "/settings" })}>Settings</MenuItem>
-          <MenuItem onClick={() => void navigate({ to: "/settings/providers" })}>
-            Providers
-          </MenuItem>
-          <MenuItem onClick={() => void navigate({ to: "/settings/appearance" })}>
-            Appearance
-          </MenuItem>
-          <MenuItem onClick={() => void navigate({ to: "/settings/keybindings" })}>
-            Keyboard shortcuts
-          </MenuItem>
-        </MenuPopup>
-      </Menu>
     </nav>
   );
 }

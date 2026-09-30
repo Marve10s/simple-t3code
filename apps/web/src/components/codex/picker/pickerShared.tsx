@@ -90,7 +90,9 @@ export function EffortList({
               <span data-codex-part="picker-row-description">{option.description}</span>
             ) : null}
           </span>
-          {effort.value === option.id ? <CheckIcon data-codex-part="picker-check" /> : null}
+          {effort.value === option.id ? (
+            <CheckIcon data-codex-part="picker-check" data-on="true" />
+          ) : null}
         </button>
       ))}
     </div>

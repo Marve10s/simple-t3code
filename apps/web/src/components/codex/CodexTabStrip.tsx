@@ -1,14 +1,18 @@
 import { useAtomValue } from "@effect/atom-react";
-import { scopedThreadKey, scopeThreadRef } from "@t3tools/client-runtime/environment";
+import {
+  scopedThreadKey,
+  scopeProjectRef,
+  scopeThreadRef,
+} from "@t3tools/client-runtime/environment";
 import type { EnvironmentProject } from "@t3tools/client-runtime/state/shell";
 import { isProjectFaviconFallbackUrl } from "@t3tools/shared/projectFavicon";
 import { useNavigate, useParams } from "@tanstack/react-router";
-import { PlusIcon, XIcon } from "lucide-react";
+import { EllipsisIcon, PlusIcon, XIcon } from "lucide-react";
 import { type MouseEvent, useEffect, useMemo, useRef } from "react";
 
-import { useComposerDraftStore } from "../../composerDraftStore";
+import { composerDraftHasUserContent, useComposerDraftStore } from "../../composerDraftStore";
 import { useHandleNewThread } from "../../hooks/useHandleNewThread";
-import { startNewThreadFromContext } from "../../lib/chatThreadActions";
+import { resolveThreadActionProjectRef } from "../../lib/chatThreadActions";
 import { projectFaviconUrlAtom } from "../../state/assets";
 import {
   useAllEnvironmentShellsBootstrapped,
@@ -16,6 +20,7 @@ import {
   useThreadShells,
 } from "../../state/entities";
 import { ProjectFavicon } from "../ProjectFavicon";
+import { Menu, MenuGroup, MenuGroupLabel, MenuItem, MenuPopup, MenuTrigger } from "../ui/menu";
 import { resolveThreadRouteTarget } from "../../threadRoutes";
 import { type CodexTab, closeCodexTab, openCodexTab, useCodexTabsStore } from "./codexTabs";
 import { ThreadMark, useThreadMarkTones } from "./CodexThreadStatus";
@@ -29,7 +34,7 @@ export function useCodexTabStrip() {
   const tones = useThreadMarkTones();
   const getDraftSession = useComposerDraftStore((store) => store.getDraftSession);
   const projects = useProjects();
-  const { activeDraftThread, activeThread, defaultProjectRef, handleNewThread } =
+  const { activeDraftThread, activeThread, defaultProjectRef, handleNewThread, orderedProjects } =
     useHandleNewThread();
 
   const routeTarget = useParams({
@@ -110,9 +115,16 @@ export function useCodexTabStrip() {
     event.preventDefault();
     const { tabs: next, neighbor } = closeCodexTab(useCodexTabsStore.getState().tabs, tab.key);
     setTabs(next);
-    if (tab.key !== activeKey) return;
-    if (neighbor) openTab(neighbor);
-    else void navigate({ to: "/" });
+    if (tab.key === activeKey) {
+      if (neighbor) openTab(neighbor);
+      else void navigate({ to: "/" });
+    }
+    if (tab.kind === "draft") {
+      const { getComposerDraft, clearDraftThread } = useComposerDraftStore.getState();
+      if (!composerDraftHasUserContent(getComposerDraft(tab.draftId))) {
+        clearDraftThread(tab.draftId);
+      }
+    }
   };
 
   const titleFor = (tab: CodexTab) =>
@@ -127,15 +139,30 @@ export function useCodexTabStrip() {
     return owner ? (projectByKey.get(`${owner.environmentId}\0${owner.projectId}`) ?? null) : null;
   };
 
-  const newChat = () =>
-    void startNewThreadFromContext({
+  const newChat = () => {
+    const projectRef = resolveThreadActionProjectRef({
       activeDraftThread,
       activeThread: activeThread ?? undefined,
       defaultProjectRef,
       handleNewThread,
     });
+    if (projectRef) void handleNewThread(projectRef, { forceNew: true });
+  };
+  const newChatIn = (project: EnvironmentProject) =>
+    void handleNewThread(scopeProjectRef(project.environmentId, project.id), { forceNew: true });
 
-  return { tabs, activeKey, tones, titleFor, projectFor, openTab, closeTab, newChat };
+  return {
+    tabs,
+    activeKey,
+    tones,
+    projects: orderedProjects,
+    titleFor,
+    projectFor,
+    openTab,
+    closeTab,
+    newChat,
+    newChatIn,
+  };
 }
 
 export type CodexTabStripState = ReturnType<typeof useCodexTabStrip>;
@@ -162,9 +189,34 @@ function TabProjectLabel({ project }: { project: EnvironmentProject }) {
 
 export function CodexNewTabButton({ strip }: { strip: CodexTabStripState }) {
   return (
-    <button type="button" aria-label="New chat" data-codex-part="tab-new" onClick={strip.newChat}>
-      <PlusIcon />
-    </button>
+    <span data-codex-part="tab-new-group">
+      <button type="button" aria-label="New chat" data-codex-part="tab-new" onClick={strip.newChat}>
+        <PlusIcon />
+      </button>
+      <Menu>
+        <MenuTrigger
+          render={
+            <button type="button" aria-label="New chat in project" data-codex-part="tab-new-more" />
+          }
+        >
+          <EllipsisIcon />
+        </MenuTrigger>
+        <MenuPopup align="start">
+          <MenuGroup>
+            <MenuGroupLabel>New chat in</MenuGroupLabel>
+            {strip.projects.map((project) => (
+              <MenuItem
+                key={`${project.environmentId}:${project.id}`}
+                onClick={() => strip.newChatIn(project)}
+              >
+                <ProjectFavicon project={project} className="size-4" />
+                <span className="max-w-64 truncate">{project.title}</span>
+              </MenuItem>
+            ))}
+          </MenuGroup>
+        </MenuPopup>
+      </Menu>
+    </span>
   );
 }
 

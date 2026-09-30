@@ -12,6 +12,12 @@ if (heroSpring?.[1] && heroSpring[2]) {
   setCodexHeroTransitionTiming({ durationMs: Number(heroSpring[1]), easing: heroSpring[2] });
 }
 
+const sidebarSpring = /^(\d+(?:\.\d+)?)ms (linear\(.+\))$/.exec(String(spring(0.34, 0)));
+if (sidebarSpring?.[1] && sidebarSpring[2]) {
+  document.documentElement.style.setProperty("--codex-sidebar-duration", `${sidebarSpring[1]}ms`);
+  document.documentElement.style.setProperty("--codex-sidebar-easing", sidebarSpring[2]);
+}
+
 const SPRING = { type: "spring", stiffness: 520, damping: 42, mass: 0.8 } as const;
 const EASE_OUT = [0.19, 1, 0.22, 1] as const;
 
@@ -24,7 +30,13 @@ export function MotionTabStrip() {
   return (
     <MotionConfig reducedMotion="user" transition={SPRING}>
       <LayoutGroup id="codex-tabs">
-        <div data-codex-part="tab-strip" role="tablist" aria-label="Open chats">
+        <motion.div
+          data-codex-part="tab-strip"
+          role="tablist"
+          aria-label="Open chats"
+          initial={{ opacity: 0, y: -4 }}
+          animate={{ opacity: 1, y: 0 }}
+        >
           <AnimatePresence initial={false}>
             {strip.tabs.map((tab) => {
               const active = tab.key === strip.activeKey;
@@ -54,7 +66,7 @@ export function MotionTabStrip() {
           <motion.div layout="position" data-codex-part="tab-new-slot">
             <CodexNewTabButton strip={strip} />
           </motion.div>
-        </div>
+        </motion.div>
       </LayoutGroup>
     </MotionConfig>
   );
@@ -77,53 +89,7 @@ function fadeUp(element: Element | null, distance: number, duration: number) {
   );
 }
 
-const SIDEBAR_SPRING = { type: "spring", visualDuration: 0.34, bounce: 0 } as const;
-
-function slideFrom(element: HTMLElement, offsetX: number) {
-  if (Math.abs(offsetX) < 1) return;
-  element.style.transform = `translateX(${offsetX}px)`;
-  void animate(
-    element,
-    { transform: [`translateX(${offsetX}px)`, "translateX(0px)"] },
-    SIDEBAR_SPRING,
-  ).then(() => {
-    element.style.removeProperty("transform");
-  });
-}
-
-function useSidebarMotion() {
-  useEffect(() => {
-    const desktop = window.matchMedia("(min-width: 768px)");
-    const observer = new MutationObserver((records) => {
-      if (!desktop.matches || prefersReducedMotion()) return;
-      for (const record of records) {
-        const sidebar = record.target;
-        if (!(sidebar instanceof HTMLElement) || sidebar.dataset.slot !== "sidebar") continue;
-        const container = sidebar.querySelector<HTMLElement>("[data-slot='sidebar-container']");
-        const main = document.querySelector<HTMLElement>("main[data-slot='sidebar-inset']");
-        if (!container || !main || getComputedStyle(sidebar).display === "none") continue;
-        const width = container.getBoundingClientRect().width;
-        const railWidth =
-          Number.parseFloat(
-            getComputedStyle(document.documentElement).getPropertyValue("--codex-rail-width"),
-          ) || 0;
-        const expanded = sidebar.dataset.state === "expanded";
-        slideFrom(container, expanded ? -width - railWidth : width + railWidth);
-        slideFrom(main, expanded ? -width : width);
-      }
-    });
-    observer.observe(document.body, {
-      subtree: true,
-      attributes: true,
-      attributeFilter: ["data-state"],
-      attributeOldValue: true,
-    });
-    return () => observer.disconnect();
-  }, []);
-}
-
 export function MotionEffects() {
-  useSidebarMotion();
   const pathname = useLocation({ select: (location) => location.pathname });
   const [view] = useCodexView();
 

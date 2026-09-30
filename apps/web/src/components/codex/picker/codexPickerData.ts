@@ -212,9 +212,7 @@ export function useCodexPickerProviders(input: {
                 entry.continuationGroupKey === lockedContinuationGroupKey)),
         )
         .map((entry) => {
-          const models = (modelOptionsByInstance.get(entry.instanceId) ?? []).filter(
-            (model) => !model.isLegacy,
-          );
+          const models = modelOptionsByInstance.get(entry.instanceId) ?? [];
           const unavailableReason = !entry.installed
             ? "Not installed"
             : entry.snapshot.auth.status === "unauthenticated"
@@ -264,4 +262,64 @@ export function matchesQuery(query: string, ...values: ReadonlyArray<string | un
   const needle = query.trim().toLowerCase();
   if (needle.length === 0) return true;
   return values.some((value) => value?.toLowerCase().includes(needle));
+}
+
+export interface CodexModelSection {
+  readonly id: string;
+  readonly label: string | null;
+  readonly models: ReadonlyArray<ModelEsque>;
+}
+
+const VERSION_PART = /^\d+(\.\d+)*$/;
+
+function modelFamily(slug: string) {
+  const parts = slug.toLowerCase().split(/[-_/:]/);
+  return {
+    family: parts.filter((part) => !VERSION_PART.test(part)).join("-"),
+    version: parts.flatMap((part) => (VERSION_PART.test(part) ? part.split(".").map(Number) : [])),
+  };
+}
+
+function compareVersions(left: ReadonlyArray<number>, right: ReadonlyArray<number>) {
+  for (let index = 0; index < Math.max(left.length, right.length); index += 1) {
+    const difference = (left[index] ?? 0) - (right[index] ?? 0);
+    if (difference !== 0) return difference;
+  }
+  return 0;
+}
+
+export function sectionPickerModels(input: {
+  driverKind: ProviderDriverKind;
+  models: ReadonlyArray<ModelEsque>;
+  pinned: (slug: string) => boolean;
+}): ReadonlyArray<CodexModelSection> {
+  if (input.driverKind === "opencode") {
+    const bySubProvider = new Map<string, Array<ModelEsque>>();
+    for (const model of input.models) {
+      const label = model.subProvider ?? "Other";
+      bySubProvider.set(label, [...(bySubProvider.get(label) ?? []), model]);
+    }
+    return [...bySubProvider].map(([label, models]) => ({ id: label, label, models }));
+  }
+
+  const latestByFamily = new Map<string, ReadonlyArray<number>>();
+  for (const model of input.models) {
+    if (model.isLegacy) continue;
+    const { family, version } = modelFamily(model.slug);
+    const latest = latestByFamily.get(family);
+    if (!latest || compareVersions(version, latest) > 0) latestByFamily.set(family, version);
+  }
+  const isPreferred = (model: ModelEsque) => {
+    if (input.pinned(model.slug)) return true;
+    if (model.isLegacy) return false;
+    const { family, version } = modelFamily(model.slug);
+    return compareVersions(version, latestByFamily.get(family) ?? []) >= 0;
+  };
+  const preferred = input.models.filter(isPreferred);
+  const legacy = input.models.filter((model) => !isPreferred(model));
+  if (preferred.length === 0) return [{ id: "preferred", label: null, models: legacy }];
+  return [
+    { id: "preferred", label: null, models: preferred },
+    ...(legacy.length > 0 ? [{ id: "legacy", label: "Legacy", models: legacy }] : []),
+  ];
 }

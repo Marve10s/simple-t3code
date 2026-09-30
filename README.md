@@ -35,7 +35,7 @@ Open the `.dmg` in `release/` and drag SimpleT3Code into Applications. Windows a
 ## What's different from T3 Code
 
 - **A Codex-style layout.** A slim top bar with back, forward, notifications and search, an icon rail, and a composer that sits in the middle of a new chat.
-- **Three sidebar views.** Activity is T3 Code's activity sidebar. Projects groups chats under their project. Tabs hides the sidebar and opens chats as tabs across the top. Switch between them from the "…" menu on the rail.
+- **Three sidebar views.** Activity is T3 Code's activity sidebar. Projects groups chats under their project. Tabs hides the sidebar and opens chats as tabs across the top. Switch between them in Settings → Appearance.
 - **Backgrounds on new chats.** Each new chat picks a random public-domain or Unsplash image. Add your own in Settings → Appearance.
 - **Optional Motion animations.** Settings → Appearance → Motion → Animation style. Standard keeps T3 Code's animations. Motion adds smoother transitions and only loads when you pick it.
 - **A single model picker.** Provider, model, reasoning effort and fast mode all live in one control.

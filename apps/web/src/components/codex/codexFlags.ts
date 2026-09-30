@@ -1,0 +1,2 @@
+export const CODEX_HIDES_PARKED_THREAD_BANNER = true;
+export const CODEX_COLLAPSES_HEADER_ACTIONS = true;

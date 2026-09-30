@@ -188,6 +188,12 @@ const SETTINGS_SEARCH_ITEMS = [
     to: "/settings/appearance",
   },
   {
+    id: "sidebar-view",
+    title: "Sidebar view",
+    to: "/settings/appearance",
+    searchTerms: ["Activity", "Projects", "Tabs", "layout", "sidebar"],
+  },
+  {
     id: "animation-style",
     title: "Animation style",
     to: "/settings/appearance",

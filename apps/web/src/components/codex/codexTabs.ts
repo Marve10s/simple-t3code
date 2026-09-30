@@ -67,3 +67,9 @@ export const useCodexTabsStore = create<CodexTabsState>()(
     },
   ),
 );
+
+export function isCodexTabDraft(draftId: string): boolean {
+  return useCodexTabsStore
+    .getState()
+    .tabs.some((tab) => tab.kind === "draft" && tab.draftId === draftId);
+}

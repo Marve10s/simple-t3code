@@ -174,6 +174,7 @@ import { ProjectFavicon } from "../ProjectFavicon";
 import { PanelAnimationsPreview } from "./PanelAnimationsPreview";
 import { CodexAnimationSetting } from "../codex/CodexAnimationSetting";
 import { CodexBackgroundSettings } from "../codex/CodexBackgroundSettings";
+import { CodexViewSetting } from "../codex/CodexViewSetting";
 
 const ENVIRONMENT_IDENTIFICATION_LABELS: Record<EnvironmentIdentificationMode, string> = {
   artwork: "Artwork",
@@ -1189,6 +1190,7 @@ export function AppearanceSettingsPanel() {
       </SettingsSection>
 
       <SettingsSection id="appearance-interface" title="Interface">
+        <CodexViewSetting />
         <SettingsRow
           {...searchableSetting("setting-appearance-contrast")}
           description="Adjust the contrast of colors and borders across the interface."

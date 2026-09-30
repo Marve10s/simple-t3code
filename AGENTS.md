@@ -202,7 +202,7 @@ This checkout is SimpleT3Code, a personal fork of T3 Code restyled after the Cod
 
 ### Layout
 
-- Three sidebar views, chosen from the rail's "…" menu: Activity (upstream `Sidebar`), Projects (upstream `LegacySidebar`), and Tabs (no sidebar; open chats as tabs in the top bar, see `CodexTabStrip.tsx`).
+- Three sidebar views, chosen in Settings → Appearance: Activity (upstream `Sidebar`), Projects (upstream `LegacySidebar`), and Tabs (no sidebar; open chats as tabs in the top bar, see `CodexTabStrip.tsx`).
 - The top bar, icon rail, composer tray, and new-chat background are fork components mounted from `AppSidebarLayout`, `BranchToolbar`, and `CodexChrome`.
 - The composer's model picker (`components/codex/picker/`) follows Synara's original design: providers in a column with a flyout of models, plus effort, fast mode, and the other model options in one control. It swaps in for upstream's `ProviderModelPicker` in `ChatComposer`, reads and saves options through the same draft-store call as upstream's `TraitsMenuContent`, and falls back to upstream's picker while several models are selected.
 
@@ -210,7 +210,7 @@ This checkout is SimpleT3Code, a personal fork of T3 Code restyled after the Cod
 
 - Settings → Appearance → Motion → Animation style has two options. Standard runs upstream's animations only. Motion, the default, adds transitions built with the `motion` library.
 - Import `motion` only from `components/codex/motion/`, and load that folder only through the lazy imports in `codexAnimations.ts`. With Standard selected the Motion chunk is never downloaded, parsed, or run; keep it that way and check it after changes (the Motion chunk must not appear in the main bundle).
-- Animate transform and opacity only, honor reduced motion, and leave nothing animating when idle. When upstream code runs its own Web Animation, feed it Motion's timing (`codexMotionTiming.ts`) instead of replacing it.
+- Animate transform and opacity only, honor reduced motion, and leave nothing animating when idle. The one exception is the sidebar: Motion keeps upstream's width transition on the sidebar gap and container so every page reflows smoothly, and only swaps in a spring curve (`--codex-sidebar-duration`, `--codex-sidebar-easing`). When upstream code runs its own Web Animation, feed it Motion's timing (`codexMotionTiming.ts`) instead of replacing it.
 
 ### New-chat backgrounds
 

@@ -33,6 +33,7 @@ import ProjectScriptsControl, {
   type ProjectScriptActionResult,
 } from "../ProjectScriptsControl";
 import { OpenInPicker } from "./OpenInPicker";
+import { CODEX_COLLAPSES_HEADER_ACTIONS } from "../codex/codexFlags";
 import { useRemoteOpenState, type RemoteOpenMode } from "../../remoteOpen";
 import { usePrimaryEnvironmentId } from "../../state/environments";
 import { useT3ProjectFileScripts } from "~/hooks/useT3ProjectFileScripts";
@@ -156,7 +157,7 @@ export const ChatHeader = memo(function ChatHeader({
     observer.observe(container);
     return () => observer.disconnect();
   }, []);
-  const actionsCollapsed = isMobile || isNarrowHeader;
+  const actionsCollapsed = isMobile || isNarrowHeader || CODEX_COLLAPSES_HEADER_ACTIONS;
   const [actionsOpen, setActionsOpen] = useState(false);
   const [actionsContainer] = useState(() => {
     const container = document.createElement("div");
