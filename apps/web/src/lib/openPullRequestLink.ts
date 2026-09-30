@@ -252,7 +252,7 @@ export function useOpenChangeRequestLink(
             to: "/pull-requests",
             search: (previous) => ({
               ...previous,
-              involvement: previous.involvement ?? "all",
+              involvement: previous.involvement ?? "authored",
               state: previous.state ?? "all",
               repository,
               number: parsed.number,
@@ -268,7 +268,7 @@ export function useOpenChangeRequestLink(
       void navigate({
         to: "/pull-requests",
         search: {
-          involvement: "all",
+          involvement: "authored",
           state: "all",
           repository,
           number: parsed.number,

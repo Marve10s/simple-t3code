@@ -135,6 +135,7 @@ function PullRequestRowImpl({
                 environmentId={entry.environmentId}
                 reference={{
                   projectId: entry.projectId,
+                  host: entry.host,
                   repository: entry.repository,
                   number: entry.number,
                 }}

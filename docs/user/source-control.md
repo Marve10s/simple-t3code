@@ -105,6 +105,13 @@ Open **Pull requests** to review changes and comments, request reviewers, check 
 or merge. You can edit review titles and descriptions and your own comments where the host allows it.
 GitLab calls these merge requests.
 
+The page defaults to **My PRs** and open pull requests. On GitHub, **All repositories** includes
+repositories you have opened PRs in even if they are not projects in the app. You need a project
+on that GitHub host and a signed-in account. Other hosts list PRs from projects in the app.
+Use **Filters → Repository** to pick a repository, or enter `owner/repo` to search one that is not
+listed. Choose **Everyone’s PRs** to include other authors from your project repositories, or
+**Review requested** for reviews assigned to you. The page remembers your filter choices.
+
 GitHub, GitLab, and Azure DevOps support auto-merge while checks are outstanding. GitHub also
 supports approving waiting fork workflows and opening a revert pull request for a merged change.
 

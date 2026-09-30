@@ -235,6 +235,27 @@ export const make = Effect.gen(function* () {
           })),
         ),
 
+    listAuthoredChangeRequests: (input) =>
+      cli
+        .searchPullRequests({
+          ...input,
+          involvement: "authored",
+          repositories: input.repository === undefined ? [] : [input.repository],
+          allRepositories: true,
+          searchCursor: input.cursor,
+          cursor: undefined,
+        })
+        .pipe(
+          Effect.mapError(fail("listAuthoredChangeRequests")),
+          Effect.map((batch) => ({
+            ...batch,
+            items: batch.items.map((item) => ({
+              ...item,
+              author: withAvatar(item.author, new Map<string, string>(), input.host),
+            })),
+          })),
+        ),
+
     listChangeRequestStats: (input) =>
       cli
         .listPullRequestStats({

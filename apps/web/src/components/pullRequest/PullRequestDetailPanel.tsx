@@ -16,6 +16,7 @@ import {
   type ScopedThreadRef,
 } from "@t3tools/contracts";
 import { resolveProjectSettings } from "@t3tools/shared/projectSettings";
+import { sourceControlRepositorySelector } from "@t3tools/shared/sourceControl";
 import {
   ArrowDownUpIcon,
   ArrowLeftIcon,
@@ -407,6 +408,9 @@ export function PullRequestDetailPanel({
       project.id === requestedReference.projectId && project.environmentId === environmentId,
   );
   const repositoryIdentity = project?.repositoryIdentity;
+  const hasRepositoryCheckout =
+    sourceControlRepositorySelector(repositoryIdentity)?.toLowerCase() ===
+    requestedReference.repository.toLowerCase();
   const supportsThreadPullRequests =
     environmentConfigs.get(environmentId)?.environment.capabilities.threadPullRequests === true;
   const reference = useMemo(
@@ -678,7 +682,7 @@ export function PullRequestDetailPanel({
     });
   }, []);
   const branchRefsQuery = useEnvironmentQuery(
-    detail === null
+    detail === null || !hasRepositoryCheckout
       ? null
       : vcsEnvironment.listRefs({
           environmentId,
@@ -806,7 +810,7 @@ export function PullRequestDetailPanel({
   ]);
   const pickableEnvironments = useMemo(
     () =>
-      context === "page"
+      context === "page" && hasRepositoryCheckout
         ? resolvePickableEnvironments(
             { environmentId, projectId: reference.projectId },
             projects,
@@ -817,7 +821,7 @@ export function PullRequestDetailPanel({
             })),
           )
         : [],
-    [context, environmentId, environments, projects, reference.projectId],
+    [context, environmentId, environments, projects, reference.projectId, hasRepositoryCheckout],
   );
   const [actingScope, setActingScope] = useState<{
     readonly pullRequestKey: string;
@@ -828,8 +832,9 @@ export function PullRequestDetailPanel({
   const acting =
     pickableEnvironments.find((entry) => entry.environmentId === chosenEnvironmentId) ?? null;
   const actingEnvironmentId = acting?.environmentId ?? environmentId;
-  const checkoutRoot =
-    acting?.workspaceRoot ?? detail?.workspaceRoot ?? project?.workspaceRoot ?? null;
+  const checkoutRoot = hasRepositoryCheckout
+    ? (acting?.workspaceRoot ?? detail?.workspaceRoot ?? project?.workspaceRoot ?? null)
+    : null;
   const prepareThread = usePreparePullRequestThreadAction({
     environmentId: actingEnvironmentId,
     cwd: checkoutRoot,

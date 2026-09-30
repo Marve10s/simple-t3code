@@ -221,6 +221,67 @@ function PullRequestFilterRadioSubmenu<Value extends string>({
   );
 }
 
+function PullRequestRepositoryFilter({
+  value,
+  options,
+  onChange,
+}: {
+  value: string | undefined;
+  options: ReadonlyArray<PullRequestFilterOption<string>>;
+  onChange: (repository: string | undefined) => void;
+}) {
+  const [query, setQuery] = useState("");
+  const needle = query.trim().toLowerCase();
+  const visible = options.filter(
+    (option) =>
+      option.value === "" || option.value === value || option.label.toLowerCase().includes(needle),
+  );
+  const custom = query.trim();
+  const canUseCustom =
+    /^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(custom) &&
+    !options.some((option) => option.value.toLowerCase() === needle);
+  return (
+    <MenuSub>
+      <MenuSubTrigger>
+        <FolderGit2Icon aria-hidden className="size-3.5" />
+        <span className="flex-1">Repository</span>
+        <span className="min-w-0 max-w-32 truncate text-xs text-muted-foreground">
+          {value ?? "All repositories"}
+        </span>
+      </MenuSubTrigger>
+      <MenuSubPopup>
+        <div className="p-1 pb-2">
+          <InputGroup>
+            <InputGroupAddon>
+              <SearchIcon aria-hidden />
+            </InputGroupAddon>
+            <InputGroupInput
+              autoFocus
+              size="compact"
+              value={query}
+              onChange={(event) => setQuery(event.currentTarget.value)}
+              onKeyDown={(event) => {
+                if (event.key !== "ArrowDown" && event.key !== "Escape") event.stopPropagation();
+              }}
+              placeholder="Search or enter owner/repo"
+              aria-label="Search repositories"
+            />
+          </InputGroup>
+        </div>
+        <PullRequestFilterRadioGroup
+          label="Repository"
+          value={value ?? ""}
+          options={[
+            ...visible,
+            ...(canUseCustom ? [{ value: custom, label: custom, Icon: FolderGit2Icon }] : []),
+          ]}
+          onChange={(next) => onChange(next || undefined)}
+        />
+      </MenuSubPopup>
+    </MenuSub>
+  );
+}
+
 function PullRequestAuthorFilter({
   value,
   options,
@@ -371,6 +432,9 @@ export function PullRequestFiltersMenu({
   involvement,
   involvementOptions,
   onInvolvement,
+  repository,
+  repositoryOptions,
+  onRepository,
   filters,
   onFilters,
   authorOptions = [],
@@ -394,6 +458,9 @@ export function PullRequestFiltersMenu({
   involvement: PullRequestInvolvement;
   involvementOptions: ReadonlyArray<PullRequestFilterOption<PullRequestInvolvement>>;
   onInvolvement: (involvement: PullRequestInvolvement) => void;
+  repository: string | undefined;
+  repositoryOptions: ReadonlyArray<PullRequestFilterOption<string>>;
+  onRepository: (repository: string | undefined) => void;
   filters: PullRequestListFilters;
   onFilters: (filters: PullRequestListFilters) => void;
   authorOptions?: ReadonlyArray<PullRequestAuthorFacet>;
@@ -413,7 +480,8 @@ export function PullRequestFiltersMenu({
   const selectedLabels = (filters.labels ?? []).flatMap((group) => group);
   const filterCount = [
     state !== "open",
-    involvement !== "all",
+    involvement !== "authored",
+    repository,
     host,
     server,
     projectId,
@@ -474,10 +542,15 @@ export function PullRequestFiltersMenu({
           onChange={onState}
         />
         <PullRequestFilterRadioSubmenu
-          label="Involvement"
+          label="Whose PRs"
           value={involvement}
           options={involvementOptions}
           onChange={onInvolvement}
+        />
+        <PullRequestRepositoryFilter
+          value={repository}
+          options={repositoryOptions}
+          onChange={onRepository}
         />
         <MenuSeparator />
         <PullRequestAuthorFilter

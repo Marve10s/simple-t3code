@@ -321,6 +321,7 @@ export type PullRequestListCursors = typeof PullRequestListCursors.Type;
 export const PullRequestListInput = Schema.Struct({
   state: PullRequestListState,
   involvement: Schema.optional(PullRequestInvolvement),
+  repository: Schema.optional(TrimmedNonEmptyString.check(Schema.isMaxLength(200))),
   filters: Schema.optional(PullRequestListFilters),
   projectId: Schema.optional(ProjectId),
   projectIds: Schema.optional(Schema.Array(ProjectId).check(Schema.isMaxLength(100))),

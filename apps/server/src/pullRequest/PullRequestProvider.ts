@@ -252,6 +252,21 @@ export interface PullRequestProviderApi {
     readonly filters?: PullRequestListFilters | undefined;
   }) => Effect.Effect<ProviderBatchedChangeRequestPage, PullRequestProviderError>;
 
+  readonly listAuthoredChangeRequests?: (input: {
+    readonly cwd: string;
+    readonly host: string;
+    readonly repository?: string | undefined;
+    readonly state: PullRequestListState;
+    readonly viewer: string;
+    readonly limit: number;
+    readonly query?: string | undefined;
+    readonly cursor?: string | undefined;
+    readonly filters?: PullRequestListFilters | undefined;
+  }) => Effect.Effect<
+    ProviderBatchedChangeRequestPage & { readonly nextCursor: string | null },
+    PullRequestProviderError
+  >;
+
   readonly listChangeRequestStats?: (input: {
     readonly cwd: string;
     readonly host: string;

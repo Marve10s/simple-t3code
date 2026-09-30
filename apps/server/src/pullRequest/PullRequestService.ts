@@ -421,6 +421,14 @@ function withRateLimitBackoff(
       : {
           listChangeRequestsAcross: wrap("listChangeRequestsAcross", api.listChangeRequestsAcross),
         }),
+    ...(api.listAuthoredChangeRequests === undefined
+      ? {}
+      : {
+          listAuthoredChangeRequests: wrap(
+            "listAuthoredChangeRequests",
+            api.listAuthoredChangeRequests,
+          ),
+        }),
     ...(api.listChangeRequestStats === undefined
       ? {}
       : {
@@ -925,7 +933,13 @@ const make = Effect.gen(function* () {
   const listUncached: PullRequestService["Service"]["list"] = (input) =>
     Effect.gen(function* () {
       const involvement = input.involvement ?? "all";
-      const continuation = yield* decodeCursors(input.cursors);
+      const continuation = yield* decodeCursors(
+        input.cursors === undefined
+          ? undefined
+          : Object.fromEntries(
+              Object.entries(input.cursors).filter(([key]) => !key.endsWith(" authored")),
+            ),
+      );
       const {
         supported: projects,
         unimplemented,
@@ -963,10 +977,47 @@ const make = Effect.gen(function* () {
         })),
       ];
 
+      const authoredHosts = new Map<string, SupportedProject>();
+      if (involvement === "authored" && input.projectId === undefined) {
+        for (const project of projects) {
+          if (
+            project.api.listAuthoredChangeRequests !== undefined &&
+            viewers[project.host] !== undefined &&
+            !authoredHosts.has(project.host)
+          ) {
+            authoredHosts.set(project.host, project);
+          }
+        }
+      }
+      const repositoryProjects = projects.filter(
+        (project) =>
+          !authoredHosts.has(project.host) &&
+          (input.repository === undefined ||
+            project.repository.toLowerCase() === input.repository.toLowerCase()),
+      );
+      if (input.repository !== undefined && input.projectId === undefined) {
+        const repository = input.repository.trim();
+        const seenHosts = new Set(repositoryProjects.map((project) => project.host));
+        for (const project of projects) {
+          if (
+            authoredHosts.has(project.host) ||
+            seenHosts.has(project.host) ||
+            project.api.listAuthoredChangeRequests === undefined
+          )
+            continue;
+          seenHosts.add(project.host);
+          repositoryProjects.push({
+            ...project,
+            repository,
+            cursorKey: listCursorKey(project.host, repository),
+            project: { ...project.project, title: repository },
+          });
+        }
+      }
       const selected =
         continuation === null
-          ? projects
-          : projects.filter(({ cursorKey }) => continuation.has(cursorKey));
+          ? repositoryProjects
+          : repositoryProjects.filter(({ cursorKey }) => continuation.has(cursorKey));
       const readable = selected.filter(({ host }) => viewers[host] !== undefined);
       const unreadable = selected
         .filter(({ host }) => viewers[host] === undefined)
@@ -975,7 +1026,7 @@ const make = Effect.gen(function* () {
           projectTitle: project.title,
           message: `${repository} could not be read.`,
         }));
-      if (readable.length === 0) {
+      if (readable.length === 0 && authoredHosts.size === 0) {
         const errors = viewerResults.flatMap((result) =>
           result.error === null || !selected.some(({ host }) => host === result.host)
             ? []
@@ -1175,6 +1226,70 @@ const make = Effect.gen(function* () {
         for (let start = 0; start < group.length; start += REPOSITORY_SEARCH_CHUNK) {
           reads.push(readTogether(group.slice(start, start + REPOSITORY_SEARCH_CHUNK)));
         }
+      }
+      for (const project of authoredHosts.values()) {
+        const key = `${project.host} authored`;
+        const cursor = input.cursors?.[key];
+        if (input.cursors !== undefined && cursor === undefined) continue;
+        const readAuthored = project.api.listAuthoredChangeRequests!;
+        const viewer = viewers[project.host]!;
+        reads.push(
+          readAuthored({
+            cwd: project.project.workspaceRoot,
+            host: project.host,
+            repository: input.repository,
+            state: input.state,
+            viewer,
+            limit,
+            query: input.query,
+            filters: input.filters,
+            cursor,
+          }).pipe(
+            observeRead,
+            Effect.map(({ value: page, observedAt }): ReadonlyArray<RepositoryBatch> => [
+              {
+                key,
+                entries: page.items
+                  .filter(
+                    (item) =>
+                      item.author?.login.toLowerCase() === viewer.toLowerCase() &&
+                      matchesRowFilters(item, input.filters, viewer),
+                  )
+                  .map((item) => {
+                    const own = projects.find(
+                      (candidate) =>
+                        candidate.host === project.host &&
+                        candidate.repository.toLowerCase() === item.repository.toLowerCase(),
+                    );
+                    const route = own ?? {
+                      ...project,
+                      repository: item.repository,
+                      project: { ...project.project, title: item.repository },
+                    };
+                    return toEntry({ project: route, item, viewer, observedAt });
+                  }),
+                errors: [],
+                truncated: page.truncated,
+                nextCursor: page.nextCursor,
+              },
+            ]),
+            Effect.orElseSucceed((): ReadonlyArray<RepositoryBatch> => [
+              {
+                key,
+                entries: [],
+                errors: [
+                  {
+                    projectId: project.project.id,
+                    projectTitle: project.project.title,
+                    message: `Your pull requests on ${project.host} could not be read.`,
+                  },
+                ],
+                truncated: false,
+                nextCursor: null,
+              },
+            ]),
+          ),
+        );
       }
       const batches = (yield* Effect.all(reads, { concurrency: REPOSITORY_CONCURRENCY })).flat();
 
@@ -2116,15 +2231,25 @@ const make = Effect.gen(function* () {
         { readonly project: SupportedProject; readonly number: number }
       >();
       for (const ref of input.refs) {
-        const project = byProject.get(ref.projectId);
+        const own = byProject.get(ref.projectId);
         if (
-          project === undefined ||
-          project.api.listChangeRequestStats === undefined ||
-          project.repository.toLowerCase() !== ref.repository.trim().toLowerCase()
-        ) {
+          own === undefined ||
+          own.api.listChangeRequestStats === undefined ||
+          (ref.host !== undefined && ref.host.toLowerCase() !== own.host)
+        )
           continue;
-        }
-        wanted.set(`${project.project.id} ${ref.number}`, { project, number: ref.number });
+        const repository = ref.repository.trim();
+        const project =
+          own.repository.toLowerCase() === repository.toLowerCase()
+            ? own
+            : own.api.listAuthoredChangeRequests === undefined
+              ? undefined
+              : { ...own, repository };
+        if (project === undefined) continue;
+        wanted.set(`${project.host} ${repository.toLowerCase()} ${ref.number}`, {
+          project,
+          number: ref.number,
+        });
       }
       const byHost = new Map<string, Array<{ project: SupportedProject; number: number }>>();
       for (const entry of wanted.values()) {
@@ -2438,6 +2563,7 @@ const make = Effect.gen(function* () {
         limit,
         query,
         cursorEntries,
+        repository,
       ] = JSON.parse(key) as [
         number,
         string,
@@ -2449,6 +2575,7 @@ const make = Effect.gen(function* () {
         number | null,
         string | null,
         ReadonlyArray<[string, string]> | null,
+        string | null,
       ];
       return listUncached({
         state,
@@ -2460,6 +2587,7 @@ const make = Effect.gen(function* () {
         ...(limit === null ? {} : { limit }),
         ...(query === null ? {} : { query }),
         ...(cursorEntries === null ? {} : { cursors: Object.fromEntries(cursorEntries) }),
+        ...(repository === null ? {} : { repository }),
       } as PullRequestListInput);
     },
     {
@@ -2490,6 +2618,7 @@ const make = Effect.gen(function* () {
       input.cursors === undefined
         ? null
         : Object.entries(input.cursors).toSorted(([left], [right]) => left.localeCompare(right)),
+      input.repository ?? null,
     ]);
     return Cache.get(listCache, key);
   };

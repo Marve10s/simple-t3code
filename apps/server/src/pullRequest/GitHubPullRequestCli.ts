@@ -399,6 +399,7 @@ class PullRequestSummaryRead extends Request.Class<
 export interface GitHubPullRequestSearchBatch {
   readonly items: ReadonlyArray<GitHubPullRequestSearchItem>;
   readonly truncated: boolean;
+  readonly nextCursor: string | null;
 }
 
 export interface GitHubPullRequestDiffSlice {
@@ -453,6 +454,8 @@ export class GitHubPullRequestCli extends Context.Service<
       readonly cwd: string;
       readonly host: string;
       readonly repositories: ReadonlyArray<string>;
+      readonly allRepositories?: boolean;
+      readonly searchCursor?: string | undefined;
       readonly state: PullRequestListState;
       readonly involvement: PullRequestInvolvement;
       readonly viewer: string;
@@ -836,6 +839,7 @@ const SEARCH_REPOSITORY = /^[A-Za-z0-9._-]+\/[A-Za-z0-9._-]+$/;
 
 function searchQuery(input: {
   readonly repositories: ReadonlyArray<string>;
+  readonly allRepositories?: boolean;
   readonly state: PullRequestListState;
   readonly involvement: PullRequestInvolvement;
   readonly viewer: string;
@@ -843,7 +847,8 @@ function searchQuery(input: {
   readonly cursor?: ProviderListCursor | undefined;
   readonly filters?: PullRequestListFilters | undefined;
 }): string | null {
-  if (input.repositories.length === 0) return null;
+  if (input.repositories.length === 0 && !input.allRepositories) return null;
+  if (input.allRepositories && input.involvement !== "authored") return null;
   const repositories = input.repositories.map((repository) => repository.trim());
   if (!repositories.every((repository) => SEARCH_REPOSITORY.test(repository))) return null;
   const query = input.query?.trim() ?? "";
@@ -1740,18 +1745,25 @@ export const make = Effect.gen(function* () {
           }),
         );
       }
-      const rows = Math.min(input.limit + 1, PULL_REQUEST_SEARCH_MAX_ROWS);
+      const rows = Math.min(
+        input.limit + (input.allRepositories ? 0 : 1),
+        PULL_REQUEST_SEARCH_MAX_ROWS,
+      );
       return graphqlRead({
         cwd: input.cwd,
         host: input.host,
         operation: "searchPullRequests",
-        privateVariables: { q: query },
+        privateVariables: {
+          q: query,
+          ...(input.searchCursor === undefined ? {} : { cursor: input.searchCursor }),
+        },
         query: pullRequestSearchGraphQlQuery(rows, input.host === "github.com"),
         decode: decodePullRequestSearchJson,
       }).pipe(
         Effect.map((batch) => ({
           items: batch.items.slice(0, input.limit),
           truncated: batch.rawCount > input.limit || batch.hasNextPage,
+          nextCursor: batch.nextCursor,
         })),
       );
     },

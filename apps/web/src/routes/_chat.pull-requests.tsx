@@ -206,9 +206,9 @@ function PullRequestGroupHeader({
 }
 
 const INVOLVEMENT_TABS = [
-  { value: "all", label: "All", Icon: LayersIcon },
-  { value: "reviewing", label: "Reviewing", Icon: EyeIcon },
-  { value: "authored", label: "Authored", Icon: PenLineIcon },
+  { value: "authored", label: "My PRs", Icon: PenLineIcon },
+  { value: "reviewing", label: "Review requested", Icon: EyeIcon },
+  { value: "all", label: "Everyone’s PRs", Icon: UsersIcon },
 ] as const satisfies ReadonlyArray<PullRequestFilterOption<PullRequestInvolvement>>;
 
 const STATE_TABS = [
@@ -265,7 +265,7 @@ function pullRequestSearchLabels(raw: unknown): Partial<Pick<PullRequestsSearch,
 export const Route = createFileRoute("/_chat/pull-requests")({
   validateSearch: (raw: Record<string, unknown>): PullRequestsSearch => ({
     involvement:
-      raw.involvement === "reviewing" || raw.involvement === "authored" ? raw.involvement : "all",
+      raw.involvement === "reviewing" || raw.involvement === "all" ? raw.involvement : "authored",
     state:
       raw.state === "closed" || raw.state === "merged" || raw.state === "all" ? raw.state : "open",
     ...(SORT_OPTIONS.some((option) => option.value === raw.sort)
@@ -284,6 +284,9 @@ export const Route = createFileRoute("/_chat/pull-requests")({
       ? { environmentId: raw.environmentId as EnvironmentId }
       : {}),
     ...(typeof raw.host === "string" && raw.host ? { host: raw.host.slice(0, 200) } : {}),
+    ...(typeof raw.repositoryFilter === "string" && raw.repositoryFilter
+      ? { repositoryFilter: raw.repositoryFilter.slice(0, 200) }
+      : {}),
     ...(typeof raw.selectedProjectId === "string" && raw.selectedProjectId
       ? { selectedProjectId: raw.selectedProjectId as ProjectId }
       : {}),
@@ -460,6 +463,7 @@ function PullRequestsRouteView() {
             ...(next.projectId ? { projectId: next.projectId } : {}),
             ...(next.environmentId ? { environmentId: next.environmentId } : {}),
             ...(next.host ? { host: next.host } : {}),
+            ...(next.repositoryFilter ? { repositoryFilter: next.repositoryFilter } : {}),
             ...(next.selectedHost ? { selectedHost: next.selectedHost } : {}),
             ...(next.selectedProjectId ? { selectedProjectId: next.selectedProjectId } : {}),
             ...(next.selectedEnvironmentId
@@ -540,7 +544,8 @@ function PullRequestsRouteView() {
     readonly projectIds?: ReadonlyArray<ProjectId>;
   }> => {
     const plain = queryEnvironmentIds.map((environmentId) => ({ environmentId }));
-    if (!projectsKnown || scopedProjectId !== undefined) return plain;
+    if (!projectsKnown || scopedProjectId !== undefined || search.involvement === "authored")
+      return plain;
     const assignment = assignProjectsToEnvironments(
       projects,
       queryEnvironmentIds,
@@ -556,7 +561,7 @@ function PullRequestsRouteView() {
       if (projectIds.length === (totals.get(environmentId) ?? 0)) return [{ environmentId }];
       return [{ environmentId, projectIds }];
     });
-  }, [projects, projectsKnown, queryEnvironmentIds, scopedProjectId]);
+  }, [projects, projectsKnown, queryEnvironmentIds, scopedProjectId, search.involvement]);
   const assignmentKey = useMemo(
     () =>
       environmentQueries
@@ -570,7 +575,7 @@ function PullRequestsRouteView() {
   const turnRefreshToken = turnRefreshes
     .map(([environmentId, revision]) => `${environmentId}:${revision}`)
     .join("|");
-  const scopeKey = `${environmentKey}:${assignmentKey}:${search.state}:${search.involvement}:${scopedProjectId ?? ""}:${search.host ?? ""}:${search.draft ?? ""}:${search.review ?? ""}:${search.checks ?? ""}:${search.author ?? ""}:${search.labels?.join("\u0000") ?? ""}`;
+  const scopeKey = `${environmentKey}:${assignmentKey}:${search.state}:${search.involvement}:${scopedProjectId ?? ""}:${search.host ?? ""}:${search.draft ?? ""}:${search.review ?? ""}:${search.checks ?? ""}:${search.author ?? ""}:${search.labels?.join("\u0000") ?? ""}:${search.repositoryFilter ?? ""}`;
   const filterKey = `${scopeKey}:${sentQuery}`;
   const statsScopeRef = useRef<PullRequestStatsScope>({ key: filterKey, policy: statsPolicy });
   statsScopeRef.current = { key: filterKey, policy: statsPolicy };
@@ -603,6 +608,7 @@ function PullRequestsRouteView() {
               involvement: search.involvement,
               limit: pageSize,
               ...(scopedProjectId ? { projectId: scopedProjectId } : {}),
+              ...(search.repositoryFilter ? { repository: search.repositoryFilter } : {}),
               ...(projectIds ? { projectIds } : {}),
               ...(search.host ? { host: search.host } : {}),
               ...(hasFilters ? { filters } : {}),
@@ -620,6 +626,7 @@ function PullRequestsRouteView() {
       scopedProjectId,
       search.host,
       search.involvement,
+      search.repositoryFilter,
       search.state,
       sentCursors,
       sentRegrown,
@@ -637,6 +644,7 @@ function PullRequestsRouteView() {
           involvement: search.involvement,
           limit: PAGE_SIZE,
           ...(scopedProjectId ? { projectId: scopedProjectId } : {}),
+          ...(search.repositoryFilter ? { repository: search.repositoryFilter } : {}),
           ...(projectIds ? { projectIds } : {}),
           ...(search.host ? { host: search.host } : {}),
           ...(menuFiltered ? { filters: menuFilters } : {}),
@@ -649,6 +657,7 @@ function PullRequestsRouteView() {
       scopedProjectId,
       search.host,
       search.involvement,
+      search.repositoryFilter,
       search.state,
     ],
   );
@@ -685,6 +694,7 @@ function PullRequestsRouteView() {
           involvement,
           limit: PAGE_SIZE,
           ...(scopedProjectId ? { projectId: scopedProjectId } : {}),
+          ...(search.repositoryFilter ? { repository: search.repositoryFilter } : {}),
           ...(projectIds ? { projectIds } : {}),
           ...(search.host ? { host: search.host } : {}),
           ...(menuFiltered ? { filters: menuFilters } : {}),
@@ -700,6 +710,7 @@ function PullRequestsRouteView() {
     scopedProjectId,
     search.host,
     search.state,
+    search.repositoryFilter,
   ]);
   const authoredQuery = usePullRequestList(partitionTargets.authored);
   const reviewingQuery = usePullRequestList(partitionTargets.reviewing);
@@ -1018,7 +1029,15 @@ function PullRequestsRouteView() {
 
   const entries = useMemo(() => {
     const known = ordered?.key === filterKey ? ordered.entries : (listData?.entries ?? []);
-    const involvementEntries = filterPullRequestsByInvolvement(known, viewers, search.involvement);
+    const involvementEntries = filterPullRequestsByInvolvement(
+      known,
+      viewers,
+      search.involvement,
+    ).filter(
+      (entry) =>
+        search.repositoryFilter === undefined ||
+        entry.repository.toLowerCase() === search.repositoryFilter.toLowerCase(),
+    );
     const narrowedEntries = hasLocalFilters
       ? involvementEntries.filter((entry) =>
           matchesPullRequestFilters(entry, localFilters, pullRequestEntryViewer(entry, viewers)),
@@ -1043,6 +1062,7 @@ function PullRequestsRouteView() {
     ordered,
     querySettled,
     search.involvement,
+    search.repositoryFilter,
     searchingHosts,
     showingCarried,
     typedParsed.text,
@@ -1467,7 +1487,8 @@ function PullRequestsRouteView() {
           filtered={
             menuFiltered ||
             search.state !== "open" ||
-            search.involvement !== "all" ||
+            search.involvement !== "authored" ||
+            search.repositoryFilter !== undefined ||
             scopedProjectId !== undefined ||
             search.host !== undefined
           }
@@ -1580,6 +1601,28 @@ function PullRequestsRouteView() {
       onChange={(next) => updateListScope({ sort: next })}
     />
   );
+  const repositoryOptions: ReadonlyArray<PullRequestFilterOption<string>> = [
+    { value: "", label: "All repositories", Icon: LayersIcon },
+    ...[
+      ...new Set([
+        ...projects.flatMap((project) =>
+          project.repositoryIdentity?.owner && project.repositoryIdentity.name
+            ? [`${project.repositoryIdentity.owner}/${project.repositoryIdentity.name}`]
+            : [],
+        ),
+        ...(baselineQuery.data?.entries ?? []).map((entry) => entry.repository),
+        ...(facetQuery.data?.entries ?? []).map((entry) => entry.repository),
+        ...(listData?.entries ?? []).map((entry) => entry.repository),
+        ...(search.repositoryFilter ? [search.repositoryFilter] : []),
+      ]),
+    ]
+      .toSorted((left, right) => left.localeCompare(right))
+      .map((repository) => ({
+        value: repository,
+        label: repository,
+        Icon: LayersIcon,
+      })),
+  ];
   const filtersMenu = (
     <PullRequestFiltersMenu
       onOpenChange={setFiltersOpen}
@@ -1589,6 +1632,11 @@ function PullRequestsRouteView() {
       involvement={search.involvement}
       involvementOptions={INVOLVEMENT_TABS}
       onInvolvement={(involvement) => updateListScope({ involvement })}
+      repository={search.repositoryFilter}
+      repositoryOptions={repositoryOptions}
+      onRepository={(repositoryFilter) =>
+        updateListScope({ repositoryFilter, projectId: undefined })
+      }
       filters={menuFilters}
       onFilters={(next) =>
         updateListScope({
@@ -1612,7 +1660,11 @@ function PullRequestsRouteView() {
       projectEnvironmentId={scopedProject?.environmentId}
       unavailable={unavailableProjects}
       onProject={(projectId, environmentId) =>
-        updateListScope(environmentId === undefined ? { projectId } : { projectId, environmentId })
+        updateListScope(
+          environmentId === undefined
+            ? { projectId, repositoryFilter: undefined }
+            : { projectId, environmentId, repositoryFilter: undefined },
+        )
       }
     />
   );
@@ -2107,7 +2159,7 @@ function PullRequestsColumn({
                 className="shrink-0"
               />
               <CompactFilterMenu
-                label="Filter by involvement"
+                label="Whose pull requests"
                 value={involvement}
                 options={INVOLVEMENT_TABS}
                 onChange={onInvolvement}
@@ -2158,6 +2210,15 @@ function PullRequestsColumn({
               <div className="min-w-0 basis-full @lg/pr-list:basis-0 @lg/pr-list:flex-1">
                 {searchInput}
               </div>
+              {!condensed ? (
+                <CompactFilterMenu
+                  label="Whose pull requests"
+                  outlined
+                  value={involvement}
+                  options={INVOLVEMENT_TABS}
+                  onChange={onInvolvement}
+                />
+              ) : null}
               {sortMenu}
               {filtersMenu}
               <CompactFilterMenu

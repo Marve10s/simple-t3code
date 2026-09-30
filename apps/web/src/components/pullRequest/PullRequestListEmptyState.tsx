@@ -130,8 +130,8 @@ export function PullRequestListEmptyState({
         <EmptyTitle>{filtered ? "Nothing under these filters" : "No pull requests"}</EmptyTitle>
         <EmptyDescription>
           {filtered
-            ? "Widen the state, involvement or project filter to see more."
-            : "Pull requests from every project in this workspace appear here."}
+            ? "Widen the state, repository or author filter to see more."
+            : "Your pull requests appear here. Use the repository filter or choose everyone’s PRs to change the view."}
         </EmptyDescription>
       </EmptyHeader>
       <div className="flex flex-wrap justify-center gap-2">

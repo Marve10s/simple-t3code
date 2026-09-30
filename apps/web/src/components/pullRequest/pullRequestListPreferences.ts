@@ -25,6 +25,7 @@ export interface PullRequestListPreferences {
   readonly environmentId?: EnvironmentId;
   readonly projectId?: ProjectId;
   readonly host?: string;
+  readonly repositoryFilter?: string;
   readonly q?: string;
   readonly draft?: "only" | "hide";
   readonly review?: NonNullable<PullRequestListFilters["review"]>;
@@ -39,7 +40,7 @@ export type PullRequestListPreferencePatch = {
 };
 
 const DEFAULT_PULL_REQUEST_LIST_PREFERENCES = {
-  involvement: "all",
+  involvement: "authored",
   state: "open",
 } as const satisfies PullRequestListPreferences;
 
@@ -50,6 +51,7 @@ const PullRequestListPreferencesSchema = Schema.Struct({
   environmentId: Schema.optional(EnvironmentId),
   projectId: Schema.optional(ProjectId),
   host: Schema.optional(BoundedPreference),
+  repositoryFilter: Schema.optional(BoundedPreference),
   q: Schema.optional(BoundedPreference),
   draft: PullRequestListFilters.fields.draft,
   review: PullRequestListFilters.fields.review,
@@ -62,7 +64,7 @@ const PullRequestListPreferencesSchema = Schema.Struct({
 const decodePullRequestListPreferences = Schema.decodeUnknownOption(
   PullRequestListPreferencesSchema,
 );
-const PULL_REQUEST_LIST_PREFERENCES_STORAGE_KEY = "t3.pullRequests.preferences";
+const PULL_REQUEST_LIST_PREFERENCES_STORAGE_KEY = "simplet3code:pullRequests.preferences";
 type PreferenceStorage = Pick<Storage, "getItem" | "setItem">;
 
 function resolvePreferenceStorage(
@@ -80,6 +82,7 @@ export function pullRequestListPreferences(
     ...(search.environmentId ? { environmentId: search.environmentId } : {}),
     ...(search.projectId ? { projectId: search.projectId } : {}),
     ...(search.host ? { host: search.host } : {}),
+    ...(search.repositoryFilter ? { repositoryFilter: search.repositoryFilter } : {}),
     ...(search.q ? { q: search.q } : {}),
     ...(search.draft ? { draft: search.draft } : {}),
     ...(search.review ? { review: search.review } : {}),
