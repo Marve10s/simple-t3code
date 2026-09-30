@@ -337,7 +337,7 @@ const waitForIndexReady = Effect.fn("WorkspaceSearchIndex.waitForIndexReady")(fu
   }
 });
 
-export const make = Effect.fn("WorkspaceSearchIndex.make")(function* (
+const make = Effect.fn("WorkspaceSearchIndex.make")(function* (
   cwd: string,
   variant: WorkspaceSearchIndexVariant = "paths",
 ) {

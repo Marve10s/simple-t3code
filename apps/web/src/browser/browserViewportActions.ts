@@ -2,7 +2,7 @@ import type { PreviewViewportSetting } from "@t3tools/contracts";
 
 type BrowserViewportHandler = (setting: PreviewViewportSetting) => Promise<void>;
 
-export const BROWSER_VIEWPORT_COMMIT_TIMEOUT_MS = 15_000;
+const BROWSER_VIEWPORT_COMMIT_TIMEOUT_MS = 15_000;
 
 class BrowserViewportCommitTimeoutError extends Error {
   override readonly name = "BrowserViewportCommitTimeoutError";

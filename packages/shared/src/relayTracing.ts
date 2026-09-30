@@ -22,7 +22,7 @@ export interface RelayClientTracingResource {
   readonly component?: string;
 }
 
-export class RelayClientTracer extends Context.Reference(
+class RelayClientTracer extends Context.Reference(
   "@t3tools/shared/relayTracing/RelayClientTracer",
   {
     defaultValue: () => Option.none<Tracer.Tracer>(),

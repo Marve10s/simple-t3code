@@ -50,11 +50,6 @@ import {
   newlyTerminalRows,
   shouldAlertForActivity,
 } from "./agentActivityAlerts.ts";
-export {
-  alertForAttentionTransition,
-  alertForNewlyTerminal,
-  alertForTerminalAggregate,
-} from "./agentActivityAlerts.ts";
 
 const MIN_LIVE_ACTIVITY_UPDATE_INTERVAL_MS = 15_000;
 const FRESHLY_ARMED_GRACE_MS = 2 * 60 * 1_000;
@@ -129,8 +124,6 @@ export class ApnsDeliveryTransportError extends Schema.TaggedError<ApnsDeliveryT
     return `APNs ${this.kind} delivery failed for device ${this.deviceId}.`;
   }
 }
-
-export const isApnsDeliveryTransportError = Schema.is(ApnsDeliveryTransportError);
 
 const decodeRelayAgentActivityAggregateStateJson = Schema.decodeUnknownOption(
   Schema.fromJsonString(RelayAgentActivityAggregateStateSchema),
@@ -513,7 +506,7 @@ export class ApnsDeliveries extends Context.Service<
   }
 >()("t3code-relay/agentActivity/ApnsDeliveries") {}
 
-export const make = Effect.gen(function* () {
+const make = Effect.gen(function* () {
   const attempts = yield* DeliveryAttempts.DeliveryAttempts;
   const liveActivities = yield* LiveActivities.LiveActivities;
   const deliveryQueue = yield* ApnsDeliveryQueue.ApnsDeliveryQueue;

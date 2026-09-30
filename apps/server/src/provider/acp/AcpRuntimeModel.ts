@@ -704,7 +704,7 @@ export function sessionModelStateFromInitialize(
   return isSessionModelState(modelState) ? modelState : undefined;
 }
 
-export function syntheticLoadSessionResponseFromInitialize(
+function syntheticLoadSessionResponseFromInitialize(
   initializeResult: EffectAcpSchema.InitializeResponse,
 ): EffectAcpSchema.LoadSessionResponse {
   const meta = initializeResult._meta;

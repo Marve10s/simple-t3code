@@ -46,7 +46,7 @@ function parseHostname(url: string): string | null {
   }
 }
 
-export function resolveRemoteOpenState(input: {
+function resolveRemoteOpenState(input: {
   readonly target: ConnectionTarget | null;
   readonly sshAlias: string | null;
   readonly remoteOpenTargets: ReadonlyArray<RemoteOpenTarget> | undefined;

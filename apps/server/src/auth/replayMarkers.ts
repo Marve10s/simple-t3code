@@ -14,9 +14,9 @@ import { DPOP_REPLAY_MARKER_PREFIX } from "./dpop.ts";
 
 const REPLAY_MARKER_PREFIXES = [DPOP_REPLAY_MARKER_PREFIX, ...CLOUD_REPLAY_MARKER_PREFIXES];
 
-export const REPLAY_MARKER_MAX_AGE = Duration.days(1);
+const REPLAY_MARKER_MAX_AGE = Duration.days(1);
 
-export const pruneExpiredReplayMarkers = Effect.fn("replayMarkers.pruneExpired")(function* () {
+const pruneExpiredReplayMarkers = Effect.fn("replayMarkers.pruneExpired")(function* () {
   const fileSystem = yield* FileSystem.FileSystem;
   const path = yield* Path.Path;
   const { secretsDir } = yield* ServerConfig.ServerConfig;

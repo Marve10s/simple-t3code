@@ -27,7 +27,7 @@ function getDesktopUpdateBridge(): DesktopUpdateBridge | undefined {
   return typeof window === "undefined" ? undefined : window.desktopBridge;
 }
 
-export function createDesktopUpdateStateAtom(getBridge: () => DesktopUpdateBridge | undefined) {
+function createDesktopUpdateStateAtom(getBridge: () => DesktopUpdateBridge | undefined) {
   const updates = Stream.callback<DesktopUpdateState | null>((queue) =>
     Effect.gen(function* () {
       const bridge = getBridge();

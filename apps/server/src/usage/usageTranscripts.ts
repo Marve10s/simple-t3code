@@ -55,7 +55,7 @@ export function mightCarryUsage(line: string, provider: UsageProviderKind): bool
   return line.includes('"token_count"');
 }
 
-export const GROK_COST_USD_TICKS_PER_DOLLAR = 10_000_000_000;
+const GROK_COST_USD_TICKS_PER_DOLLAR = 10_000_000_000;
 
 function grokCostTicksToUsd(ticks: unknown): number | null {
   if (typeof ticks !== "number" || !Number.isFinite(ticks) || ticks < 0) return null;

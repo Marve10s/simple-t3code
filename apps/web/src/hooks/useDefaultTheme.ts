@@ -9,11 +9,11 @@ import { useTheme } from "./useTheme";
 
 const APPLIED_DEFAULT_THEME_STORAGE_PREFIX = "t3code:default-theme-applied:v2:";
 
-export function defaultThemeGeneration(theme: string, setAt: string): string {
+function defaultThemeGeneration(theme: string, setAt: string): string {
   return setAt.length > 0 ? `${theme}@${setAt}` : theme;
 }
 
-export function defaultThemeToApply(input: {
+function defaultThemeToApply(input: {
   readonly environmentId: string | null;
   readonly defaultTheme: string;
   readonly defaultThemeSetAt: string;

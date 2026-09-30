@@ -61,7 +61,7 @@ import {
 export const LAST_INVOKED_SCRIPT_BY_PROJECT_KEY = "t3code:last-invoked-script-by-project";
 export const MAX_HIDDEN_MOUNTED_TERMINAL_THREADS = 10;
 
-export const ENVIRONMENT_RECONNECT_WARNING_GRACE_MS = 2_000;
+const ENVIRONMENT_RECONNECT_WARNING_GRACE_MS = 2_000;
 
 export const LastInvokedScriptByProjectSchema = Schema.Record(ProjectId, Schema.String);
 
@@ -325,13 +325,7 @@ export function peekHeldThreadTimeline<
   return held as HeldThreadTimeline<T>;
 }
 
-export function resetHeldThreadTimeline(): void {
-  rememberedThreadTimelines = new Map();
-  rememberedThreadTimelineOrder = [];
-  lastReadyThreadKey = null;
-}
-
-export function threadKeysShareEnvironment(left: string | null, right: string | null): boolean {
+function threadKeysShareEnvironment(left: string | null, right: string | null): boolean {
   if (left === null || right === null) {
     return false;
   }

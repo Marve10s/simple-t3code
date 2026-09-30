@@ -32,7 +32,7 @@ export type ThreadSnoozeShell = Pick<
   | "latestTurn"
 >;
 
-export function threadRaisedHandWhileSnoozed(shell: ThreadSnoozeShell): boolean {
+function threadRaisedHandWhileSnoozed(shell: ThreadSnoozeShell): boolean {
   if (shell.hasPendingApprovals || shell.hasPendingUserInput) return true;
   if (
     shell.session?.status === "error" &&

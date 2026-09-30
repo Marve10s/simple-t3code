@@ -76,7 +76,7 @@ export class ApnsDeliveryQueue extends Context.Service<
   }
 >()("t3code-relay/agentActivity/ApnsDeliveryQueue") {}
 
-export const make = Effect.gen(function* () {
+const make = Effect.gen(function* () {
   const sender = yield* ApnsDeliveryQueueSender;
   const crypto = yield* Crypto.Crypto;
   const config = yield* RelayConfiguration.RelayConfiguration;
@@ -206,7 +206,7 @@ export const make = Effect.gen(function* () {
   });
 });
 
-export const layer = Layer.effect(ApnsDeliveryQueue, make);
+const layer = Layer.effect(ApnsDeliveryQueue, make);
 
 export const layerCloudflareQueues = (
   sender: Cloudflare.Queues.WriteQueueClient,

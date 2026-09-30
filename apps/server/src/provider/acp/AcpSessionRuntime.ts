@@ -207,7 +207,7 @@ interface AcpActivePrompt {
   readonly completed: Deferred.Deferred<void>;
 }
 
-export const make = (
+const make = (
   options: AcpSessionRuntimeOptions,
 ): Effect.Effect<
   AcpSessionRuntime["Service"],

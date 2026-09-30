@@ -31,7 +31,7 @@ export type ServiceReconcileResult =
       readonly plan: BootService.BootServicePlan;
     };
 
-export const reconcileService = Effect.fn("cli.service.reconcile")(function* (options?: {
+const reconcileService = Effect.fn("cli.service.reconcile")(function* (options?: {
   readonly allowDowngrade?: boolean;
   readonly start?: boolean;
 }) {
@@ -58,10 +58,7 @@ export const reconcileService = Effect.fn("cli.service.reconcile")(function* (op
   } satisfies ServiceReconcileResult;
 });
 
-export function formatServiceStatus(
-  status: BootService.BootServiceStatus,
-  cliVersion: string,
-): string {
+function formatServiceStatus(status: BootService.BootServiceStatus, cliVersion: string): string {
   if (!status.supported) {
     return "T3 Code service\n  Status: unavailable on this machine\n  Supported on: Linux with systemd, macOS with launchd";
   }

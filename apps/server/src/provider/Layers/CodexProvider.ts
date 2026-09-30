@@ -147,7 +147,7 @@ function codexAccountEmail(account: CodexSchema.V2GetAccountResponse["account"])
   return account.email;
 }
 
-export function mapCodexModelCapabilities(
+function mapCodexModelCapabilities(
   model: CodexSchema.V2ModelListResponse__Model,
 ): ModelCapabilities {
   const reasoningOptions = model.supportedReasoningEfforts.map(({ reasoningEffort }) =>
@@ -237,7 +237,7 @@ function parseCodexModelListResponse(
   }));
 }
 
-export function applyPreferredCodexDefaultModel(
+function applyPreferredCodexDefaultModel(
   models: ReadonlyArray<ServerProviderModel>,
 ): ReadonlyArray<ServerProviderModel> {
   const preferredSlug = PREFERRED_DEFAULT_CODEX_MODELS.flatMap((slug) =>

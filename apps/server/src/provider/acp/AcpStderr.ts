@@ -1,7 +1,7 @@
 // @effect-diagnostics nodeBuiltinImport:off -- The excerpt sanitizer masks the home directory, which only the Node os module can resolve.
 import * as NodeOS from "node:os";
 
-export const ACP_STDERR_TAIL_MAX_CHARS = 4_096;
+const ACP_STDERR_TAIL_MAX_CHARS = 4_096;
 
 const PAIRING_URL_PATTERN = /https?:\/\/[^\s]*\/pair#[^\s]*/gi;
 const BEARER_TOKEN_PATTERN = /\bBearer\s+[A-Za-z0-9._\-+=/]+/gi;

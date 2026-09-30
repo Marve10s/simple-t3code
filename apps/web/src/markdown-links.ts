@@ -59,7 +59,7 @@ export function rewriteMarkdownFileUriHref(href: string | undefined): string | n
   return target ? `${target.path}${target.hash}` : null;
 }
 
-export function resolveMarkdownFileLinkTarget(
+function resolveMarkdownFileLinkTarget(
   href: string | undefined,
   cwd?: string,
   baseDir: string | undefined = cwd,

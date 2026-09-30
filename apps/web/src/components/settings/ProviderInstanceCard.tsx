@@ -136,7 +136,7 @@ function nextConfigBlobWithValue(
   return base;
 }
 
-export function deriveProviderModelsForDisplay(input: {
+function deriveProviderModelsForDisplay(input: {
   readonly liveModels: ReadonlyArray<ServerProviderModel> | undefined;
   readonly customModels: ReadonlyArray<CustomModelDefinition>;
 }): ReadonlyArray<ServerProviderModel> {

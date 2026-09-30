@@ -9,7 +9,7 @@ import {
   createEnvironmentRpcSubscriptionAtomFamily,
 } from "./runtime.ts";
 
-export const previewAutomationHostFocusConcurrencyKey = (value: {
+const previewAutomationHostFocusConcurrencyKey = (value: {
   readonly environmentId: string;
   readonly input: {
     readonly clientId: string;

@@ -9,7 +9,7 @@ import { ProviderInstanceRegistry } from "../Services/ProviderInstanceRegistry.t
 import { ProviderService } from "../Services/ProviderService.ts";
 import { ProviderSessionDirectory } from "../Services/ProviderSessionDirectory.ts";
 
-export const makeProviderAuthService = Effect.gen(function* () {
+const makeProviderAuthService = Effect.gen(function* () {
   const registry = yield* ProviderInstanceRegistry;
   const providers = yield* ProviderService;
   const directory = yield* ProviderSessionDirectory;

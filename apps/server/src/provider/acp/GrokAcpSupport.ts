@@ -30,7 +30,7 @@ interface GrokAcpRuntimeInput extends Omit<
   readonly runtimeMode?: RuntimeMode;
 }
 
-export function grokAcpSpawnArgs(runtimeMode?: RuntimeMode): ReadonlyArray<string> {
+function grokAcpSpawnArgs(runtimeMode?: RuntimeMode): ReadonlyArray<string> {
   switch (runtimeMode) {
     case "approval-required":
       return ["--permission-mode", "default", "agent", "stdio"];
@@ -45,7 +45,7 @@ export function grokAcpSpawnArgs(runtimeMode?: RuntimeMode): ReadonlyArray<strin
   }
 }
 
-export function buildGrokAcpSpawnInput(
+function buildGrokAcpSpawnInput(
   grokSettings: GrokAcpRuntimeGrokSettings | null | undefined,
   cwd: string,
   environment?: NodeJS.ProcessEnv,

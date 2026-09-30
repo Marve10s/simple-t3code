@@ -36,9 +36,9 @@ import type {
 
 const DIFF_FILE_CONCURRENCY = 4;
 
-export const MAX_DIFF_SPAWNS = 2 * DIFF_FILE_CONCURRENCY;
+const MAX_DIFF_SPAWNS = 2 * DIFF_FILE_CONCURRENCY;
 
-export const LOCATION_CACHE_CAPACITY = 128;
+const LOCATION_CACHE_CAPACITY = 128;
 
 const CAPABILITIES: PullRequestCapabilities = {
   diff: true,
@@ -69,7 +69,7 @@ const AZURE_DEVOPS_VIEWER_PERMISSIONS: PullRequestViewerPermissions = {
   requestReviewers: CAPABILITIES.reviewers.request,
 };
 
-export function azureDevOpsProviderFailure(
+function azureDevOpsProviderFailure(
   error: AzureDevOpsPullRequestCli.AzureDevOpsPullRequestCliError,
 ): PullRequestProviderFailure {
   if (error._tag === "AzureDevOpsCliUnavailableError") return { reason: "missing-tool" };

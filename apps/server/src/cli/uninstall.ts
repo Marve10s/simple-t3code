@@ -36,7 +36,7 @@ export interface UninstallPlan {
   readonly userdataDir: string;
 }
 
-export const findOwnedLauncher = Effect.fn("cli.uninstall.find_launcher")(function* (input: {
+const findOwnedLauncher = Effect.fn("cli.uninstall.find_launcher")(function* (input: {
   readonly launchedAs: string | undefined;
   readonly versionsDir: string;
 }) {

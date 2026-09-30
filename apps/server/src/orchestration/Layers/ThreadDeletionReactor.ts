@@ -17,7 +17,7 @@ import { forkParked } from "../../serverActivation.ts";
 
 type ThreadDeletedEvent = Extract<OrchestrationEvent, { type: "thread.deleted" }>;
 
-export const logCleanupCauseUnlessInterrupted = <R, E>({
+const logCleanupCauseUnlessInterrupted = <R, E>({
   effect,
   message,
   threadId,

@@ -143,38 +143,38 @@ function sshPreparationError(cause: unknown) {
   });
 }
 
-export const provisionDesktopSshEnvironment = Effect.fn(
-  "web.connectionPlatform.ssh.provisionDesktop",
-)(function* (bridge: DesktopBridge, target: DesktopSshEnvironmentTarget) {
-  const bootstrap = yield* Effect.tryPromise({
-    try: () =>
-      bridge.ensureSshEnvironment(target, {
-        issuePairingToken: true,
-      }),
-    catch: sshPreparationError,
-  });
-  const pairingToken = bootstrap.pairingToken;
-  if (pairingToken === null) {
-    return yield* new ConnectionBlockedError({
-      reason: "authentication",
-      detail: "The SSH environment did not issue a pairing credential.",
+const provisionDesktopSshEnvironment = Effect.fn("web.connectionPlatform.ssh.provisionDesktop")(
+  function* (bridge: DesktopBridge, target: DesktopSshEnvironmentTarget) {
+    const bootstrap = yield* Effect.tryPromise({
+      try: () =>
+        bridge.ensureSshEnvironment(target, {
+          issuePairingToken: true,
+        }),
+      catch: sshPreparationError,
     });
-  }
-  const descriptor = yield* Effect.tryPromise({
-    try: () => bridge.fetchSshEnvironmentDescriptor(bootstrap.httpBaseUrl),
-    catch: sshPreparationError,
-  });
-  const access = yield* Effect.tryPromise({
-    try: () => bridge.bootstrapSshBearerSession(bootstrap.httpBaseUrl, pairingToken),
-    catch: sshPreparationError,
-  });
-  return {
-    environmentId: descriptor.environmentId,
-    label: descriptor.label,
-    bootstrap,
-    bearerToken: access.access_token,
-  };
-});
+    const pairingToken = bootstrap.pairingToken;
+    if (pairingToken === null) {
+      return yield* new ConnectionBlockedError({
+        reason: "authentication",
+        detail: "The SSH environment did not issue a pairing credential.",
+      });
+    }
+    const descriptor = yield* Effect.tryPromise({
+      try: () => bridge.fetchSshEnvironmentDescriptor(bootstrap.httpBaseUrl),
+      catch: sshPreparationError,
+    });
+    const access = yield* Effect.tryPromise({
+      try: () => bridge.bootstrapSshBearerSession(bootstrap.httpBaseUrl, pairingToken),
+      catch: sshPreparationError,
+    });
+    return {
+      environmentId: descriptor.environmentId,
+      label: descriptor.label,
+      bootstrap,
+      bearerToken: access.access_token,
+    };
+  },
+);
 
 const capabilitiesLayer = Layer.effectContext(
   Effect.sync(() => {
@@ -359,14 +359,14 @@ const loadSecondaryConnectionRegistration = Effect.fn(
 const PLATFORM_POLL_INTERVAL = "3 seconds";
 const SECONDARY_BEARER_REFRESH_SKEW_MS = 5_000;
 
-export function secondaryBearerExpiresAtEpochMs(
+function secondaryBearerExpiresAtEpochMs(
   issuedAtEpochMs: number,
   expiresInSeconds: number,
 ): number {
   return issuedAtEpochMs + Math.max(0, expiresInSeconds * 1_000);
 }
 
-export function secondaryBearerRefreshAtEpochMs(
+function secondaryBearerRefreshAtEpochMs(
   issuedAtEpochMs: number,
   expiresInSeconds: number,
 ): number {
@@ -394,7 +394,7 @@ export type PrimaryEnvironmentTargetRead =
       readonly cause: unknown;
     };
 
-export function readPrimaryEnvironmentTargetResult(
+function readPrimaryEnvironmentTargetResult(
   readTarget: () => PrimaryEnvironmentTarget | null = readPrimaryEnvironmentTarget,
 ): PrimaryEnvironmentTargetRead {
   try {
@@ -404,14 +404,14 @@ export function readPrimaryEnvironmentTargetResult(
   }
 }
 
-export function primaryRegistrationToRetainAfterTopologyRead(
+function primaryRegistrationToRetainAfterTopologyRead(
   previous: ReadonlyMap<string, CachedPlatformRegistration>,
   topologyRead: PrimaryEnvironmentTargetRead,
 ): CachedPlatformRegistration | undefined {
   return topologyRead._tag === "Failure" ? previous.get(PRIMARY_LOCAL_ENVIRONMENT_ID) : undefined;
 }
 
-export function canReuseCachedPlatformRegistration(
+function canReuseCachedPlatformRegistration(
   cached: CachedPlatformRegistration,
   signature: string,
   nowEpochMs: number,
@@ -422,7 +422,7 @@ export function canReuseCachedPlatformRegistration(
   );
 }
 
-export function canRetainCachedPlatformRegistrationAfterRefreshFailure(
+function canRetainCachedPlatformRegistrationAfterRefreshFailure(
   cached: CachedPlatformRegistration,
   signature: string,
   nowEpochMs: number,
@@ -434,7 +434,7 @@ export function canRetainCachedPlatformRegistrationAfterRefreshFailure(
   );
 }
 
-export function secondaryRegistrationsToRetainAfterTopologyRead(
+function secondaryRegistrationsToRetainAfterTopologyRead(
   previous: ReadonlyMap<string, CachedPlatformRegistration>,
   topologyRead: DesktopSecondaryBootstrapsRead,
   nowEpochMs: number,

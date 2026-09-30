@@ -14,7 +14,7 @@ const EMPTY_SHORTCUT_MODIFIER_STATE: ShortcutModifierState = {
   shiftKey: false,
 };
 
-export function areShortcutModifierStatesEqual(
+function areShortcutModifierStatesEqual(
   left: ShortcutModifierState,
   right: ShortcutModifierState,
 ): boolean {
@@ -76,7 +76,7 @@ function normalizeModifierKey(key: string): keyof ShortcutModifierState | null {
   }
 }
 
-export function shortcutModifierStateAfterKeyboardEvent(
+function shortcutModifierStateAfterKeyboardEvent(
   currentState: ShortcutModifierState,
   event: KeyboardEvent,
 ): ShortcutModifierState {

@@ -16,7 +16,7 @@ import { ForgejoPullRequestSchema, toForgejoChangeRequest } from "./forgejoPullR
 
 const isForgejoCliError = Schema.is(ForgejoCli.ForgejoCliError);
 
-export const discovery = {
+const discovery = {
   type: "cli",
   kind: "forgejo",
   label: "Forgejo / Gitea",

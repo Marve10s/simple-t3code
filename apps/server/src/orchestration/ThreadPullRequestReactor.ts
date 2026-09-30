@@ -51,7 +51,7 @@ function samePullRequest(
   );
 }
 
-export const BACKFILL_ATTEMPTS = 5;
+const BACKFILL_ATTEMPTS = 5;
 
 interface RefreshRequest {
   readonly threadId: ThreadId | null;

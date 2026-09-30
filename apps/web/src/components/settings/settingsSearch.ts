@@ -98,7 +98,7 @@ const KEYBINDING_SEARCH_ITEMS = STATIC_KEYBINDING_COMMANDS.toSorted((left, right
   };
 });
 
-export const SETTINGS_SEARCH_ITEMS = [
+const SETTINGS_SEARCH_ITEMS = [
   {
     id: "storage-worktrees",
     title: "Worktree cleanup",

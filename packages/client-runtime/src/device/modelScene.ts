@@ -4,7 +4,7 @@ import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 import type { DeviceAssetSource } from "./model.ts";
 import { createDisplayProjection, updateDisplayUv, type PhoneDisplayLayout } from "./phoneScene.ts";
 
-export function disposeDeviceModel(root: Object3D) {
+function disposeDeviceModel(root: Object3D) {
   const geometries = new Set<Mesh["geometry"]>();
   const materials = new Set<Material>();
   const textures = new Set<Texture>();

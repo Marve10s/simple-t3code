@@ -39,7 +39,7 @@ export const applyWebBrandAssets = Effect.fn("applyWebBrandAssets")(function* (
   );
 });
 
-export const applyWebBrandAssetsCommand = Command.make(
+const applyWebBrandAssetsCommand = Command.make(
   "apply-web-brand-assets",
   {
     brand: Argument.Literals("brand", WEB_ASSET_BRANDS).pipe(

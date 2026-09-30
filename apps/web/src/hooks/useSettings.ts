@@ -292,7 +292,7 @@ export function useClientSettings<T = ClientSettings>(
   return useMemo(() => (selector ? selector(settings) : (settings as T)), [selector, settings]);
 }
 
-export function resolveEnvironmentIdentificationMode(input: {
+function resolveEnvironmentIdentificationMode(input: {
   mode: EnvironmentIdentificationMode;
   settingsHydrated: boolean;
   paletteThemeActive?: boolean;
@@ -435,22 +435,4 @@ export function useUpdateClientSettings() {
   return useCallback((patch: ClientSettingsPatch) => {
     return persistClientSettingsPatch(patch);
   }, []);
-}
-
-export function __resetClientSettingsPersistenceForTests(): void {
-  clientSettingsHydrationGeneration += 1;
-  clientSettingsSnapshot = DEFAULT_CLIENT_SETTINGS;
-  clientSettingsHydrationStatus = "pending";
-  clientSettingsHydrationPromise = null;
-  clientSettingsPersistenceQueue = Promise.resolve();
-  deferredClientSettingsPatchCount = 0;
-  clientSettingsListeners.clear();
-  clientSettingsHydrationListeners.clear();
-}
-
-export function __setClientSettingsForTests(settings: ClientSettings): void {
-  clientSettingsHydrationGeneration += 1;
-  clientSettingsSnapshot = settings;
-  clientSettingsHydrationStatus = "ready";
-  clientSettingsHydrationPromise = null;
 }

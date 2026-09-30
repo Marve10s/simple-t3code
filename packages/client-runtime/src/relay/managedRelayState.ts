@@ -75,7 +75,7 @@ export const managedRelaySessionAtom = Atom.make<ManagedRelaySession | null>(nul
 
 const managedRelaySessionControls = new WeakMap<ManagedRelaySession, ManagedRelaySessionControl>();
 
-export function createManagedRelaySession(input: ManagedRelaySessionInput): ManagedRelaySession {
+function createManagedRelaySession(input: ManagedRelaySessionInput): ManagedRelaySession {
   let cachedToken: { readonly token: string; readonly expiresAtMillis: number } | null = null;
   let pendingToken: Promise<string | null> | null = null;
   let readClerkToken = input.readClerkToken;

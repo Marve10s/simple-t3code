@@ -39,7 +39,7 @@ export type PullRequestDiffLoadError =
   | RemoteEnvironmentRequestError
   | PullRequestDiffCredentialRejectedError;
 
-export const fetchEnvironmentPullRequestDiff = Effect.fn(
+const fetchEnvironmentPullRequestDiff = Effect.fn(
   "clientRuntime.state.fetchEnvironmentPullRequestDiff",
 )(function* (input: {
   readonly prepared: PreparedConnection;

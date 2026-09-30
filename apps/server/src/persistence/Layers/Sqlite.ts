@@ -8,7 +8,7 @@ import * as NodeSqliteClient from "@t3tools/shared/nodeSqliteClient";
 import { runMigrations } from "../Migrations.ts";
 import { ServerConfig } from "../../config.ts";
 
-export const WAL_SIZE_LIMIT_BYTES = 32 * 1024 * 1024;
+const WAL_SIZE_LIMIT_BYTES = 32 * 1024 * 1024;
 
 const setup = Layer.effectDiscard(
   Effect.gen(function* () {
@@ -21,7 +21,7 @@ const setup = Layer.effectDiscard(
   }),
 );
 
-export const makeSqlitePersistenceLive = Effect.fn("makeSqlitePersistenceLive")(function* (
+const makeSqlitePersistenceLive = Effect.fn("makeSqlitePersistenceLive")(function* (
   dbPath: string,
 ) {
   const fs = yield* FileSystem.FileSystem;
@@ -39,11 +39,6 @@ export const makeSqlitePersistenceLive = Effect.fn("makeSqlitePersistenceLive")(
     }),
   );
 }, Layer.unwrap);
-
-export const SqlitePersistenceMemory = Layer.provideMerge(
-  setup,
-  NodeSqliteClient.layer({ filename: ":memory:" }),
-);
 
 export const layerConfig = Layer.unwrap(
   Effect.gen(function* () {

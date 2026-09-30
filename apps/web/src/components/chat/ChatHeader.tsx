@@ -79,7 +79,7 @@ interface ChatHeaderProps {
   onDeleteProjectScript: (scriptId: string) => Promise<ProjectScriptActionResult>;
 }
 
-export function resolveRenameCommit(input: {
+function resolveRenameCommit(input: {
   readonly title: string;
   readonly originalTitle: string;
 }): { action: "commit"; title: string } | { action: "reject-empty" } | { action: "noop" } {
@@ -92,7 +92,7 @@ export function resolveRenameCommit(input: {
 const TITLE_MENU_OPEN_DELAY_MS = 500;
 const HEADER_ACTIONS_EXPANDED_BREAKPOINT_REM = 48;
 
-export function shouldShowOpenInPicker(input: {
+function shouldShowOpenInPicker(input: {
   readonly activeProjectName: string | undefined;
   readonly activeThreadEnvironmentId: EnvironmentId;
   readonly primaryEnvironmentId: EnvironmentId | null;

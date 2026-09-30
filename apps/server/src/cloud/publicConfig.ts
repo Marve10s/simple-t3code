@@ -95,7 +95,7 @@ export function resolveRelayClientTracingConfig(
     : null;
 }
 
-export function makeRelayUrlConfig(fallback = buildTimeRelayUrl) {
+function makeRelayUrlConfig(fallback = buildTimeRelayUrl) {
   const runtimeConfig = Config.NonEmptyString("T3CODE_RELAY_URL");
   return (fallback ? runtimeConfig.pipe(Config.withDefault(fallback)) : runtimeConfig).pipe(
     Config.mapEffect(validateRelayUrl),
@@ -153,7 +153,7 @@ export interface CloudCliOAuthConfig {
   readonly scopes: typeof CLOUD_CLI_OAUTH_SCOPES;
 }
 
-export function makeCloudCliOAuthConfig({
+function makeCloudCliOAuthConfig({
   clerkPublishableKeyFallback = buildTimeClerkPublishableKey,
   clerkCliOAuthClientIdFallback = buildTimeClerkCliOAuthClientId,
 }: {

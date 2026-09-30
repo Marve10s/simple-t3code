@@ -70,7 +70,7 @@ type TranscriptCommitResult =
   | { readonly kind: "stale" }
   | { readonly kind: "empty" };
 
-export function resolveTranscriptCommit(
+function resolveTranscriptCommit(
   captured: VoiceDraftSnapshot,
   current: VoiceDraftSnapshot | null,
   transcript: string,
@@ -481,9 +481,4 @@ export class VoiceInputController {
     this.state = state;
     this.dependencies.onStateChange(state);
   }
-}
-
-export function resetVoiceInputGlobalsForTests(): void {
-  activeSession = null;
-  activeTranscriptionOperation = null;
 }

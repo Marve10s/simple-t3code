@@ -114,7 +114,7 @@ export function useThreadStatus(ref: ScopedThreadRef | null): EnvironmentThreadS
   );
 }
 
-export function resolveThreadDetailRef(
+function resolveThreadDetailRef(
   ref: ScopedThreadRef | null,
   options: {
     shellExists: boolean;

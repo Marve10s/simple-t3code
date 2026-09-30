@@ -39,7 +39,7 @@ function sameKeys(left: string, right: string) {
   }
 }
 
-export function captureConfigBinding(format: CaptureConfigFormat, appId: string, keys: string) {
+function captureConfigBinding(format: CaptureConfigFormat, appId: string, keys: string) {
   if (!/^[A-Za-z0-9_.-]+$/.test(appId)) throw new Error("Invalid capture application ID.");
   const chord = captureConfigKeys(keys);
   if (format === "niri") return niriCaptureBinding(appId).replace("Ctrl+Shift+2", chord.label);

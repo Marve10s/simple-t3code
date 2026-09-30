@@ -8,7 +8,7 @@ export type BrowserFaviconEntry = {
   aliases?: ReadonlyArray<string>;
 };
 
-export const BROWSER_FAVICON_MAX_ENTRIES = 40;
+const BROWSER_FAVICON_MAX_ENTRIES = 40;
 const BROWSER_FAVICON_MAX_KEY_LENGTH = 4_096;
 const BROWSER_FAVICON_MAX_FUTURE_SKEW_MS = 5 * 60 * 1_000;
 export const BROWSER_FAVICON_MAX_ALIASES_PER_ENTRY = 4;

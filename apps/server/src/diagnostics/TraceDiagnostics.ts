@@ -195,9 +195,7 @@ const latestSeenFirst = (
   right: ServerTraceDiagnosticsLogEvent,
 ) => DateTime.toEpochMillis(right.seenAt) - DateTime.toEpochMillis(left.seenAt);
 
-export function makeTraceDiagnosticsAggregator(
-  slowSpanThresholdMs = DEFAULT_SLOW_SPAN_THRESHOLD_MS,
-) {
+function makeTraceDiagnosticsAggregator(slowSpanThresholdMs = DEFAULT_SLOW_SPAN_THRESHOLD_MS) {
   let parseErrorCount = 0;
   let recordCount = 0;
   let failureCount = 0;

@@ -123,7 +123,7 @@ const UNPRICEABLE_MODELS = new Set([
   "fable",
 ]);
 
-export function lookupRate(table: RateTable, model: string): ModelRate | null {
+function lookupRate(table: RateTable, model: string): ModelRate | null {
   const key = stripVariantSuffix(normalizeRateKey(model));
   const bareName = bareModelName(key);
   if (bareName.length === 0 || UNPRICEABLE_MODELS.has(bareName)) return null;

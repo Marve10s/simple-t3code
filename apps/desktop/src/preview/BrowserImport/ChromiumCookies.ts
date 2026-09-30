@@ -132,7 +132,7 @@ const decryptGcm = (
   }
 };
 
-export function decryptChromiumValue(
+function decryptChromiumValue(
   encrypted: Uint8Array,
   keys: ChromiumKeyMaterial,
   domain: string,
@@ -170,7 +170,7 @@ export function decryptChromiumValue(
   return null;
 }
 
-export const readChromiumCookieDatabase = Effect.fn("ChromiumCookies.readChromiumCookieDatabase")(
+const readChromiumCookieDatabase = Effect.fn("ChromiumCookies.readChromiumCookieDatabase")(
   function* (snapshotPath: string, keys: ChromiumKeyMaterial, platform: NodeJS.Platform) {
     const result = yield* Effect.gen(function* () {
       const sql = yield* SqlClient.SqlClient;

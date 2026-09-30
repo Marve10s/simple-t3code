@@ -109,7 +109,7 @@ const settleQueuedCommand = <A, E>(deferred: Deferred.Deferred<A, E>, exit: Exit
     ? Deferred.succeed(deferred, exit.value)
     : Deferred.failCause(deferred, exit.cause);
 
-export const makeCommandGate = Effect.gen(function* () {
+const makeCommandGate = Effect.gen(function* () {
   const commandReady = yield* Deferred.make<void, ServerRuntimeStartupError>();
   const commandQueue = yield* Queue.unbounded<QueuedCommand>();
   const commandReadinessState = yield* Ref.make<CommandReadinessState>("pending");
@@ -181,7 +181,7 @@ const getAutoBootstrapThreadModelSelection = (): ModelSelection => ({
   model: DEFAULT_MODEL,
 });
 
-export const resolveWelcomeBase = Effect.gen(function* () {
+const resolveWelcomeBase = Effect.gen(function* () {
   const serverConfig = yield* ServerConfig.ServerConfig;
   const segments = serverConfig.cwd.split(/[/\\]/).filter(Boolean);
   const projectName = segments[segments.length - 1] ?? "project";
@@ -192,7 +192,7 @@ export const resolveWelcomeBase = Effect.gen(function* () {
   } as const;
 });
 
-export const resolveAutoBootstrapWelcomeTargets = Effect.gen(function* () {
+const resolveAutoBootstrapWelcomeTargets = Effect.gen(function* () {
   const crypto = yield* Crypto.Crypto;
   const randomUUID = crypto.randomUUIDv4;
   const serverConfig = yield* ServerConfig.ServerConfig;
@@ -285,9 +285,7 @@ export const resolveAutoBootstrapWelcomeTargets = Effect.gen(function* () {
   } as const;
 });
 
-export const completeAutoBootstrapWelcome = <A extends object, E, R>(
-  bootstrap: Effect.Effect<A, E, R>,
-) =>
+const completeAutoBootstrapWelcome = <A extends object, E, R>(bootstrap: Effect.Effect<A, E, R>) =>
   bootstrap.pipe(
     Effect.matchCauseEffect({
       onFailure: (cause) =>
@@ -402,7 +400,7 @@ const toServerUpdateThreadContinuationError = (cause: unknown) =>
     ? cause
     : new ServerUpdateThreadContinuationError({ cause });
 
-export const markRunningProviderSessionsForContinuation = Effect.gen(function* () {
+const markRunningProviderSessionsForContinuation = Effect.gen(function* () {
   const directory = yield* ProviderSessionDirectory.ProviderSessionDirectory;
   const query = yield* ProjectionSnapshotQuery.ProjectionSnapshotQuery;
   const { threads } = yield* query.getCommandReadModel();
@@ -478,7 +476,7 @@ const clearProviderSessionContinuationMarkers = (threadIds: ReadonlyArray<Thread
     yield* clearContinuationMarkers(directory, threadIds);
   }).pipe(Effect.mapError(toServerUpdateThreadContinuationError));
 
-export const reconcileProviderSessions = Effect.gen(function* () {
+const reconcileProviderSessions = Effect.gen(function* () {
   const crypto = yield* Crypto.Crypto;
   const directory = yield* ProviderSessionDirectory.ProviderSessionDirectory;
   const orchestrationEngine = yield* OrchestrationEngine.OrchestrationEngineService;
@@ -741,7 +739,7 @@ export const reconcileProviderSessions = Effect.gen(function* () {
 
 const decodeWorktreeSetupSnapshot = Schema.decodeUnknownOption(WorktreeSetupSnapshot);
 
-export const reconcileWorktreeSetups = Effect.gen(function* () {
+const reconcileWorktreeSetups = Effect.gen(function* () {
   const crypto = yield* Crypto.Crypto;
   const orchestrationEngine = yield* OrchestrationEngine.OrchestrationEngineService;
   const query = yield* ProjectionSnapshotQuery.ProjectionSnapshotQuery;
@@ -818,7 +816,7 @@ interface StartupOptions {
   readonly abort?: (error: ServerRuntimeStartupError) => Effect.Effect<void>;
 }
 
-export const autoPullProjects = Effect.fn("autoPullProjects")(function* (
+const autoPullProjects = Effect.fn("autoPullProjects")(function* (
   projects: ReadonlyArray<OrchestrationProjectShell>,
   settings: ServerSettingsValue = DEFAULT_SERVER_SETTINGS,
 ) {
@@ -1113,5 +1111,3 @@ export const make = (options?: StartupOptions) =>
 
 export const layerWithOptions = (options?: StartupOptions) =>
   Layer.effect(ServerRuntimeStartup, make(options));
-
-export const layer = layerWithOptions();

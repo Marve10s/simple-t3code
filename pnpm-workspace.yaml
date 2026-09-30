@@ -35,7 +35,6 @@ catalog:
   "@effect/platform-node-shared": 4.0.0-rc.115
   "@effect/sql-pg": 4.0.0-rc.115
   "@effect/tsgo": 0.41.0
-  "@effect/vitest": 4.0.0-rc.115
   "@legendapp/list": 3.3.5
   "@noble/curves": 1.9.1
   "@noble/hashes": 1.8.0
@@ -71,7 +70,6 @@ minimumReleaseAgeExclude:
   - "@effect/platform-node-shared@4.0.0-rc.115"
   - "@effect/platform-node@4.0.0-rc.115"
   - "@effect/sql-pg@4.0.0-rc.115"
-  - "@effect/vitest@4.0.0-rc.115"
   - alchemy@2.0.0-beta.79
   - effect@4.0.0-rc.115
   - "@legendapp/list@3.3.5"
@@ -141,8 +139,6 @@ overrides:
   "@effect/platform-node": "catalog:"
   "@effect/platform-node-shared": "catalog:"
   "@effect/sql-pg": "catalog:"
-  "@effect/vitest": "catalog:"
-  "@effect/vitest>vitest": "-"
   "@expo/dom-webview": 57.0.1
   "@expo/metro-config": 57.0.12
   expo-constants: 57.0.16
@@ -169,19 +165,12 @@ packageExtensions:
   "@clerk/expo@*":
     dependencies:
       "@expo/config-plugins": 57.0.9
-  "@effect/vitest@*":
-    dependencies:
-      vite-plus: "catalog:"
-    peerDependenciesMeta:
-      vitest:
-        optional: true
   vite-plus@*:
     dependencies:
       vite: "catalog:"
 
 patchedDependencies:
   "@clerk/expo@4.6.8": patches/@clerk__expo@4.6.8.patch
-  "@effect/vitest@4.0.0-rc.115": patches/@effect__vitest@4.0.0-rc.115.patch
   "@expo/metro-config@57.0.12": patches/@expo__metro-config@57.0.12.patch
   "@ff-labs/fff-node@0.9.4": patches/@ff-labs__fff-node@0.9.4.patch
   "@legendapp/list@3.3.5": patches/@legendapp__list@3.3.5.patch

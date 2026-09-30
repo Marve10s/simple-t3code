@@ -305,7 +305,7 @@ const classifyResponseError = (
   }
 };
 
-export const make = Effect.gen(function* PreviewAutomationBrokerMake() {
+const make = Effect.gen(function* PreviewAutomationBrokerMake() {
   const crypto = yield* Crypto.Crypto;
   const state = yield* SynchronizedRef.make<BrokerState>({
     clients: new Map(),

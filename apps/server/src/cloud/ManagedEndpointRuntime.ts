@@ -64,14 +64,14 @@ const RELAY_RESTART_BACKOFF_BASE_MS = 1_000;
 const RELAY_RESTART_BACKOFF_MAX_MS = 60_000;
 const TUNNEL_AUTHORIZATION_FAILURES_BEFORE_RECOVERY = 4;
 
-export function classifyRelayClientOutput(line: string): "connected" | "warning" | "debug" {
+function classifyRelayClientOutput(line: string): "connected" | "warning" | "debug" {
   if (/\bRegistered tunnel connection\b/iu.test(line)) {
     return "connected";
   }
   return /\b(?:ERR|WRN|FTL|PNC)\b/u.test(line) ? "warning" : "debug";
 }
 
-export function isRejectedRelayClientTunnelOutput(line: string): boolean {
+function isRejectedRelayClientTunnelOutput(line: string): boolean {
   return (
     /\bRegister tunnel error from server side\b/iu.test(line) &&
     /error="(?:Unauthorized:\s*)?(?:Failed to get tunnel|Record for tunnel not found|Invalid tunnel secret)"/iu.test(

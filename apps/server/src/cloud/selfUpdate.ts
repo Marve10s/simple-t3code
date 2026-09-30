@@ -169,7 +169,7 @@ export const withRunningThreadContinuation = Effect.fn(
   });
 });
 
-export const make = Effect.fn("cloud.server_self_update.make")(function* () {
+const make = Effect.fn("cloud.server_self_update.make")(function* () {
   const serverConfig = yield* ServerConfig.ServerConfig;
   const desktopAppUpdate = yield* DesktopAppUpdate.DesktopAppUpdate;
   const launcher = yield* ServiceLauncherClient.ServiceLauncherClient;

@@ -26,7 +26,7 @@ import {
   resolveRemoteOperateAccess,
 } from "./ProviderSettingsPanel.logic";
 
-export function resolveEnvironmentIconPickerLock(input: {
+function resolveEnvironmentIconPickerLock(input: {
   readonly serverConfig: ServerConfig | null;
   readonly operateAccess: "granted" | "denied" | "pending";
 }): string | null {

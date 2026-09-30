@@ -8,14 +8,15 @@
     ".": {
       // Keep vendored reference repositories outside the root project.
       "project": ["*.{js,mjs,cjs,ts,mts,cts}", ".github/**/*.cjs"],
-      "entry": [".github/scripts/thread-transfer-report.cjs"],
-      "vite": { "entry": [".github/**/*.test.cjs"] },
-      "vitest": { "entry": [".github/**/*.test.cjs"] },
+      "entry": [
+        ".github/scripts/thread-transfer-report.cjs",
+        ".github/scripts/check-nightly-release.cjs",
+      ],
     },
     "scripts": {
       // Knip loads its preprocessor through a CLI option; native verification and
       // worktree setup (from t3.json) run directly.
-      "entry": ["knip-schemas.ts", "mobile-native-client.ts", "setup-worktree.ts"],
+      "entry": ["knip-schemas.ts", "mobile-native-client.ts", "setup-worktree.ts", "sign-macos.ts"],
     },
     "apps/server": {
       // Vite+ pack entries and the launcher used by installed background services.
@@ -25,7 +26,7 @@
         "scripts/cli.ts",
         "scripts/evaluate-thread-titles.ts",
         "scripts/measure-pr-preview.ts",
-        "src/provider/testFixtures/*.mjs",
+        "scripts/t3-sqlite-state.ts",
       ],
       // Keep the transitive Effect runtime pinned for standalone npm installs.
       // The Vite+ web build prerequisite.
@@ -53,8 +54,6 @@
       "ignoreDependencies": ["playwright-core", "electron-builder"],
     },
     "apps/web": {
-      // Vitest loads this through the per-file @vitest-environment directive.
-      "ignoreDependencies": ["jsdom"],
       // Worktree setup (scripts/setup-worktree.ts) runs this directly.
       "entry": ["scripts/warm-dep-cache.ts"],
       // UI component modules are copied and adapted as cohesive sets. Keep their
@@ -90,13 +89,11 @@
     },
     "packages/effect-acp": {
       "includeEntryExports": true,
-      "entry": ["test/fixtures/*.ts"],
       // Generated upstream protocol definitions are retained as a complete set.
       "ignoreIssues": { "src/_generated/**": ["exports", "types"] },
     },
     "packages/effect-codex-app-server": {
       "includeEntryExports": true,
-      "entry": ["test/fixtures/*.ts"],
       "ignoreIssues": { "src/_generated/**": ["exports", "types"] },
     },
   },

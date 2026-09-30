@@ -62,13 +62,13 @@ const makeNodeSampler = Effect.gen(function* () {
   });
 });
 
-export const stallMs = ({ delayMaxNs, activeMs }: EventLoopReadings) => {
+const stallMs = ({ delayMaxNs, activeMs }: EventLoopReadings) => {
   const delayMs = Math.round(delayMaxNs / 1e6) - RESOLUTION_MS;
   if (delayMs <= STALL_THRESHOLD_MS || activeMs < delayMs) return undefined;
   return delayMs;
 };
 
-export const layerWith = (
+const layerWith = (
   makeSampler: Effect.Effect<Effect.Effect<EventLoopReadings>, never, Scope.Scope>,
 ) =>
   Layer.effectDiscard(

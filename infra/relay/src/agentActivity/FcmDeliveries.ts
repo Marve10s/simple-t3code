@@ -73,7 +73,7 @@ export function androidAlertForState(
   };
 }
 
-export function androidAlertForAggregate(input: {
+function androidAlertForAggregate(input: {
   readonly previousAggregate: RelayAgentActivityAggregateState;
   readonly nextAggregate: RelayAgentActivityAggregateState;
   readonly preferences: RelayAgentAwarenessPreferences;
@@ -133,7 +133,7 @@ export class FcmDeliveries extends Context.Service<
   }
 >()("t3code-relay/agentActivity/FcmDeliveries") {}
 
-export const make = Effect.gen(function* () {
+const make = Effect.gen(function* () {
   const config = yield* RelayConfiguration.RelayConfiguration;
   const crypto = yield* Crypto.Crypto;
   const sender = yield* FcmDeliveryQueueSender.FcmDeliveryQueueSender;

@@ -53,7 +53,7 @@ function valueFor(
   return metric === "tokens" ? entry.totalTokens : entry.costUsd;
 }
 
-export function buildPeriodColumns(
+function buildPeriodColumns(
   periods: readonly string[],
   byPeriod: ReadonlyMap<string, DailyTotals | HourlyTotals>,
   metric: UsageChartMetric,
@@ -145,7 +145,7 @@ function curvePath(segments: readonly CurveSegment[]): string {
   return path;
 }
 
-export function niceScale(peak: number, count: number): { max: number; ticks: readonly number[] } {
+function niceScale(peak: number, count: number): { max: number; ticks: readonly number[] } {
   if (peak <= 0) return { max: 0, ticks: [0] };
 
   const rawStep = peak / count;

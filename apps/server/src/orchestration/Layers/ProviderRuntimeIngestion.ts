@@ -197,7 +197,7 @@ const LIST_ITEM_START_PATTERN = /^[ \t]*(?:[-*+]|\d{1,9}[.)])[ \t]/;
 const SECTION_TITLE_PATTERN = /^ {0,3}(?:#{1,6}(?:[ \t]|$)|\*\*(?:[^*]|\*(?!\*))+\*\*:?$)/;
 const TOP_LEVEL_HEADING_PATTERN = /^#{1,6}(?:[ \t]|$)/;
 
-export function splitBufferedAssistantText(text: string): { ready: string; rest: string } {
+function splitBufferedAssistantText(text: string): { ready: string; rest: string } {
   let openFence: { marker: string; indent: number } | null = null;
   let boundary = -1;
   let lineStart = 0;
@@ -437,7 +437,7 @@ function taskLinkageActivityFields(payload: Record<string, unknown>): Record<str
   return fields;
 }
 
-export function runtimeEventToActivities(
+function runtimeEventToActivities(
   event: ProviderRuntimeEvent,
   taskTitle?: string,
 ): ReadonlyArray<OrchestrationThreadActivity> {

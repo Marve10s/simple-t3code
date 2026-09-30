@@ -226,7 +226,7 @@ export interface ChatMarkdownContextReference {
   label: string;
 }
 
-export function canUseMarkdownFileShellActions(
+function canUseMarkdownFileShellActions(
   environmentId: EnvironmentId | null,
   remoteOpenMode: RemoteOpenMode,
   isRemoteOpenResolved: boolean,
@@ -234,7 +234,7 @@ export function canUseMarkdownFileShellActions(
   return environmentId !== null && isRemoteOpenResolved && remoteOpenMode === "local-exec";
 }
 
-export function hasMarkdownFilePrimaryAction(input: {
+function hasMarkdownFilePrimaryAction(input: {
   canOpenInEditor: boolean;
   canOpenInBrowser: boolean;
   canOpenInPanel: boolean;
@@ -248,7 +248,7 @@ export function hasMarkdownFilePrimaryAction(input: {
   );
 }
 
-export function shouldUseMarkdownFileBrowserPrimaryAction(input: {
+function shouldUseMarkdownFileBrowserPrimaryAction(input: {
   iconPath: string;
   canOpenInEditor: boolean;
   canOpenInBrowser: boolean;

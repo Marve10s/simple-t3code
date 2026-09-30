@@ -111,7 +111,7 @@ const isTransientGitExit = (stderr: string) =>
   /unable to create [^\n]*\.lock['"]?: file exists/i.test(stderr) ||
   /(?:unable to stat|lstat\(|error: open\()[^\n]+: no such file or directory/i.test(stderr);
 
-export const make = Effect.gen(function* () {
+const make = Effect.gen(function* () {
   const processRunner = yield* ProcessRunner.ProcessRunner;
   const vcsProcesses = yield* Semaphore.make(VCS_PROCESS_CONCURRENCY);
   const githubProcesses = yield* Semaphore.make(GITHUB_PROCESS_CONCURRENCY);

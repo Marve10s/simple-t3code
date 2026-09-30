@@ -48,7 +48,7 @@ const OpenCodeHealthSchema = Schema.Struct({
 });
 const decodeOpenCodeHealth = Schema.decodeUnknownEffect(OpenCodeHealthSchema);
 
-export function resolveOpenCodeConfigContent(
+function resolveOpenCodeConfigContent(
   inputEnvironment: Readonly<Record<string, string | undefined>> | undefined,
   inheritedEnvironment: Readonly<Record<string, string | undefined>> = process.env,
 ): string {
@@ -59,7 +59,7 @@ export function resolveOpenCodeConfigContent(
   );
 }
 
-export function resolveOpenCodeServerPassword(
+function resolveOpenCodeServerPassword(
   input: {
     readonly external: boolean;
     readonly serverPassword?: string;
@@ -138,7 +138,7 @@ export const runOpenCodeSdk = <A>(
       new OpenCodeRuntimeError({ operation, detail: openCodeRuntimeErrorDetail(cause), cause }),
   }).pipe(Effect.withSpan(`opencode.${operation}`));
 
-export const verifyOpenCodeServerVersion = Effect.fn("verifyOpenCodeServerVersion")(function* (
+const verifyOpenCodeServerVersion = Effect.fn("verifyOpenCodeServerVersion")(function* (
   client: OpencodeClient,
 ) {
   const healthOption = yield* runOpenCodeSdk("global.health", (signal) =>
@@ -287,7 +287,7 @@ const AGENT_HEADER_RE = /^(.+)\s+\((\S+)\)\s*$/;
 const KNOWN_HIDDEN_AGENTS = new Set(["compaction", "summary", "title"]);
 
 /** @internal */
-export function parseModelsCliOutput(stdout: string): {
+function parseModelsCliOutput(stdout: string): {
   readonly providers: ReadonlyMap<
     string,
     { readonly id: string; readonly name: string; readonly models: { [key: string]: Model } }
@@ -341,7 +341,7 @@ export function parseModelsCliOutput(stdout: string): {
 }
 
 /** @internal */
-export function parseAgentListCliOutput(stdout: string): ReadonlyArray<Agent> {
+function parseAgentListCliOutput(stdout: string): ReadonlyArray<Agent> {
   const agents: Array<Agent> = [];
   const lines = stdout.split("\n");
   let currentHeader: { name: string; mode: string } | null = null;
@@ -382,7 +382,7 @@ export function parseAgentListCliOutput(stdout: string): ReadonlyArray<Agent> {
 }
 
 /** @internal */
-export function parseSkillsCliOutput(stdout: string): ReadonlyArray<OpenCodeSkill> {
+function parseSkillsCliOutput(stdout: string): ReadonlyArray<OpenCodeSkill> {
   const result = decodeOpenCodeSkillsCliOutputExit(stdout);
   return Exit.isSuccess(result) ? result.value : [];
 }

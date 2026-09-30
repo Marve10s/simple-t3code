@@ -23,7 +23,7 @@ import { Button } from "../ui/button";
 import { Dialog, DialogHeader, DialogPanel, DialogPopup, DialogTitle } from "../ui/dialog";
 import { ThemeSearchSection } from "./ThemeSearchSection";
 
-export const MAX_THEME_FILE_BYTES = 256 * 1024;
+const MAX_THEME_FILE_BYTES = 256 * 1024;
 
 const MAX_HIGHLIGHTED_JSON_LENGTH = 20_000;
 
@@ -33,7 +33,7 @@ function formatByteSize(bytes: number): string {
   return `${bytes} bytes`;
 }
 
-export function describeOversizedThemeFile(bytes: number): string | null {
+function describeOversizedThemeFile(bytes: number): string | null {
   if (bytes <= MAX_THEME_FILE_BYTES) return null;
   return `That file is ${formatByteSize(bytes)}. Theme files are only a few KB, so this one was not read (limit ${formatByteSize(MAX_THEME_FILE_BYTES)}).`;
 }

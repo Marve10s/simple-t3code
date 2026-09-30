@@ -67,7 +67,7 @@ const headlessFlag = Flag.Boolean("headless").pipe(
   Flag.withDefault(false),
 );
 
-export const headlessSessionConfig = Config.all({
+const headlessSessionConfig = Config.all({
   sshConnection: Config.String("SSH_CONNECTION").pipe(Config.option),
   sshTty: Config.String("SSH_TTY").pipe(Config.option),
 }).pipe(
@@ -236,25 +236,26 @@ const reportRelayClientInstallProgress = (event: RelayClientInstallProgressEvent
     ? Console.log(`Relay client: ${relayClientInstallProgressMessage(event.stage)}...`)
     : Effect.void;
 
-export const acquireRelayClientForLink = Effect.fn("cloud.cli.acquire_relay_client_for_link")(
-  function* <ConfirmError, ConfirmContext>(
-    relayClient: RelayClient.RelayClient["Service"],
-    confirmInstall: (version: string) => Effect.Effect<boolean, ConfirmError, ConfirmContext>,
-    reportProgress: (event: RelayClientInstallProgressEvent) => Effect.Effect<void>,
-  ) {
-    const executable = yield* relayClient.resolve;
-    if (executable.status === "available") {
-      return Option.some(executable);
-    }
-    if (executable.status === "unsupported") {
-      return Option.some(yield* relayClient.installWithProgress(reportProgress));
-    }
-    if (!(yield* confirmInstall(executable.version))) {
-      return Option.none();
-    }
+const acquireRelayClientForLink = Effect.fn("cloud.cli.acquire_relay_client_for_link")(function* <
+  ConfirmError,
+  ConfirmContext,
+>(
+  relayClient: RelayClient.RelayClient["Service"],
+  confirmInstall: (version: string) => Effect.Effect<boolean, ConfirmError, ConfirmContext>,
+  reportProgress: (event: RelayClientInstallProgressEvent) => Effect.Effect<void>,
+) {
+  const executable = yield* relayClient.resolve;
+  if (executable.status === "available") {
+    return Option.some(executable);
+  }
+  if (executable.status === "unsupported") {
     return Option.some(yield* relayClient.installWithProgress(reportProgress));
-  },
-);
+  }
+  if (!(yield* confirmInstall(executable.version))) {
+    return Option.none();
+  }
+  return Option.some(yield* relayClient.installWithProgress(reportProgress));
+});
 
 const withCloudCliSessionToken = <A, E, R>(
   environmentAuth: EnvironmentAuth.EnvironmentAuth["Service"],
@@ -345,7 +346,7 @@ const unlinkRelayEnvironment = Effect.fn("cloud.cli.unlink_relay_environment")(f
     : ({ status: "not-linked" } satisfies RelayUnlinkResult);
 });
 
-export const reportCloudDisconnectResults = Effect.fn("cloud.cli.report_disconnect_results")(
+const reportCloudDisconnectResults = Effect.fn("cloud.cli.report_disconnect_results")(
   function* (input: {
     readonly clearAuthorization: boolean;
     readonly liveResult: LiveCloudActionResult;

@@ -78,7 +78,7 @@ function terminalMetadataIndex(metadata: ReadonlyArray<TerminalSummary>): Termin
   return index;
 }
 
-export function selectKnownTerminalSessions(
+function selectKnownTerminalSessions(
   metadata: ReadonlyArray<TerminalSummary> | null,
   environmentId: EnvironmentId | null,
   threadId: ThreadId | null,

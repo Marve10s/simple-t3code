@@ -22,7 +22,7 @@ export interface CreatedPullRequestKey {
   readonly url: string;
 }
 
-export function createdPullRequestKey(
+function createdPullRequestKey(
   result: Pick<GitRunStackedActionResult, "pr">,
   project: OrchestrationProjectShell | undefined,
 ): CreatedPullRequestKey | null {

@@ -258,7 +258,7 @@ function isThermallyConstrained(snapshot: HostPowerSnapshot): boolean {
   return snapshot.thermalState === "serious" || snapshot.thermalState === "critical";
 }
 
-export function resolveNativeSampleIntervalMs(
+function resolveNativeSampleIntervalMs(
   snapshot: HostPowerSnapshot,
   liveSubscriberCount: number,
 ): number {
@@ -277,7 +277,7 @@ export function resolveNativeSampleIntervalMs(
   return liveSubscriberCount > 0 ? SAMPLE_INTERVAL_MS : UNKNOWN_BACKGROUND_SAMPLE_INTERVAL_MS;
 }
 
-export function commitCollectionControlUpdate<E, R>(
+function commitCollectionControlUpdate<E, R>(
   desiredState: Ref.Ref<CollectionControl>,
   appliedState: Ref.Ref<CollectionControl>,
   update: (current: CollectionControl) => CollectionControl,
@@ -295,7 +295,7 @@ export function commitCollectionControlUpdate<E, R>(
   });
 }
 
-export function synchronizeCollectionControlOnStart<E1, R1, E2, R2>(
+function synchronizeCollectionControlOnStart<E1, R1, E2, R2>(
   mutex: Semaphore.Semaphore,
   desiredState: Ref.Ref<CollectionControl>,
   appliedState: Ref.Ref<CollectionControl>,
@@ -335,7 +335,7 @@ function restartDelay(attempt: number): Duration.Duration {
   return Duration.min(Duration.times(INITIAL_RESTART_DELAY, 2 ** attempt), MAX_RESTART_DELAY);
 }
 
-export function retainRecentNativeTelemetryFailures(
+function retainRecentNativeTelemetryFailures(
   failures: ReadonlyArray<number>,
   now: number,
 ): ReadonlyArray<number> {
@@ -346,14 +346,14 @@ function errorMessage(error: NativeTelemetryClientError): string {
   return error.message;
 }
 
-export function canRequestNativeTelemetryRetry(
+function canRequestNativeTelemetryRetry(
   status: ResourceTelemetrySourceStatus,
   hasHandle: boolean,
 ): boolean {
   return status !== "healthy" && status !== "starting" && !hasHandle;
 }
 
-export function canCommandNativeTelemetrySidecar(
+function canCommandNativeTelemetrySidecar(
   status: ResourceTelemetrySourceStatus,
   hasHandle: boolean,
 ): boolean {
@@ -1057,62 +1057,3 @@ export const make = Effect.fn("resourceTelemetry.nativeTelemetryClient.make")(fu
 });
 
 export const layer = Layer.effect(NativeTelemetryClient, make());
-
-export const layerTest = (
-  overrides: Partial<NativeTelemetryClient["Service"]> = {},
-): Layer.Layer<NativeTelemetryClient> => {
-  const health =
-    overrides.health ??
-    Effect.succeed({
-      status: "unavailable" as const,
-      hello: Option.none<ResourceMonitorHelloEvent>(),
-      lastSampleAt: Option.none<DateTime.Utc>(),
-      lastError: Option.some("Resource monitor test implementation is unavailable."),
-      restartCount: 0,
-      sampleIntervalMs: UNKNOWN_BACKGROUND_SAMPLE_INTERVAL_MS,
-    });
-  return Layer.succeed(
-    NativeTelemetryClient,
-    NativeTelemetryClient.of({
-      capabilities: Effect.succeed({
-        cumulativeCpuTime: true,
-        currentCpuPercent: true,
-        residentMemory: true,
-        virtualMemory: true,
-        ioBytes: true,
-        processStartTime: true,
-        processTree: true,
-      }),
-      snapshots: Stream.empty,
-      readHistory: () =>
-        Effect.fail(
-          new NativeTelemetryUnavailable({
-            reason: "No resource monitor history was configured for this test.",
-          }),
-        ),
-      setExternalProcesses: () => Effect.void,
-      setHostPowerState: () => Effect.void,
-      sampleNow: Effect.fail(
-        new NativeTelemetryUnavailable({
-          reason: "No resource monitor sample was configured for this test.",
-        }),
-      ),
-      processTable: Effect.fail(
-        new NativeTelemetryUnavailable({
-          reason: "No resource monitor process table was configured for this test.",
-        }),
-      ),
-      retry: Effect.succeed(false),
-      health,
-      subscribeHealth:
-        overrides.subscribeHealth ??
-        health.pipe(
-          Effect.map((initial) => ({
-            latest: initial,
-            changes: Stream.empty,
-          })),
-        ),
-      ...overrides,
-    }),
-  );
-};

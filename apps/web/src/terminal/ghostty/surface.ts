@@ -17,14 +17,14 @@ import {
 import symbolsFontUrl from "./fonts/SymbolsNerdFontMono-Regular.woff2?url";
 import { isMonospaceFamily } from "../../appearanceFonts";
 
-export const DEFAULT_TERMINAL_FONT_SIZE = 12;
+const DEFAULT_TERMINAL_FONT_SIZE = 12;
 const MIN_TERMINAL_FONT_SIZE = 6;
 const MAX_TERMINAL_FONT_SIZE = 32;
 const TERMINAL_GLYPH_FALLBACKS =
   '"Symbols Nerd Font Mono", "Symbols Nerd Font", "JetBrainsMono Nerd Font", ' +
   '"JetBrainsMono NF", "FiraCode Nerd Font", "Hack Nerd Font", "MesloLGS NF", ' +
   '"CaskaydiaCove Nerd Font", "PowerlineSymbols", monospace';
-export const DEFAULT_TERMINAL_FONT_FAMILY =
+const DEFAULT_TERMINAL_FONT_FAMILY =
   '"SF Mono", "SFMono-Regular", Menlo, Consolas, "Liberation Mono", ' + TERMINAL_GLYPH_FALLBACKS;
 const CONTENT_PADDING = 4;
 const MIN_SCROLLBAR_THUMB_HEIGHT = 18;
@@ -76,14 +76,14 @@ function uncheckedTerminalFontFamily(family?: string): string {
     : `${custom}, ${TERMINAL_GLYPH_FALLBACKS}`;
 }
 
-export function terminalFontFamily(family?: string): string {
+function terminalFontFamily(family?: string): string {
   const custom = family === undefined ? "" : quoteTerminalFontFamilies(family);
   if (custom.length === 0) return DEFAULT_TERMINAL_FONT_FAMILY;
   if (!isMonospaceFamily(custom)) return DEFAULT_TERMINAL_FONT_FAMILY;
   return uncheckedTerminalFontFamily(custom);
 }
 
-export async function loadTerminalFontFamily(
+async function loadTerminalFontFamily(
   family: string | undefined,
   size: number,
   environment?: {
@@ -104,12 +104,12 @@ export async function loadTerminalFontFamily(
   return (environment?.resolve ?? terminalFontFamily)(family);
 }
 
-export function terminalFontSize(size?: number): number {
+function terminalFontSize(size?: number): number {
   if (size === undefined || !Number.isFinite(size)) return DEFAULT_TERMINAL_FONT_SIZE;
   return Math.max(MIN_TERMINAL_FONT_SIZE, Math.min(MAX_TERMINAL_FONT_SIZE, Math.round(size)));
 }
 
-export function shouldBlinkTerminalCursor(state: {
+function shouldBlinkTerminalCursor(state: {
   readonly focused: boolean;
   readonly cursorBlinking: boolean;
   readonly cursorVisible: boolean;
@@ -118,7 +118,7 @@ export function shouldBlinkTerminalCursor(state: {
   return state.focused && state.cursorBlinking && state.cursorVisible && !state.reducedMotion;
 }
 
-export function terminalContentOriginY(
+function terminalContentOriginY(
   mountHeight: number,
   padding: number,
   rows: number,
@@ -136,7 +136,7 @@ export interface TerminalScrollbarGeometry {
   readonly maxOffset: number;
 }
 
-export function terminalScrollbarGeometry(
+function terminalScrollbarGeometry(
   state: GhosttyScrollbar,
   trackHeight: number,
 ): TerminalScrollbarGeometry | null {
@@ -157,7 +157,7 @@ export function terminalScrollbarGeometry(
   };
 }
 
-export function terminalScrollbarOffsetAtPointer(
+function terminalScrollbarOffsetAtPointer(
   state: GhosttyScrollbar,
   trackHeight: number,
   pointerY: number,
@@ -171,7 +171,7 @@ export function terminalScrollbarOffsetAtPointer(
   return Math.round((thumbTop / travel) * geometry.maxOffset);
 }
 
-export function terminalGridCellAt(options: {
+function terminalGridCellAt(options: {
   bounds: { left: number; top: number };
   clientX: number;
   clientY: number;
@@ -232,7 +232,7 @@ function terminalColumnAtOffset(row: GhosttySnapshot["rowData"][number], offset:
   return Math.max(0, row.cells.length - 1);
 }
 
-export function terminalLinkAtPositionWithRange(
+function terminalLinkAtPositionWithRange(
   rows: GhosttySnapshot["rowData"],
   rowIndex: number,
   column: number,
@@ -287,7 +287,7 @@ export function terminalLinkAtPositionWithRange(
   return null;
 }
 
-export function isTerminalCopyShortcut(
+function isTerminalCopyShortcut(
   event: Pick<KeyboardEvent, "ctrlKey" | "key" | "metaKey" | "shiftKey">,
   platform = navigator.platform,
 ) {
@@ -299,7 +299,7 @@ export function isTerminalCopyShortcut(
   return isMacPlatform(platform) ? event.metaKey : event.ctrlKey;
 }
 
-export function primeTerminalCopyInput(
+function primeTerminalCopyInput(
   input: Pick<HTMLTextAreaElement, "value" | "select">,
   selection: string,
 ): void {
@@ -308,7 +308,7 @@ export function primeTerminalCopyInput(
   input.select();
 }
 
-export function clearPrimedTerminalCopyInput(
+function clearPrimedTerminalCopyInput(
   input: Pick<HTMLTextAreaElement, "value">,
   primedSelection: string,
 ): void {
@@ -316,7 +316,7 @@ export function clearPrimedTerminalCopyInput(
   input.value = "";
 }
 
-export function applyTerminalCopyEvent(
+function applyTerminalCopyEvent(
   selection: string,
   clipboardData: { setData: (type: string, data: string) => void } | null | undefined,
 ): { preventDefault: boolean; claimWriteFallback: boolean } {
@@ -327,7 +327,7 @@ export function applyTerminalCopyEvent(
   return { preventDefault: true, claimWriteFallback: true };
 }
 
-export function isTerminalPasteShortcut(
+function isTerminalPasteShortcut(
   event: Pick<KeyboardEvent, "ctrlKey" | "key" | "metaKey" | "shiftKey">,
   platform = navigator.platform,
 ) {
@@ -343,7 +343,7 @@ function isMiddleClickPastePlatform(): boolean {
   return /linux|bsd/i.test(navigator.platform);
 }
 
-export function isTerminalCompositionCommitInput(event: Pick<InputEvent, "inputType">): boolean {
+function isTerminalCompositionCommitInput(event: Pick<InputEvent, "inputType">): boolean {
   return (
     event.inputType === "" ||
     event.inputType === "insertCompositionText" ||
@@ -351,20 +351,18 @@ export function isTerminalCompositionCommitInput(event: Pick<InputEvent, "inputT
   );
 }
 
-export function isTerminalCompositionKey(
+function isTerminalCompositionKey(
   event: Pick<KeyboardEvent, "isComposing" | "key" | "keyCode">,
   composing: boolean,
 ): boolean {
   return event.isComposing || composing || event.key === "Process" || event.keyCode === 229;
 }
 
-export function isTerminalAltGraphText(
-  event: Pick<KeyboardEvent, "getModifierState" | "key">,
-): boolean {
+function isTerminalAltGraphText(event: Pick<KeyboardEvent, "getModifierState" | "key">): boolean {
   return event.getModifierState("AltGraph") && [...event.key].length === 1;
 }
 
-export function shouldReportTerminalMouse(
+function shouldReportTerminalMouse(
   tracking: boolean,
   event: Pick<MouseEvent, "ctrlKey" | "metaKey" | "shiftKey">,
 ): boolean {
@@ -373,7 +371,7 @@ export function shouldReportTerminalMouse(
 
 type TerminalMouseAction = "press" | "release" | "motion";
 
-export function resolveTerminalMouseData(
+function resolveTerminalMouseData(
   action: TerminalMouseAction,
   data: string,
   previousMotionData: string,
@@ -385,7 +383,7 @@ export function resolveTerminalMouseData(
   };
 }
 
-export function resolveTerminalMouseTrackingState(
+function resolveTerminalMouseTrackingState(
   previousTracking: boolean,
   tracking: boolean,
   motionData: string,
@@ -396,7 +394,7 @@ export function resolveTerminalMouseTrackingState(
   };
 }
 
-export function terminalWheelDeltaRows(
+function terminalWheelDeltaRows(
   event: Pick<WheelEvent, "deltaY" | "deltaMode">,
   cellHeight: number,
   viewportRows: number,
@@ -413,7 +411,7 @@ export function terminalWheelDeltaRows(
   return { rows, remainder: total - rows };
 }
 
-export function terminalWheelArrowData(rows: number, applicationCursorKeys: boolean): string {
+function terminalWheelArrowData(rows: number, applicationCursorKeys: boolean): string {
   if (rows === 0) return "";
   const sequence =
     rows < 0
@@ -426,7 +424,7 @@ export function terminalWheelArrowData(rows: number, applicationCursorKeys: bool
   return sequence.repeat(Math.abs(rows));
 }
 
-export function ghosttyMouseButton(button: number): number | null {
+function ghosttyMouseButton(button: number): number | null {
   switch (button) {
     case 0:
       return 1;
@@ -452,7 +450,7 @@ export interface TerminalSelectionClickSequence {
 
 const TERMINAL_LINK_DRAG_THRESHOLD_PX = 4;
 
-export function advanceTerminalSelectionClickSequence(
+function advanceTerminalSelectionClickSequence(
   previous: TerminalSelectionClickSequence | null,
   event: Pick<PointerEvent, "clientX" | "clientY" | "timeStamp">,
 ): TerminalSelectionClickSequence {

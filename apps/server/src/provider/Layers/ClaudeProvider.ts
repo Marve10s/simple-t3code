@@ -166,13 +166,13 @@ function apiProviderAuthMetadata(
 
 const CAPABILITIES_PROBE_TIMEOUT_MS = 25_000;
 
-export const CLAUDE_CAPABILITIES_PROBE_SETTING_SOURCES = [
+const CLAUDE_CAPABILITIES_PROBE_SETTING_SOURCES = [
   "user",
   "project",
   "local",
 ] as const satisfies ReadonlyArray<SettingSource>;
 
-export function buildClaudeCapabilitiesProbeQueryOptions(input: {
+function buildClaudeCapabilitiesProbeQueryOptions(input: {
   readonly executablePath: string;
   readonly abortController: AbortController;
   readonly environment: NodeJS.ProcessEnv;

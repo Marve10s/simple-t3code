@@ -581,13 +581,6 @@ export const BranchToolbar = memo(function BranchToolbar({
       )}
     >
       <CodexComposerTray
-        projectTitle={activeProject.title}
-        environmentLabel={
-          activeEnvironmentOption && !activeEnvironmentOption.isPrimary
-            ? activeEnvironmentOption.label
-            : null
-        }
-        isRemoteEnvironment={activeEnvironmentOption?.isPrimary === false}
         showWorktreeToggle={showGitControls}
         worktreeChecked={effectiveEnvMode === "worktree"}
         worktreeLocked={envModeLocked || forceNewWorktree}

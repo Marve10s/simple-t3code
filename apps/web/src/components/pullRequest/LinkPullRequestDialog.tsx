@@ -1,5 +1,4 @@
 import { changeRequestUrlFor as changeRequestWebUrl } from "@t3tools/shared/changeRequestUrl";
-export { changeRequestUrlFor as changeRequestWebUrl } from "@t3tools/shared/changeRequestUrl";
 import {
   pullRequestHostOf,
   type ScopedThreadRef,
@@ -66,7 +65,7 @@ interface ResolvedLink {
   readonly url: string;
 }
 
-export function resolveLinkPullRequestInput(input: {
+function resolveLinkPullRequestInput(input: {
   readonly reference: string;
   readonly project: {
     readonly host: string;

@@ -241,7 +241,7 @@ const makeReconcile = <R>(input: {
     });
 };
 
-export const makeProviderInstanceRegistry = <R>(input: {
+const makeProviderInstanceRegistry = <R>(input: {
   readonly drivers: ReadonlyArray<AnyProviderDriver<R>>;
   readonly configMap: ProviderInstanceConfigMap;
 }): Effect.Effect<

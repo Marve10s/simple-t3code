@@ -201,7 +201,7 @@ const isProtocolMismatch = Schema.is(DesktopTelemetryProtocolMismatch);
 const isDecodeFailed = Schema.is(DesktopTelemetryDecodeFailed);
 const isStreamFailed = Schema.is(DesktopTelemetryStreamFailed);
 
-export function isDesktopTelemetryContactStale(
+function isDesktopTelemetryContactStale(
   lastContactAtMs: Option.Option<number>,
   nowMs: number,
 ): boolean {
@@ -211,7 +211,7 @@ export function isDesktopTelemetryContactStale(
   );
 }
 
-export function resolveDesktopTelemetrySnapshotStaleAfterMs(
+function resolveDesktopTelemetrySnapshotStaleAfterMs(
   activeIntervalMs: number,
   idleIntervalMs: number,
 ): number {
@@ -221,14 +221,14 @@ export function resolveDesktopTelemetrySnapshotStaleAfterMs(
   );
 }
 
-export function initialDesktopTelemetryContactAt(
+function initialDesktopTelemetryContactAt(
   desktopTelemetryFd: number | undefined,
   nowMs: number,
 ): Option.Option<number> {
   return desktopTelemetryFd === undefined ? Option.none() : Option.some(nowMs);
 }
 
-export const recordDesktopTelemetrySampleHealth = Effect.fn(
+const recordDesktopTelemetrySampleHealth = Effect.fn(
   "resourceTelemetry.desktopTelemetryReceiver.recordSampleHealth",
 )(function* (
   health: Ref.Ref<DesktopTelemetryReceiverHealth>,
@@ -262,7 +262,7 @@ function messageVersion(value: unknown): number | undefined {
   return typeof version === "number" ? version : undefined;
 }
 
-export const writeAllToFileDescriptor = Effect.fn(
+const writeAllToFileDescriptor = Effect.fn(
   "resourceTelemetry.desktopTelemetryReceiver.writeAllToFileDescriptor",
 )(function* (fd: number, payload: Buffer) {
   let offset = 0;
@@ -311,7 +311,7 @@ export const writeAllToFileDescriptor = Effect.fn(
   }
 });
 
-export function requireDesktopTelemetryWriteProgress(
+function requireDesktopTelemetryWriteProgress(
   fd: number,
   remainingBytes: number,
   written: number,
@@ -661,52 +661,3 @@ export const make = Effect.fn("resourceTelemetry.desktopTelemetryReceiver.make")
 });
 
 export const layer = Layer.effect(DesktopTelemetryReceiver, make());
-
-export const layerTest = (
-  overrides: Partial<DesktopTelemetryReceiver["Service"]> = {},
-): Layer.Layer<DesktopTelemetryReceiver> => {
-  const latest = overrides.latest ?? Effect.succeedNone;
-  const changes = overrides.changes ?? Stream.empty;
-  const health =
-    overrides.health ??
-    Effect.succeed({
-      status: "unavailable" as const,
-      lastSampleAt: Option.none<DateTime.Utc>(),
-      lastError: Option.some("Desktop telemetry test implementation is unavailable."),
-    });
-  return Layer.succeed(
-    DesktopTelemetryReceiver,
-    DesktopTelemetryReceiver.of({
-      latest,
-      changes,
-      subscribe:
-        overrides.subscribe ??
-        latest.pipe(
-          Effect.map((initial) => ({
-            latest: initial,
-            changes,
-          })),
-        ),
-      health,
-      subscribeHealth:
-        overrides.subscribeHealth ??
-        health.pipe(
-          Effect.map((initial) => ({
-            latest: initial,
-            changes: Stream.empty,
-          })),
-        ),
-      setDiagnosticsDemand: () => Effect.void,
-      requestDesktopUpdate: () => Effect.void,
-      commitDesktopUpdate: () => Effect.void,
-      cancelDesktopUpdate: () => Effect.void,
-      desktopUpdates:
-        overrides.desktopUpdates ??
-        Effect.succeed({
-          latest: Option.none<DesktopUpdateStatusReport>(),
-          changes: Stream.empty,
-        }),
-      ...overrides,
-    }),
-  );
-};

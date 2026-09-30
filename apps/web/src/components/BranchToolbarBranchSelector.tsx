@@ -58,7 +58,6 @@ import {
   resolveThreadPullRequestBadge,
   useLinkedThreadPullRequest,
 } from "./ThreadStatusIndicators";
-import { Button } from "./ui/button";
 import { ComposerControl } from "./chat/ComposerControl";
 import { Switch } from "./ui/switch";
 import { getVirtualizedScrollFadeClassName } from "./ui/scroll-area";

@@ -32,24 +32,24 @@ function initialConfigOption<E>(
 
 const DEFAULT_SESSION_STATE_TIMEOUT_MS = 6_000;
 
-export const fetchEnvironmentSessionState = Effect.fn(
-  "clientRuntime.state.fetchEnvironmentSessionState",
-)(function* (input: {
-  readonly prepared: PreparedConnection;
-  readonly signer: Option.Option<ManagedRelayDpopSigner["Service"]>;
-  readonly remoteAuthorization?: Option.Option<RemoteEnvironmentAuthorization["Service"]>;
-  readonly timeoutMs?: number;
-}) {
-  return yield* executeAuthenticatedEnvironmentHttpRequest({
-    ...input,
-    group: "auth",
-    method: "GET",
-    url: (httpBaseUrl) => environmentEndpointUrl(httpBaseUrl, "/api/auth/session"),
-    timeoutMs: input.timeoutMs ?? DEFAULT_SESSION_STATE_TIMEOUT_MS,
-    request: ({ client, headers }) => client.session({ headers }),
-    isUnauthorizedResponse: (response) => !response.authenticated,
-  });
-});
+const fetchEnvironmentSessionState = Effect.fn("clientRuntime.state.fetchEnvironmentSessionState")(
+  function* (input: {
+    readonly prepared: PreparedConnection;
+    readonly signer: Option.Option<ManagedRelayDpopSigner["Service"]>;
+    readonly remoteAuthorization?: Option.Option<RemoteEnvironmentAuthorization["Service"]>;
+    readonly timeoutMs?: number;
+  }) {
+    return yield* executeAuthenticatedEnvironmentHttpRequest({
+      ...input,
+      group: "auth",
+      method: "GET",
+      url: (httpBaseUrl) => environmentEndpointUrl(httpBaseUrl, "/api/auth/session"),
+      timeoutMs: input.timeoutMs ?? DEFAULT_SESSION_STATE_TIMEOUT_MS,
+      request: ({ client, headers }) => client.session({ headers }),
+      isUnauthorizedResponse: (response) => !response.authenticated,
+    });
+  },
+);
 
 export function createEnvironmentSessionAtoms<R, E>(
   runtime: Atom.AtomRuntime<EnvironmentRegistry | HttpClient.HttpClient | R, E>,

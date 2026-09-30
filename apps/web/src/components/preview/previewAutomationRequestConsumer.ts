@@ -14,7 +14,7 @@ import {
 
 type AutomationStreamResult<E> = AsyncResult.AsyncResult<PreviewAutomationStreamEvent, E>;
 
-export function serializePreviewAutomationError(
+function serializePreviewAutomationError(
   error: unknown,
   context: PreviewAutomationOperationContext,
 ): NonNullable<PreviewAutomationResponse["error"]> {

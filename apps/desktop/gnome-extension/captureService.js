@@ -1,7 +1,4 @@
-export const CLIENT_NAMES = [
-  "com.t3tools.T3Code.SnapShot",
-  "com.t3tools.T3Code.Development.SnapShot",
-];
+const CLIENT_NAMES = ["com.t3tools.T3Code.SnapShot", "com.t3tools.T3Code.Development.SnapShot"];
 
 export function isWaylandSession(meta) {
   return typeof meta.is_wayland_compositor !== "function" || meta.is_wayland_compositor();

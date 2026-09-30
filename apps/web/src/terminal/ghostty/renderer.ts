@@ -32,7 +32,7 @@ function sameTextStyle(left: GhosttyCell, right: GhosttyCell): boolean {
   );
 }
 
-export function ghosttyTextRunEnd(
+function ghosttyTextRunEnd(
   cells: readonly GhosttyCell[],
   start: number,
   sameStyle: (cell: GhosttyCell) => boolean,

@@ -15,7 +15,7 @@ export class OAuthScopeEncodingError extends Schema.TaggedError<OAuthScopeEncodi
   }
 }
 
-export function parseOAuthScope(value: string): ReadonlyArray<string> | null {
+function parseOAuthScope(value: string): ReadonlyArray<string> | null {
   if (value.length === 0) {
     return null;
   }

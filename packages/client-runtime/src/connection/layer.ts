@@ -15,7 +15,7 @@ import * as RelayEnvironmentDiscovery from "../relay/discovery.ts";
 import * as RemoteEnvironmentAuthorization from "../authorization/service.ts";
 import * as RpcSession from "../rpc/session.ts";
 
-export const watchDiscoveredCompatibility = Effect.fn("connection.watchDiscoveredCompatibility")(
+const watchDiscoveredCompatibility = Effect.fn("connection.watchDiscoveredCompatibility")(
   function* () {
     const registry = yield* EnvironmentRegistry.EnvironmentRegistry;
     const discovery = yield* RelayEnvironmentDiscovery.RelayEnvironmentDiscovery;

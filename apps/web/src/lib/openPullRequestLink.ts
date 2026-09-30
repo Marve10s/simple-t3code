@@ -169,7 +169,7 @@ export function findProjectOnChangeRequestHost(
   });
 }
 
-export function shouldOpenPullRequestExternally(
+function shouldOpenPullRequestExternally(
   event: Pick<MouseEvent<HTMLElement>, "metaKey" | "ctrlKey">,
 ): boolean {
   return event.metaKey || event.ctrlKey;

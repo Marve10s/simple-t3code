@@ -28,7 +28,7 @@ const IMAGE_MIME_TYPE_BY_EXTENSION: Readonly<Record<string, string>> = {
   webp: "image/webp",
 };
 
-export function inferImageMimeTypeFromName(name: string): string | null {
+function inferImageMimeTypeFromName(name: string): string | null {
   const dotIndex = name.lastIndexOf(".");
   if (dotIndex <= 0) {
     return null;

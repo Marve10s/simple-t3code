@@ -172,7 +172,7 @@ export const relayDocsRedirectRoute = HttpRouter.add(
   HttpServerResponse.redirect("/docs"),
 );
 
-export const RELAY_REQUEST_DEADLINE_MS = 9_000;
+const RELAY_REQUEST_DEADLINE_MS = 9_000;
 
 const relayRequestDeadline = <E, R>(
   httpEffect: Effect.Effect<
@@ -206,7 +206,7 @@ const relayRequestDeadline = <E, R>(
     ),
   );
 
-export const traceRelayHttpRequest = <E, R>(
+const traceRelayHttpRequest = <E, R>(
   httpEffect: Effect.Effect<
     HttpServerResponse.HttpServerResponse,
     E,
@@ -408,34 +408,34 @@ export const healthApi = HttpApiBuilder.group(
   }),
 );
 
-export const revokeEnvironmentLinkRecord = Effect.fn(
-  "relay.api.client.revokeEnvironmentLinkRecord",
-)(function* (input: {
-  readonly userId: string;
-  readonly environmentId: string;
-  readonly environmentPublicKey: string;
-}) {
-  const transactions = yield* RelayDb.RelayTransactions;
-  const links = yield* EnvironmentLinks.EnvironmentLinks;
-  const credentials = yield* EnvironmentCredentials.EnvironmentCredentials;
-  return yield* transactions.withTransaction(
-    Effect.gen(function* () {
-      const revoked = yield* links.revokeForUser({
-        userId: input.userId,
-        environmentId: input.environmentId,
-      });
-      if (revoked) {
-        yield* credentials.revokeForEnvironmentPublicKey({
+const revokeEnvironmentLinkRecord = Effect.fn("relay.api.client.revokeEnvironmentLinkRecord")(
+  function* (input: {
+    readonly userId: string;
+    readonly environmentId: string;
+    readonly environmentPublicKey: string;
+  }) {
+    const transactions = yield* RelayDb.RelayTransactions;
+    const links = yield* EnvironmentLinks.EnvironmentLinks;
+    const credentials = yield* EnvironmentCredentials.EnvironmentCredentials;
+    return yield* transactions.withTransaction(
+      Effect.gen(function* () {
+        const revoked = yield* links.revokeForUser({
+          userId: input.userId,
           environmentId: input.environmentId,
-          environmentPublicKey: input.environmentPublicKey,
         });
-      }
-      return revoked;
-    }),
-  );
-});
+        if (revoked) {
+          yield* credentials.revokeForEnvironmentPublicKey({
+            environmentId: input.environmentId,
+            environmentPublicKey: input.environmentPublicKey,
+          });
+        }
+        return revoked;
+      }),
+    );
+  },
+);
 
-export const unlinkEnvironmentRecord = Effect.fn("relay.api.client.unlinkEnvironmentRecord")(
+const unlinkEnvironmentRecord = Effect.fn("relay.api.client.unlinkEnvironmentRecord")(
   function* (input: { readonly userId: string; readonly environmentId: string }) {
     const links = yield* EnvironmentLinks.EnvironmentLinks;
     const managedEndpointProvider = yield* ManagedEndpointProvider.ManagedEndpointProvider;
@@ -485,7 +485,7 @@ type EnvironmentTunnelRecoveryProofInput = {
   | { readonly action: "recover"; readonly origin: RelayManagedEndpointOrigin }
 );
 
-export const verifyEnvironmentTunnelRecoveryProof = Effect.fn(
+const verifyEnvironmentTunnelRecoveryProof = Effect.fn(
   "relay.api.server.verifyEnvironmentTunnelRecoveryProof",
 )(function* (input: EnvironmentTunnelRecoveryProofInput) {
   const config = yield* RelayConfiguration.RelayConfiguration;
@@ -530,7 +530,7 @@ export const verifyEnvironmentTunnelRecoveryProof = Effect.fn(
   }
 });
 
-export const registerEnvironmentTunnelRecovery = Effect.fn(
+const registerEnvironmentTunnelRecovery = Effect.fn(
   "relay.api.server.registerEnvironmentTunnelRecovery",
 )(function* (input: {
   readonly userId: string;
@@ -569,93 +569,93 @@ export const registerEnvironmentTunnelRecovery = Effect.fn(
   return { status };
 });
 
-export const recoverEnvironmentTunnelRecord = Effect.fn(
-  "relay.api.server.recoverEnvironmentTunnelRecord",
-)(function* (input: {
-  readonly userId: string;
-  readonly environmentId: string;
-  readonly environmentPublicKey: string;
-  readonly origin: RelayManagedEndpointOrigin;
-}) {
-  const links = yield* EnvironmentLinks.EnvironmentLinks;
-  const allocations = yield* ManagedEndpointAllocations.ManagedEndpointAllocations;
-  const managedEndpointProvider = yield* ManagedEndpointProvider.ManagedEndpointProvider;
-  const link = yield* links.getForUser({
-    userId: input.userId,
-    environmentId: input.environmentId,
-  });
-  if (
-    link === null ||
-    link.environmentPublicKey !== input.environmentPublicKey ||
-    link.endpoint.providerKind !== "cloudflare_tunnel"
-  ) {
-    return yield* new HttpApiError.Unauthorized({});
-  }
+const recoverEnvironmentTunnelRecord = Effect.fn("relay.api.server.recoverEnvironmentTunnelRecord")(
+  function* (input: {
+    readonly userId: string;
+    readonly environmentId: string;
+    readonly environmentPublicKey: string;
+    readonly origin: RelayManagedEndpointOrigin;
+  }) {
+    const links = yield* EnvironmentLinks.EnvironmentLinks;
+    const allocations = yield* ManagedEndpointAllocations.ManagedEndpointAllocations;
+    const managedEndpointProvider = yield* ManagedEndpointProvider.ManagedEndpointProvider;
+    const link = yield* links.getForUser({
+      userId: input.userId,
+      environmentId: input.environmentId,
+    });
+    if (
+      link === null ||
+      link.environmentPublicKey !== input.environmentPublicKey ||
+      link.endpoint.providerKind !== "cloudflare_tunnel"
+    ) {
+      return yield* new HttpApiError.Unauthorized({});
+    }
 
-  const recovered = yield* managedEndpointProvider.provision({
-    userId: input.userId,
-    environmentId: input.environmentId,
-    origin: input.origin,
-  });
-  const recoveredTunnelId = recovered.runtime.tunnelId;
-  if (
-    recoveredTunnelId === undefined ||
-    recovered.endpoint.httpBaseUrl !== link.endpoint.httpBaseUrl ||
-    recovered.endpoint.wsBaseUrl !== link.endpoint.wsBaseUrl
-  ) {
-    if (recoveredTunnelId !== undefined) {
-      yield* managedEndpointProvider
-        .release({
-          userId: input.userId,
-          environmentId: input.environmentId,
-          expectedTunnelId: recoveredTunnelId,
-        })
-        .pipe(
+    const recovered = yield* managedEndpointProvider.provision({
+      userId: input.userId,
+      environmentId: input.environmentId,
+      origin: input.origin,
+    });
+    const recoveredTunnelId = recovered.runtime.tunnelId;
+    if (
+      recoveredTunnelId === undefined ||
+      recovered.endpoint.httpBaseUrl !== link.endpoint.httpBaseUrl ||
+      recovered.endpoint.wsBaseUrl !== link.endpoint.wsBaseUrl
+    ) {
+      if (recoveredTunnelId !== undefined) {
+        yield* managedEndpointProvider
+          .release({
+            userId: input.userId,
+            environmentId: input.environmentId,
+            expectedTunnelId: recoveredTunnelId,
+          })
+          .pipe(
+            Effect.catch((cause) =>
+              Effect.logWarning("Failed to clean up a tunnel with a mismatched endpoint", {
+                userId: input.userId,
+                environmentId: input.environmentId,
+                tunnelId: recoveredTunnelId,
+                cause,
+              }),
+            ),
+          );
+      }
+      return yield* new HttpApiError.Unauthorized({});
+    }
+
+    const enabled = yield* allocations.enableRecovery({
+      userId: input.userId,
+      environmentId: input.environmentId,
+      tunnelId: recoveredTunnelId,
+      environmentPublicKey: input.environmentPublicKey,
+      origin: input.origin,
+    });
+    if (!enabled) {
+      const owner = { userId: input.userId, environmentId: input.environmentId };
+      const target = yield* managedEndpointProvider.prepareDeprovision(owner);
+      const currentLink = target === null ? null : yield* links.getForUser(input);
+      if (
+        target !== null &&
+        (currentLink === null || currentLink.endpoint.providerKind !== "cloudflare_tunnel")
+      ) {
+        yield* managedEndpointProvider.deprovision({ ...owner, target }).pipe(
           Effect.catch((cause) =>
-            Effect.logWarning("Failed to clean up a tunnel with a mismatched endpoint", {
+            Effect.logWarning("Failed to clean up a tunnel after its managed link was removed", {
               userId: input.userId,
               environmentId: input.environmentId,
-              tunnelId: recoveredTunnelId,
               cause,
             }),
           ),
         );
+      }
+      return yield* new HttpApiError.Unauthorized({});
     }
-    return yield* new HttpApiError.Unauthorized({});
-  }
-
-  const enabled = yield* allocations.enableRecovery({
-    userId: input.userId,
-    environmentId: input.environmentId,
-    tunnelId: recoveredTunnelId,
-    environmentPublicKey: input.environmentPublicKey,
-    origin: input.origin,
-  });
-  if (!enabled) {
-    const owner = { userId: input.userId, environmentId: input.environmentId };
-    const target = yield* managedEndpointProvider.prepareDeprovision(owner);
-    const currentLink = target === null ? null : yield* links.getForUser(input);
-    if (
-      target !== null &&
-      (currentLink === null || currentLink.endpoint.providerKind !== "cloudflare_tunnel")
-    ) {
-      yield* managedEndpointProvider.deprovision({ ...owner, target }).pipe(
-        Effect.catch((cause) =>
-          Effect.logWarning("Failed to clean up a tunnel after its managed link was removed", {
-            userId: input.userId,
-            environmentId: input.environmentId,
-            cause,
-          }),
-        ),
-      );
-    }
-    return yield* new HttpApiError.Unauthorized({});
-  }
-  return {
-    endpoint: recovered.endpoint,
-    endpointRuntime: recovered.runtime,
-  };
-});
+    return {
+      endpoint: recovered.endpoint,
+      endpointRuntime: recovered.runtime,
+    };
+  },
+);
 
 export const mobileApi = HttpApiBuilder.group(
   RelayApi,
@@ -1326,9 +1326,7 @@ type MapRelayCommonApiError<E> =
   | (Extract<E, DpopProofs.DpopProofRejected> extends never ? never : RelayAuthInvalidError)
   | (Extract<E, RelayCommonPersistenceError> extends never ? never : RelayInternalError);
 
-export function relayDpopFailureReason(
-  code: DpopProofs.DpopProofFailureCode,
-): RelayDpopFailureReason {
+function relayDpopFailureReason(code: DpopProofs.DpopProofFailureCode): RelayDpopFailureReason {
   switch (code) {
     case "time_window":
       return "time_window";
@@ -1544,7 +1542,7 @@ function verifyClerkOAuthBearerToken(
   });
 }
 
-export function verifyRelayClientBearerToken(
+function verifyRelayClientBearerToken(
   config: RelayConfiguration.RelayConfiguration["Service"],
   token: string,
 ) {

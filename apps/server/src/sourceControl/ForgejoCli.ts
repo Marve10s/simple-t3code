@@ -209,7 +209,7 @@ export function matchForgejoLogin(
       : undefined;
 }
 
-export const make = Effect.gen(function* () {
+const make = Effect.gen(function* () {
   const process = yield* VcsProcess.VcsProcess;
   const fileSystem = yield* FileSystem.FileSystem;
   const httpClient = yield* HttpClient.HttpClient;

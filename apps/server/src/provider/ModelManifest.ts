@@ -172,7 +172,7 @@ const decodeManifestCache = Schema.decodeUnknownEffect(
     ManifestCacheFile as unknown as Schema.Codec<typeof ManifestCacheFile.Type>,
   ),
 );
-export const encodeManifestCache = Schema.encodeEffect(
+const encodeManifestCache = Schema.encodeEffect(
   Schema.fromJsonString(
     ManifestCacheFile as unknown as Schema.Codec<typeof ManifestCacheFile.Type>,
   ),
@@ -216,7 +216,7 @@ export function manifestDefaultModel(
   return manifest.providers?.[driverKind]?.defaults?.chat;
 }
 
-export function applyManifestDefault(
+function applyManifestDefault(
   models: ReadonlyArray<ServerProviderModel>,
   manifest: ModelManifestData,
   driverKind: ProviderDriverKind,
@@ -248,7 +248,7 @@ export function applyManifestDefault(
   });
 }
 
-export function classifyModels(
+function classifyModels(
   models: ReadonlyArray<ServerProviderModel>,
   manifest: ModelManifestData,
   driverKind: ProviderDriverKind,
@@ -274,16 +274,7 @@ export class ModelManifest extends Context.Service<
   }
 >()("t3/provider/ModelManifest") {}
 
-const BundledOnlyModelManifest: ModelManifest["Service"] = {
-  current: Effect.succeed(BUNDLED_MODEL_MANIFEST),
-  refresh: Effect.succeed(BUNDLED_MODEL_MANIFEST),
-  forceRefresh: Effect.succeed(BUNDLED_MODEL_MANIFEST),
-  refreshInBackground: Effect.void,
-};
-
-export const layerTest = Layer.succeed(ModelManifest, BundledOnlyModelManifest);
-
-export const make = Effect.gen(function* () {
+const make = Effect.gen(function* () {
   const fileSystem = yield* FileSystem.FileSystem;
   const path = yield* Path.Path;
   const config = yield* ServerConfig;

@@ -45,7 +45,7 @@ const ensureTrustedSnapShotSender = Effect.fn("desktop.ipc.snapShot.ensureTruste
   },
 );
 
-export function snapShotScreenFrame(
+function snapShotScreenFrame(
   viewportFrame: DesktopSnapShotAnimationDestination["viewportFrame"],
   contentBounds: Electron.Rectangle,
   zoomFactor: number,
@@ -58,7 +58,7 @@ export function snapShotScreenFrame(
   };
 }
 
-export function snapShotRelativeFrame(
+function snapShotRelativeFrame(
   frame: DesktopSnapShotAnimationDestination["viewportFrame"],
   bounds: Electron.Rectangle,
   zoom: number,

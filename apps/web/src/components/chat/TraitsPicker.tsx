@@ -56,7 +56,7 @@ function savedOptionLabel(id: string): string {
   );
 }
 
-export function buildUnavailableModelOptionDescriptors(
+function buildUnavailableModelOptionDescriptors(
   selections: ProviderOptions | null | undefined,
 ): ReadonlyArray<ProviderOptionDescriptor> {
   return (selections ?? []).map((selection) =>
@@ -468,7 +468,7 @@ export const TraitsMenuContent = memo(function TraitsMenuContentImpl({
   );
 });
 
-export function buildTraitsTriggerDisplay(input: {
+function buildTraitsTriggerDisplay(input: {
   provider: ProviderDriverKind;
   descriptors: ReadonlyArray<ProviderOptionDescriptor>;
   primarySelectDescriptorId: string | null;

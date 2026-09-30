@@ -135,7 +135,7 @@ export function compareExactServiceVersions(left: string, right: string): number
   return 0;
 }
 
-export function decodeServiceState(value: unknown): ServiceState | undefined {
+function decodeServiceState(value: unknown): ServiceState | undefined {
   if (!isRecord(value)) return undefined;
   const update = value.update === undefined ? undefined : decodeServiceUpdate(value.update);
   if (

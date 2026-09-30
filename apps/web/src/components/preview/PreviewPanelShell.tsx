@@ -20,7 +20,7 @@ const PREVIEW_PANEL_MAX_WIDTH_FRACTION = 0.7;
 const PREVIEW_PANEL_DEFAULT_WIDTH = 540;
 const SIBLING_COLUMN_MIN_WIDTH = 360;
 
-export function getPreviewPanelMaxWidth(viewportWidth: number, containerWidth?: number): number {
+function getPreviewPanelMaxWidth(viewportWidth: number, containerWidth?: number): number {
   const fractionCap = Math.floor(viewportWidth * PREVIEW_PANEL_MAX_WIDTH_FRACTION);
   const containerCap =
     containerWidth === undefined ? Infinity : Math.floor(containerWidth) - SIBLING_COLUMN_MIN_WIDTH;

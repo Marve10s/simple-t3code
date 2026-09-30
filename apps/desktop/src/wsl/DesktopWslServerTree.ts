@@ -39,7 +39,7 @@ export class DesktopWslServerTree extends Context.Service<
   }
 >()("@t3tools/desktop/wsl/DesktopWslServerTree") {}
 
-export const forEachBoundedTree = <Node, E, R>(
+const forEachBoundedTree = <Node, E, R>(
   roots: ReadonlyArray<Node>,
   visit: (node: Node) => Effect.Effect<ReadonlyArray<Node>, E, R>,
 ): Effect.Effect<void, E, R> =>
@@ -197,15 +197,3 @@ export interface DesktopWslServerTreeTestStub {
   readonly result?: WslServerTreeResult;
   readonly cleanupLegacy?: Effect.Effect<void>;
 }
-
-export const layerTest = (stub: DesktopWslServerTreeTestStub = {}) =>
-  Layer.effect(
-    DesktopWslServerTree,
-    Effect.gen(function* () {
-      const environment = yield* DesktopEnvironment.DesktopEnvironment;
-      return DesktopWslServerTree.of({
-        ensure: Effect.succeed(stub.result ?? { ok: true, root: environment.appRoot }),
-        cleanupLegacy: stub.cleanupLegacy ?? Effect.void,
-      });
-    }),
-  );

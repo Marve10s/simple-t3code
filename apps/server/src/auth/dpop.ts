@@ -20,7 +20,7 @@ import * as ServerSecretStore from "./ServerSecretStore.ts";
 
 export const DPOP_REPLAY_MARKER_PREFIX = "dpop-proof-";
 
-export const mapDpopFailureReason = (code: DpopVerificationFailureCodeType): DpopFailureReason => {
+const mapDpopFailureReason = (code: DpopVerificationFailureCodeType): DpopFailureReason => {
   switch (code) {
     case "time_window":
       return "time_window";
@@ -39,7 +39,7 @@ export const mapDpopFailureReason = (code: DpopVerificationFailureCodeType): Dpo
   }
 };
 
-export const mapDpopReplayStoreError = (
+const mapDpopReplayStoreError = (
   error: ServerSecretStore.SecretStoreError,
 ): ServerAuthInvalidCredentialError | ServerAuthInternalError =>
   ServerSecretStore.isSecretAlreadyExistsError(error)

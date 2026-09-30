@@ -94,7 +94,7 @@ function runChecked(command, args) {
   throw new Error(`Failed to run ${command} ${args.join(" ")}: ${details}`.trim());
 }
 
-export function resolveMacCodeSignArguments(appBundlePath) {
+function resolveMacCodeSignArguments(appBundlePath) {
   return ["--force", "--deep", "--sign", "-", "--timestamp=none", appBundlePath];
 }
 
@@ -106,7 +106,7 @@ function shellSingleQuote(value) {
   return `'${value.replaceAll("'", "'\\''")}'`;
 }
 
-export function makeDevelopmentEnvironmentScript(environment) {
+function makeDevelopmentEnvironmentScript(environment) {
   const envEntries = [
     ["VITE_DEV_SERVER_URL", environment.VITE_DEV_SERVER_URL],
     ["T3CODE_PORT", environment.T3CODE_PORT],
@@ -127,7 +127,7 @@ export function makeDevelopmentEnvironmentScript(environment) {
   ].join("\n");
 }
 
-export function makeDevelopmentLauncherScript({
+function makeDevelopmentLauncherScript({
   electronBinaryPath,
   mainEntryPath,
   desktopRoot,
@@ -155,7 +155,7 @@ function writeDevelopmentEnvironmentScript() {
   );
 }
 
-export function writeDevelopmentLauncherScript(targetBinaryPath, electronBinaryPath) {
+function writeDevelopmentLauncherScript(targetBinaryPath, electronBinaryPath) {
   const script = makeDevelopmentLauncherScript({
     electronBinaryPath,
     mainEntryPath: NodePath.join(desktopDir, "dist-electron", "main.cjs"),
@@ -200,7 +200,7 @@ function registerMacLauncherBundle(appBundlePath) {
   }
 }
 
-export function resolveMacLauncherIconPaths(runtimeDir, development = isDevelopment) {
+function resolveMacLauncherIconPaths(runtimeDir, development = isDevelopment) {
   return {
     sourceIconPath: development ? developmentMacIconPngPath : productionMacIconPngPath,
     generatedIconPath: NodePath.posix.join(
@@ -259,7 +259,7 @@ function ensureMacIconIcns(runtimeDir) {
   }
 }
 
-export function resolveMacBundleInfoPlistStrings(executableName) {
+function resolveMacBundleInfoPlistStrings(executableName) {
   return {
     CFBundleDisplayName: APP_DISPLAY_NAME,
     CFBundleName: APP_DISPLAY_NAME,
@@ -328,7 +328,7 @@ function readJson(path) {
   }
 }
 
-export function resolveMacLauncherPaths(appBundlePath, displayName = APP_DISPLAY_NAME) {
+function resolveMacLauncherPaths(appBundlePath, displayName = APP_DISPLAY_NAME) {
   const executableDir = NodePath.posix.join(appBundlePath, "Contents", "MacOS");
   const launcherExecutableName = `${displayName} Launcher`;
   return {
@@ -443,7 +443,7 @@ export function resolveElectronLaunchCommand(args = []) {
   };
 }
 
-export function resolveElectronBinaryPath({
+function resolveElectronBinaryPath({
   ensureRuntime = ensureElectronRuntime,
   createRequire = NodeModule.createRequire,
   moduleUrl = import.meta.url,

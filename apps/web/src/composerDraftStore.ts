@@ -81,7 +81,7 @@ const isReviewCommentContext = Schema.is(ReviewCommentContextSchema);
 const isSnapShotSource = Schema.is(SnapShotSource);
 const isPreviewAnnotationPayload = Schema.is(PreviewAnnotationPayloadSchema);
 
-export const COMPOSER_DRAFT_STORAGE_KEY = "t3code:composer-drafts:v1";
+const COMPOSER_DRAFT_STORAGE_KEY = "t3code:composer-drafts:v1";
 const COMPOSER_DRAFT_STORAGE_VERSION = 9;
 const DraftThreadEnvModeSchema = Schema.Literals(["local", "worktree"]);
 export type DraftThreadEnvMode = typeof DraftThreadEnvModeSchema.Type;
@@ -978,7 +978,7 @@ function legacyToModelSelectionByProvider(
   return result;
 }
 
-export function deriveEffectiveComposerModelState(input: {
+function deriveEffectiveComposerModelState(input: {
   draft:
     | Pick<ComposerThreadDraftState, "modelSelectionByProvider" | "activeProvider">
     | null
@@ -1862,7 +1862,7 @@ function migratePersistedComposerDraftStoreState(
   };
 }
 
-export function partializeComposerDraftStoreState(
+function partializeComposerDraftStoreState(
   state: ComposerDraftStoreState,
 ): PersistedComposerDraftStoreState {
   const mappedDraftKeys = new Set(

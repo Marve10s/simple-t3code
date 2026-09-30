@@ -30,7 +30,7 @@ const CAPABILITIES: PullRequestCapabilities = {
   viewedFiles: "environment",
 };
 
-export function bitbucketViewerPermissions(input: {
+function bitbucketViewerPermissions(input: {
   readonly canWrite: boolean;
 }): PullRequestViewerPermissions {
   return {
@@ -42,7 +42,7 @@ export function bitbucketViewerPermissions(input: {
   };
 }
 
-export function bitbucketProviderFailure(
+function bitbucketProviderFailure(
   error: BitbucketPullRequestApi.BitbucketPullRequestApiError,
 ): PullRequestProviderFailure {
   if (error._tag === "BitbucketResponseError" && error.status === 401) {

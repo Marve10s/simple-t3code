@@ -18,7 +18,7 @@ interface DiscoveredPortsState {
   readonly configuredUrlProbing: boolean;
 }
 
-export function boundConfiguredLocalServerUrls(
+function boundConfiguredLocalServerUrls(
   urls: ReadonlyArray<string> | undefined,
 ): ReadonlyArray<string> {
   const bounded: string[] = [];

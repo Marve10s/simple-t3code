@@ -95,7 +95,7 @@ const isFutureTimestamp = (value: string, nowMs: number) => {
   );
 };
 
-export function claudeResetCreditsToContract(
+function claudeResetCreditsToContract(
   block: unknown,
   nowMs: number,
 ): ServerProviderResetCredits | undefined {

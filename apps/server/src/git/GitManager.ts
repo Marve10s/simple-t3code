@@ -143,7 +143,7 @@ const PR_LOOKUP_FAILURE_MAX_TTL = Duration.minutes(15);
 const PR_LOOKUP_CACHE_CAPACITY = 2_048;
 const isSourceControlProviderError = Schema.is(SourceControlProviderError);
 
-export function prLookupFailureTtl(consecutiveFailures: number): Duration.Duration {
+function prLookupFailureTtl(consecutiveFailures: number): Duration.Duration {
   const exponent = Math.max(0, consecutiveFailures - 1);
   const backoffMs = Duration.toMillis(PR_LOOKUP_FAILURE_BASE_TTL) * Math.pow(2, exponent);
   return Duration.min(Duration.millis(backoffMs), PR_LOOKUP_FAILURE_MAX_TTL);
@@ -205,7 +205,7 @@ interface BranchHeadContext {
   isCrossRepository: boolean;
 }
 
-export function pullRequestRepositoryKey(value: string): string | null {
+function pullRequestRepositoryKey(value: string): string | null {
   try {
     const url = new URL(value);
     const match =
@@ -262,7 +262,7 @@ function resolvePullRequestWorktreeLocalBranchName(
   return `t3code/pr-${pullRequest.number}/${suffix}`;
 }
 
-export function parseRepositoryNameWithOwnerFromRemoteUrl(
+function parseRepositoryNameWithOwnerFromRemoteUrl(
   url: string | null,
   providerKind?: ChangeRequest["provider"],
 ): string | null {
@@ -361,7 +361,7 @@ function resolvePullRequestHeadIdentity(pr: PullRequestInfo): PullRequestHeadIde
   };
 }
 
-export function matchesBranchHeadContext(
+function matchesBranchHeadContext(
   pr: PullRequestInfo,
   headContext: Pick<
     BranchHeadContext,
@@ -659,7 +659,7 @@ function toPullRequestHeadRemoteInfo(pr: {
   };
 }
 
-export const make = Effect.gen(function* () {
+const make = Effect.gen(function* () {
   const gitCore = yield* GitVcsDriver.GitVcsDriver;
   const sourceControlProviders = yield* SourceControlProviderRegistry.SourceControlProviderRegistry;
   const textGeneration = yield* TextGeneration.TextGeneration;

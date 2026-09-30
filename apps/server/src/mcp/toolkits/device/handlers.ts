@@ -18,13 +18,13 @@ import * as DeviceService from "../../../device/DeviceService.ts";
 import * as McpInvocationContext from "../../McpInvocationContext.ts";
 import { DeviceScreenshotToolkit, DeviceStandardToolkit, DeviceToolkit } from "./tools.ts";
 
-export function agentDeviceTargetArgs(device: DeviceSummary): ReadonlyArray<string> {
+function agentDeviceTargetArgs(device: DeviceSummary): ReadonlyArray<string> {
   return device.platform === "ios"
     ? ["--platform", "ios", "--udid", device.id]
     : ["--platform", "android", "--serial", device.id];
 }
 
-export function agentDeviceQuickStart(
+function agentDeviceQuickStart(
   device: DeviceSummary,
   targetArgs = agentDeviceTargetArgs(device),
   command = "agent-device",
@@ -235,7 +235,7 @@ const handlers = {
     }).pipe(Effect.mapError(toolError)),
 } satisfies Parameters<typeof DeviceToolkit.toLayer>[0];
 
-export function pngDimensions(png: Uint8Array): { width: number; height: number } {
+function pngDimensions(png: Uint8Array): { width: number; height: number } {
   if (png.length < 24) return { width: 0, height: 0 };
   const view = new DataView(png.buffer, png.byteOffset, png.byteLength);
   const isPng =

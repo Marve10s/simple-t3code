@@ -8,7 +8,6 @@ import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 import * as Path from "effect/Path";
 import * as Schema from "effect/Schema";
-import * as Ref from "effect/Ref";
 
 import * as DesktopEnvironment from "../app/DesktopEnvironment.ts";
 
@@ -169,7 +168,7 @@ const writeClientSettings = Effect.fnUntraced(function* (input: {
   );
 });
 
-export const make = Effect.gen(function* () {
+const make = Effect.gen(function* () {
   const environment = yield* DesktopEnvironment.DesktopEnvironment;
   const fileSystem = yield* FileSystem.FileSystem;
   const path = yield* Path.Path;
@@ -205,15 +204,3 @@ export const make = Effect.gen(function* () {
 });
 
 export const layer = Layer.effect(DesktopClientSettings, make);
-
-export const layerTest = (initialSettings: Option.Option<ClientSettings> = Option.none()) =>
-  Layer.effect(
-    DesktopClientSettings,
-    Effect.gen(function* () {
-      const settingsRef = yield* Ref.make(initialSettings);
-      return DesktopClientSettings.of({
-        get: Ref.get(settingsRef),
-        set: (settings) => Ref.set(settingsRef, Option.some(settings)),
-      });
-    }),
-  );

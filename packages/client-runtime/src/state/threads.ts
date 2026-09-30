@@ -40,7 +40,7 @@ function statusWithoutLiveData(data: Option.Option<OrchestrationThread>): Enviro
   return Option.isSome(data) ? "cached" : "empty";
 }
 
-export const INITIAL_THREAD_USER_TURN_LIMIT = 10;
+const INITIAL_THREAD_USER_TURN_LIMIT = 10;
 const OLDER_THREAD_PAGE_USER_TURN_LIMIT = 20;
 
 function pageStateFromSnapshot(
@@ -150,7 +150,7 @@ function cachedThreadState(value: EnvironmentThreadState): EnvironmentThreadStat
   };
 }
 
-export const makeEnvironmentThreadState = Effect.fn("EnvironmentThreadState.make")(function* (
+const makeEnvironmentThreadState = Effect.fn("EnvironmentThreadState.make")(function* (
   threadId: ThreadIdType,
   resumeCache?: ThreadResumeCache,
 ) {

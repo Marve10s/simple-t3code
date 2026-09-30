@@ -67,22 +67,3 @@ export const make = Effect.gen(function* () {
 });
 
 export const layer = Layer.effect(ResetCreditCoordinator, make);
-
-export const layerTest = Layer.effect(
-  ResetCreditCoordinator,
-  Effect.gen(function* () {
-    let counter = 0;
-    return yield* make.pipe(
-      Effect.provideService(
-        Crypto.Crypto,
-        Crypto.make({
-          randomBytes: (size) => {
-            counter += 1;
-            return new Uint8Array(size).fill(counter);
-          },
-          digest: (_algorithm, data) => Effect.succeed(data),
-        }),
-      ),
-    );
-  }),
-);

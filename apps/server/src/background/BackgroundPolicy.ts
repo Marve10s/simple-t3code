@@ -57,7 +57,7 @@ export class BackgroundPolicy extends Context.Service<
 
 const DEFAULT_LEASE_TTL_MS = 45_000;
 const MAX_LEASE_TTL_MS = 120_000;
-export const MAX_CLIENT_ACTIVITY_LEASES_PER_RPC_CLIENT = 16;
+const MAX_CLIENT_ACTIVITY_LEASES_PER_RPC_CLIENT = 16;
 
 function scopeKey(scope: BackgroundScope): string {
   switch (scope.type) {

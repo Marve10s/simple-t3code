@@ -77,7 +77,7 @@ interface ServiceLauncherProcess {
   ) => void;
 }
 
-export const ServiceLauncherHostProcess = Context.Reference<ServiceLauncherProcess>(
+const ServiceLauncherHostProcess = Context.Reference<ServiceLauncherProcess>(
   "t3/cloud/serviceLauncherHostProcess",
   {
     defaultValue: () => ({
@@ -142,7 +142,7 @@ export const resolveServiceLauncherMode = Effect.fn("cloud.service_launcher_clie
   },
 );
 
-export const make = Effect.fn("cloud.service_launcher_client.make")(function* (options?: {
+const make = Effect.fn("cloud.service_launcher_client.make")(function* (options?: {
   readonly currentVersion?: string;
 }) {
   const { host, context, managed } = yield* resolveStartup(options);

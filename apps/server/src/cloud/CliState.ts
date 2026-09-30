@@ -13,7 +13,7 @@ import {
   RELAY_URL_SECRET,
 } from "./config.ts";
 
-export const CLOUD_CLI_DESIRED_LINK_SECRET = "cloud-cli-desired-link";
+const CLOUD_CLI_DESIRED_LINK_SECRET = "cloud-cli-desired-link";
 
 export type CliDesiredLinkMode = "managed" | "publish_only";
 

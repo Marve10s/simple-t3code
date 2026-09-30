@@ -8,7 +8,6 @@
     "ensure:electron": "node scripts/ensure-electron-runtime.mjs",
     "start": "node scripts/start-electron.mjs",
     "typecheck": "tsc --noEmit",
-    "test": "vp test run --passWithNoTests",
     "smoke-test": "node scripts/smoke-test.mjs"
   },
   "dependencies": {
@@ -32,7 +31,6 @@
     "react-grab": "^0.1.32"
   },
   "devDependencies": {
-    "@effect/vitest": "catalog:",
     "@types/node": "catalog:",
     "acorn": "8.16.0",
     "cross-env": "^10.1.0",

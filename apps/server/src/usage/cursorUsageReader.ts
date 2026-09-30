@@ -19,7 +19,7 @@ function tokens(value: unknown): number {
   return typeof value === "number" && Number.isFinite(value) && value > 0 ? Math.trunc(value) : 0;
 }
 
-export function cursorRateModel(model: string): string {
+function cursorRateModel(model: string): string {
   const base = model
     .replace(/^cursor-/, "")
     .replace(/(?:-thinking)?(?:-(?:none|minimal|low|medium|high|xhigh|max))?(?:-fast)?$/, "");

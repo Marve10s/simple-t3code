@@ -14,11 +14,11 @@ import { appAtomRegistry } from "../rpc/atomRegistry";
 import { useAtomCommand } from "../state/use-atom-command";
 import { resolveRelayClerkTokenOptions } from "./publicConfig";
 
-export function deactivateManagedRelayAuthentication(): void {
+function deactivateManagedRelayAuthentication(): void {
   setManagedRelaySession(appAtomRegistry, null);
 }
 
-export function activateManagedRelayAuthentication(
+function activateManagedRelayAuthentication(
   accountId: string,
   readClerkToken: () => Promise<string | null>,
 ): void {

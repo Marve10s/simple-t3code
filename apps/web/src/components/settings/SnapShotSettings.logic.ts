@@ -13,7 +13,7 @@ export function snapShotStatus(state: DesktopSnapShotState | null, enabled: bool
   return snapShotSetupSummary(state, enabled);
 }
 
-export function snapShotSetupSummary(state: DesktopSnapShotState, enabled: boolean): string {
+function snapShotSetupSummary(state: DesktopSnapShotState, enabled: boolean): string {
   if (state.message) return "Capture needs attention";
   if (state.linuxBackend === "hyprland" && state.hyprlandHelper?.status !== "ready")
     return state.hyprlandHelper?.status === "error"

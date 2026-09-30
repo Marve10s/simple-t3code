@@ -36,7 +36,7 @@ export class ThreadBackgroundLivenessService extends Context.Service<
   }
 >()("t3/orchestration/ThreadBackgroundLiveness/ThreadBackgroundLivenessService") {}
 
-export function make(): ThreadBackgroundLivenessService["Service"] {
+function make(): ThreadBackgroundLivenessService["Service"] {
   const stateByThreadId = new Map<string, ThreadLivenessState>();
 
   const stateFor = (threadId: string): ThreadLivenessState => {

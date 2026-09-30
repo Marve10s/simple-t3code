@@ -42,7 +42,7 @@ type SessionSetupResult = Pick<
   "configOptions" | "models"
 >;
 
-export function buildAntigravityModelsFromSession(
+function buildAntigravityModelsFromSession(
   setup: SessionSetupResult,
 ): ReadonlyArray<ServerProviderModel> {
   const config = setup.configOptions?.find(

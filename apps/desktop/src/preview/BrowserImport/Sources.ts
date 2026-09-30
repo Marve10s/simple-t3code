@@ -175,7 +175,7 @@ export const BROWSER_IMPORT_SOURCES: ReadonlyArray<BrowserImportSourceDefinition
   },
 ];
 
-export const cookieDatabaseCandidatePaths = (
+const cookieDatabaseCandidatePaths = (
   definition: BrowserImportSourceDefinition,
   context: BrowserImportPathContext,
   profileDirectory: string,
@@ -208,7 +208,7 @@ export const resolveCookieDatabase = Effect.fnUntraced(function* (
   return undefined;
 });
 
-export function parseFirefoxProfiles(
+function parseFirefoxProfiles(
   ini: string,
   path: Path.Path,
   root: string,
@@ -506,7 +506,7 @@ const databaseFileExists = Effect.fnUntraced(function* (path: string) {
 
 type ProcessLivenessProbe = (pid: number) => Effect.Effect<boolean>;
 
-export const chromiumProcessIsAlive = (
+const chromiumProcessIsAlive = (
   pid: number,
   signalProcess: (pid: number, signal: 0) => unknown = process.kill.bind(process),
 ) =>
@@ -526,7 +526,7 @@ export const chromiumProcessIsAlive = (
 
 const processIsAlive: ProcessLivenessProbe = (pid) => chromiumProcessIsAlive(pid);
 
-export const chromiumSingletonLockIsHeld = Effect.fnUntraced(function* (
+const chromiumSingletonLockIsHeld = Effect.fnUntraced(function* (
   target: string,
   currentHost: string,
   isProcessAlive: ProcessLivenessProbe,
@@ -542,7 +542,7 @@ export const chromiumSingletonLockIsHeld = Effect.fnUntraced(function* (
   return yield* isProcessAlive(pid);
 });
 
-export const isWindowsLockHeldError = (error: PlatformError.PlatformError): boolean =>
+const isWindowsLockHeldError = (error: PlatformError.PlatformError): boolean =>
   error.reason._tag === "Busy";
 
 const windowsLockIsHeld = Effect.fnUntraced(function* (lockPath: string) {
@@ -557,7 +557,7 @@ const windowsLockIsHeld = Effect.fnUntraced(function* (lockPath: string) {
 
 type WindowsLockProbe = (path: string) => Effect.Effect<boolean, never, FileSystem.FileSystem>;
 
-export const windowsChromiumCookiesAreHeld = Effect.fnUntraced(function* (
+const windowsChromiumCookiesAreHeld = Effect.fnUntraced(function* (
   definition: BrowserImportSourceDefinition,
   context: BrowserImportPathContext,
   lockIsHeld: WindowsLockProbe = windowsLockIsHeld,
@@ -573,7 +573,7 @@ export const windowsChromiumCookiesAreHeld = Effect.fnUntraced(function* (
   return held.some(Boolean);
 });
 
-export const firefoxSymlinkLockIsHeld = Effect.fnUntraced(function* (
+const firefoxSymlinkLockIsHeld = Effect.fnUntraced(function* (
   target: string,
   localAddresses: ReadonlySet<string>,
   isProcessAlive: ProcessLivenessProbe,
@@ -601,7 +601,7 @@ const FCNTL_PROBE_SCRIPT =
   "else:\n" +
   "  print('free')";
 
-export const posixLockIsHeld = Effect.fnUntraced(function* (
+const posixLockIsHeld = Effect.fnUntraced(function* (
   path: string,
   interpreters: ReadonlyArray<string> = FCNTL_PROBE_INTERPRETERS,
 ) {

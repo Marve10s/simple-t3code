@@ -133,9 +133,7 @@ export interface PullRequestTabStatus {
 
 export type PullRequestTabStatusSeed = Pick<PullRequestTabStatus, "state" | "isDraft">;
 
-export function shouldOpenDefaultBrowserProfileFromMenuClick(
-  pointerType: string | undefined,
-): boolean {
+function shouldOpenDefaultBrowserProfileFromMenuClick(pointerType: string | undefined): boolean {
   return pointerType !== "touch";
 }
 
@@ -195,7 +193,7 @@ function previewTabIdOf(
   return sessions[surface.resourceId]?.tabId ?? null;
 }
 
-export function tabMuteMenuItem(input: {
+function tabMuteMenuItem(input: {
   overlay: DesktopPreviewOverlay | null;
   canResolveRuntimeTabId: boolean;
 }): { label: string; disabled: boolean } {
@@ -218,9 +216,10 @@ type SurfaceShortcutEvent = Pick<
   "altKey" | "ctrlKey" | "defaultPrevented" | "isComposing" | "key" | "metaKey"
 >;
 
-export function surfaceShortcutActionForKey<
-  const Action extends { available: boolean; shortcut: string },
->(actions: readonly Action[], event: SurfaceShortcutEvent): Action | null {
+function surfaceShortcutActionForKey<const Action extends { available: boolean; shortcut: string }>(
+  actions: readonly Action[],
+  event: SurfaceShortcutEvent,
+): Action | null {
   if (event.defaultPrevented || event.isComposing) return null;
   if (event.metaKey || event.ctrlKey || event.altKey) return null;
   return (
@@ -230,7 +229,7 @@ export function surfaceShortcutActionForKey<
   );
 }
 
-export function surfaceShortcutTargetsTypingContext(
+function surfaceShortcutTargetsTypingContext(
   target: { closest(selectors: string): unknown } | null,
 ): boolean {
   return (
@@ -662,7 +661,7 @@ function SurfaceIcon({
   }
 }
 
-export function resolvePullRequestTabLink(
+function resolvePullRequestTabLink(
   threads: readonly Pick<EnvironmentThreadShell, "environmentId" | "pullRequests">[],
   environmentId: EnvironmentId | null,
   host: string | null,

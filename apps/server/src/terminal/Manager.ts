@@ -599,10 +599,7 @@ interface TerminalProcessTableSnapshot {
   readonly commandById: ReadonlyMap<number, string>;
 }
 
-export function subprocessSnapshotPollDelayMs(
-  pollIntervalMs: number,
-  failureCount: number,
-): number {
+function subprocessSnapshotPollDelayMs(pollIntervalMs: number, failureCount: number): number {
   return Math.min(pollIntervalMs * 2 ** failureCount, MAX_SUBPROCESS_POLL_INTERVAL_MS);
 }
 
@@ -772,7 +769,7 @@ interface TerminalHistoryChunk {
   lineBreaks: number;
 }
 
-export class BoundedTerminalHistory {
+class BoundedTerminalHistory {
   private readonly maxLines: number;
   private readonly maxBytes: number;
   private chunks: Array<TerminalHistoryChunk | undefined> = [];
@@ -1267,7 +1264,7 @@ interface TerminalManagerOptions {
   >;
 }
 
-export const resolveProviderInstanceTerminalEnvironment = Effect.fn(
+const resolveProviderInstanceTerminalEnvironment = Effect.fn(
   "terminal.resolveProviderInstanceTerminalEnvironment",
 )(function* (input: {
   readonly serverSettings: ServerSettings.ServerSettingsService["Service"];
@@ -1340,7 +1337,7 @@ export const make = Effect.fn("TerminalManager.make")(function* () {
   });
 });
 
-export const makeWithOptions = Effect.fn("TerminalManager.makeWithOptions")(function* (
+const makeWithOptions = Effect.fn("TerminalManager.makeWithOptions")(function* (
   options: TerminalManagerOptions,
 ) {
   const fileSystem = yield* FileSystem.FileSystem;

@@ -6,7 +6,7 @@ import * as Context from "effect/Context";
 import { runSshCommand } from "@t3tools/ssh/command";
 import * as Effect from "effect/Effect";
 
-export const LocalDeviceHostAddresses = Context.Reference<ReadonlySet<string>>(
+const LocalDeviceHostAddresses = Context.Reference<ReadonlySet<string>>(
   "LocalDeviceHostAddresses",
   {
     defaultValue: () =>

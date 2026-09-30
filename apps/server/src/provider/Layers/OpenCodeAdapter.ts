@@ -79,7 +79,7 @@ function parseOpenCodeResume(raw: unknown): { readonly sessionId: string } | und
   return { sessionId: record.sessionId.trim() };
 }
 
-export function isOpenCodeNotFound(cause: unknown): boolean {
+function isOpenCodeNotFound(cause: unknown): boolean {
   const seen = new Set<unknown>();
   const queue: Array<unknown> = [cause];
   for (let steps = 0; queue.length > 0 && steps < 32; steps += 1) {
@@ -119,7 +119,7 @@ export function isOpenCodeNotFound(cause: unknown): boolean {
   return false;
 }
 
-export function isSameOpenCodeDirectory(
+function isSameOpenCodeDirectory(
   fileSystem: FileSystem.FileSystem,
   path: Path.Path,
   left: string,
@@ -571,7 +571,7 @@ function resolveLatestAssistantText(previousText: string | undefined, nextText: 
   return nextText;
 }
 
-export function mergeOpenCodeAssistantText(
+function mergeOpenCodeAssistantText(
   previousText: string | undefined,
   nextText: string,
 ): {

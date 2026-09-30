@@ -1,4 +1,4 @@
-export const CLI_RUNTIME_EXTERNAL_PREFIXES = [
+const CLI_RUNTIME_EXTERNAL_PREFIXES = [
   "node-pty",
   "ffi-rs",
   "@yuuang/",
@@ -11,7 +11,7 @@ export const CLI_RUNTIME_EXTERNAL_PREFIXES = [
   "utf-8-validate",
 ] as const;
 
-export function isRuntimeExternalCliDependency(id: string): boolean {
+function isRuntimeExternalCliDependency(id: string): boolean {
   return CLI_RUNTIME_EXTERNAL_PREFIXES.some((prefix) => id.startsWith(prefix));
 }
 

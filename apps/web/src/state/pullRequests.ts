@@ -91,7 +91,7 @@ function pullRequestSummaryKey(environmentId: EnvironmentId, reference: PullRequ
   ]);
 }
 
-export function newestPullRequestObservation(
+function newestPullRequestObservation(
   current: ObservedPullRequestSummary | null,
   incoming: ObservedPullRequestSummary | null,
 ): ObservedPullRequestSummary | null {

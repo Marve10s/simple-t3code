@@ -161,7 +161,7 @@ function sameColor(left: GhosttyColor, right: GhosttyColor): boolean {
   return left.r === right.r && left.g === right.g && left.b === right.b;
 }
 
-export function ghosttyCellText(codepointView: DataView, graphemeLength: number): string {
+function ghosttyCellText(codepointView: DataView, graphemeLength: number): string {
   if (graphemeLength === 1) return String.fromCodePoint(codepointView.getUint32(0, true));
   const CHUNK_SIZE = 4_096;
   let text = "";

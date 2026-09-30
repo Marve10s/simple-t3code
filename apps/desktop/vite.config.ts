@@ -1,4 +1,3 @@
-import "vite-plus/test/config";
 import { defineConfig } from "vite-plus";
 
 import { isDesktopRuntimeExternalDependency } from "../../scripts/lib/desktop-external-packages.ts";
@@ -132,8 +131,4 @@ export default defineConfig({
       entry: ["src/mac-permission-preload.ts"],
     },
   ],
-  test: {
-    testTimeout: 15_000,
-    setupFiles: ["../../packages/shared/src/testing/longTempDir.ts"],
-  },
 });

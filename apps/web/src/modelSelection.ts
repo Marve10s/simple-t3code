@@ -306,7 +306,7 @@ export function getCustomModelOptionsByInstance(
   return out;
 }
 
-export function withoutPlanAgentSelection(
+function withoutPlanAgentSelection(
   selection: ModelSelection | null | undefined,
 ): ModelSelection | null | undefined {
   if (!selection?.options) {

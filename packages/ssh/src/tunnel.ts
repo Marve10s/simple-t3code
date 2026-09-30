@@ -2,10 +2,7 @@ import type {
   DesktopSshEnvironmentBootstrap,
   DesktopSshEnvironmentTarget,
 } from "@t3tools/contracts";
-import {
-  describeReadinessCause,
-  waitForHttpReady as waitForHttpReadyShared,
-} from "@t3tools/shared/httpReadiness";
+import { waitForHttpReady as waitForHttpReadyShared } from "@t3tools/shared/httpReadiness";
 import { cliReleaseDownloadBaseUrl } from "@t3tools/shared/cliRelease";
 import * as NetService from "@t3tools/shared/Net";
 import { extractJsonObject, fromLenientJson } from "@t3tools/shared/schemaJson";
@@ -233,9 +230,7 @@ function applyScriptPlaceholders(
   return result;
 }
 
-export { describeReadinessCause };
-
-export const REMOTE_PICK_PORT_SCRIPT = `const fs = require("node:fs");
+const REMOTE_PICK_PORT_SCRIPT = `const fs = require("node:fs");
 const net = require("node:net");
 const filePath = process.argv[2] ?? "";
 const defaultPort = Number.parseInt(process.argv[3] ?? "", 10);
@@ -771,7 +766,7 @@ export class SshMissingRunnerError extends Schema.TaggedError<SshMissingRunnerEr
   }
 }
 
-export function buildRemoteT3RunnerScript(input?: RemoteT3RunnerOptions): string {
+function buildRemoteT3RunnerScript(input?: RemoteT3RunnerOptions): string {
   const nodeScriptPath = input?.nodeScriptPath?.trim() || "";
   const archiveVersion = input?.archiveVersion?.trim() || "";
   if (nodeScriptPath === "" && archiveVersion === "") {
@@ -806,7 +801,7 @@ export function buildRemoteNodeEnvScript(input?: RemoteT3RunnerOptions): string 
   );
 }
 
-export function buildRemoteLaunchScript(input?: RemoteT3RunnerOptions): string {
+function buildRemoteLaunchScript(input?: RemoteT3RunnerOptions): string {
   return applyScriptPlaceholders(REMOTE_LAUNCH_SCRIPT, {
     T3_ARCHIVE_MODE: isNodeScriptRunner(input) ? "0" : "1",
     T3_NODE_ENV_SCRIPT: buildRemoteNodeEnvScript(input),
@@ -821,7 +816,7 @@ export function buildRemoteLaunchScript(input?: RemoteT3RunnerOptions): string {
   });
 }
 
-export function buildRemotePairingScript(
+function buildRemotePairingScript(
   target: DesktopSshEnvironmentTarget,
   input?: RemoteT3RunnerOptions,
 ): string {
@@ -831,7 +826,7 @@ export function buildRemotePairingScript(
   });
 }
 
-export function buildRemoteStopScript(target: DesktopSshEnvironmentTarget): string {
+function buildRemoteStopScript(target: DesktopSshEnvironmentTarget): string {
   return applyScriptPlaceholders(REMOTE_STOP_SCRIPT, {
     T3_STATE_KEY: remoteStateKey(target),
   });
@@ -843,67 +838,65 @@ function buildRemoteLogTailScript(target: DesktopSshEnvironmentTarget): string {
   });
 }
 
-export const launchOrReuseRemoteServer = Effect.fn("ssh/tunnel.launchOrReuseRemoteServer")(
-  function* (
-    target: DesktopSshEnvironmentTarget,
-    input?: SshAuthOptions,
-    runner?: RemoteT3RunnerOptions,
-  ): Effect.fn.Return<
-    { readonly remotePort: number; readonly remoteServerKind: "external" | "managed" | null },
-    SshCommandError | SshInvalidTargetError | SshLaunchError,
-    ChildProcessSpawner.ChildProcessSpawner | FileSystem.FileSystem | Path.Path
-  > {
-    yield* Effect.logInfo("ssh.remoteServer.launch.start", {
-      ...sshTargetLogFields(target),
-      ...sshRunnerLogFields(runner),
-      stateKey: remoteStateKey(target),
+const launchOrReuseRemoteServer = Effect.fn("ssh/tunnel.launchOrReuseRemoteServer")(function* (
+  target: DesktopSshEnvironmentTarget,
+  input?: SshAuthOptions,
+  runner?: RemoteT3RunnerOptions,
+): Effect.fn.Return<
+  { readonly remotePort: number; readonly remoteServerKind: "external" | "managed" | null },
+  SshCommandError | SshInvalidTargetError | SshLaunchError,
+  ChildProcessSpawner.ChildProcessSpawner | FileSystem.FileSystem | Path.Path
+> {
+  yield* Effect.logInfo("ssh.remoteServer.launch.start", {
+    ...sshTargetLogFields(target),
+    ...sshRunnerLogFields(runner),
+    stateKey: remoteStateKey(target),
+  });
+  const result = yield* runSshCommand(target, {
+    remoteCommandArgs: ["sh", "-l", "-s", "--", remoteStateKey(target)],
+    stdin: buildRemoteLaunchScript(runner),
+    timeoutMs: isNodeScriptRunner(runner)
+      ? REMOTE_LAUNCH_TIMEOUT_MS
+      : REMOTE_ARCHIVE_LAUNCH_TIMEOUT_MS,
+    ...(input?.authSecret === undefined ? {} : { authSecret: input.authSecret }),
+    ...(input?.batchMode === undefined ? {} : { batchMode: input.batchMode }),
+    ...(input?.interactiveAuth === undefined ? {} : { interactiveAuth: input.interactiveAuth }),
+  });
+  if (!getLastNonEmptyOutputLine(result.stdout)) {
+    return yield* new SshLaunchError({
+      message: "SSH launch did not return a remote port.",
+      stdout: result.stdout,
     });
-    const result = yield* runSshCommand(target, {
-      remoteCommandArgs: ["sh", "-l", "-s", "--", remoteStateKey(target)],
-      stdin: buildRemoteLaunchScript(runner),
-      timeoutMs: isNodeScriptRunner(runner)
-        ? REMOTE_LAUNCH_TIMEOUT_MS
-        : REMOTE_ARCHIVE_LAUNCH_TIMEOUT_MS,
-      ...(input?.authSecret === undefined ? {} : { authSecret: input.authSecret }),
-      ...(input?.batchMode === undefined ? {} : { batchMode: input.batchMode }),
-      ...(input?.interactiveAuth === undefined ? {} : { interactiveAuth: input.interactiveAuth }),
+  }
+  const parsed = yield* decodeRemoteLaunchOutput(result.stdout).pipe(
+    Effect.mapError(
+      (cause) =>
+        new SshLaunchError({
+          message: "SSH launch returned unparseable output.",
+          stdout: result.stdout,
+          cause,
+        }),
+    ),
+  );
+  if (!Number.isInteger(parsed.remotePort)) {
+    return yield* new SshLaunchError({
+      message: `SSH launch returned an invalid remote port: ${String(parsed.remotePort)}.`,
+      stdout: result.stdout,
     });
-    if (!getLastNonEmptyOutputLine(result.stdout)) {
-      return yield* new SshLaunchError({
-        message: "SSH launch did not return a remote port.",
-        stdout: result.stdout,
-      });
-    }
-    const parsed = yield* decodeRemoteLaunchOutput(result.stdout).pipe(
-      Effect.mapError(
-        (cause) =>
-          new SshLaunchError({
-            message: "SSH launch returned unparseable output.",
-            stdout: result.stdout,
-            cause,
-          }),
-      ),
-    );
-    if (!Number.isInteger(parsed.remotePort)) {
-      return yield* new SshLaunchError({
-        message: `SSH launch returned an invalid remote port: ${String(parsed.remotePort)}.`,
-        stdout: result.stdout,
-      });
-    }
-    yield* Effect.logInfo("ssh.remoteServer.launch.ready", {
-      ...sshTargetLogFields(target),
-      remotePort: parsed.remotePort,
-      remoteServerKind: parsed.serverKind ?? null,
-      stateKey: remoteStateKey(target),
-    });
-    return {
-      remotePort: parsed.remotePort,
-      remoteServerKind: parsed.serverKind ?? null,
-    };
-  },
-);
+  }
+  yield* Effect.logInfo("ssh.remoteServer.launch.ready", {
+    ...sshTargetLogFields(target),
+    remotePort: parsed.remotePort,
+    remoteServerKind: parsed.serverKind ?? null,
+    stateKey: remoteStateKey(target),
+  });
+  return {
+    remotePort: parsed.remotePort,
+    remoteServerKind: parsed.serverKind ?? null,
+  };
+});
 
-export const issueRemotePairingToken = Effect.fn("ssh/tunnel.issueRemotePairingToken")(function* (
+const issueRemotePairingToken = Effect.fn("ssh/tunnel.issueRemotePairingToken")(function* (
   target: DesktopSshEnvironmentTarget,
   input?: SshAuthOptions,
   runner?: RemoteT3RunnerOptions,
@@ -1001,7 +994,7 @@ const readRemoteServerLogTail = Effect.fn("ssh/tunnel.readRemoteServerLogTail")(
   return result.stdout.trim();
 });
 
-export const waitForHttpReady = (input: {
+const waitForHttpReady = (input: {
   readonly baseUrl: string;
   readonly timeoutMs?: number;
   readonly intervalMs?: number;

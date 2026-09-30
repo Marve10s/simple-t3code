@@ -1,6 +1,5 @@
 import { OtlpHeadersFromString, OtlpProtocol } from "@t3tools/shared/observability";
 import * as Config from "effect/Config";
-import * as ConfigProvider from "effect/ConfigProvider";
 import * as Option from "effect/Option";
 
 const trimNonEmptyOption = (value: string): Option.Option<string> => {
@@ -26,11 +25,6 @@ const commaSeparatedStrings = (name: string) =>
             .filter((entry) => entry.length > 0),
       }),
     ),
-  );
-
-const compactEnv = (env: Readonly<Record<string, string | undefined>>): Record<string, string> =>
-  Object.fromEntries(
-    Object.entries(env).filter((entry): entry is [string, string] => entry[1] !== undefined),
   );
 
 export const DesktopConfig = Config.all({
@@ -62,6 +56,3 @@ export const DesktopConfig = Config.all({
     Config.withDefault(3000),
   ),
 });
-
-export const layerTest = (env: Readonly<Record<string, string | undefined>>) =>
-  ConfigProvider.layer(ConfigProvider.fromEnv({ env: compactEnv(env) }));

@@ -36,7 +36,7 @@ function hydratePosixPath(env: NodeJS.ProcessEnv, platform: NodeJS.Platform): vo
   }
 }
 
-export function hydratePosixHome(
+function hydratePosixHome(
   env: NodeJS.ProcessEnv,
   resolveHomeDir = () => NodeOS.userInfo().homedir,
 ): void {

@@ -114,10 +114,3 @@ export function completeConfirmDialogClose(): void {
   activeConfirmation = next;
   publish({ status: "confirming", message: next.message, variant: next.variant });
 }
-
-export function resetConfirmDialogForTests(): void {
-  resolvePendingConfirmations(false);
-  registeredHostCount = 0;
-  publish(idleState);
-  listeners.clear();
-}

@@ -189,7 +189,7 @@ function grokReasoningOptionsFromModel(model: EffectAcpSchema.ModelInfo): {
   };
 }
 
-export function buildGrokModelCapabilities(model: EffectAcpSchema.ModelInfo): ModelCapabilities {
+function buildGrokModelCapabilities(model: EffectAcpSchema.ModelInfo): ModelCapabilities {
   const reasoning = grokReasoningOptionsFromModel(model);
   return reasoning.options.length > 0
     ? createModelCapabilities({
@@ -211,7 +211,7 @@ export function buildGrokModelCapabilities(model: EffectAcpSchema.ModelInfo): Mo
     : EMPTY_CAPABILITIES;
 }
 
-export function buildGrokModelsFromSessionModelState(
+function buildGrokModelsFromSessionModelState(
   modelState: EffectAcpSchema.SessionModelState | null | undefined,
 ): ReadonlyArray<ServerProviderModel> {
   if (!modelState || modelState.availableModels.length === 0) {
@@ -242,7 +242,7 @@ export interface GrokModelsCliOutput {
   readonly models: ReadonlyArray<ServerProviderModel>;
 }
 
-export function parseGrokModelsCliOutput(output: string): GrokModelsCliOutput {
+function parseGrokModelsCliOutput(output: string): GrokModelsCliOutput {
   const authenticated = /you are logged in/i.test(output)
     ? true
     : /not authenticated|not logged in/i.test(output)
@@ -299,7 +299,7 @@ const runGrokCliCommand = (
 const decodeAvailableCommands = Schema.decodeUnknownOption(Schema.Array(Schema.Unknown));
 const decodeAvailableCommand = Schema.decodeUnknownOption(EffectAcpSchema.AvailableCommand);
 
-export function grokSlashCommandsFromInitialize(
+function grokSlashCommandsFromInitialize(
   initialized: EffectAcpSchema.InitializeResponse,
 ): ReadonlyArray<ServerProviderSlashCommand> {
   const commands = decodeAvailableCommands(initialized._meta?.availableCommands);

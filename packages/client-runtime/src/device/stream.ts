@@ -116,13 +116,13 @@ function taggedJson(tag: number, payload: unknown): Uint8Array<ArrayBuffer> {
   return out;
 }
 
-export function avcCodecString(bytes: Uint8Array): string {
+function avcCodecString(bytes: Uint8Array): string {
   if (bytes.length < 4) return "avc1.42E01E";
   const hex = (byte: number) => byte.toString(16).padStart(2, "0");
   return `avc1.${hex(bytes[1]!)}${hex(bytes[2]!)}${hex(bytes[3]!)}`;
 }
 
-export function parseSemuPacket(raw: ArrayBuffer): {
+function parseSemuPacket(raw: ArrayBuffer): {
   readonly data: Uint8Array;
   readonly isKey: boolean | null;
   readonly timestamp: number | null;
@@ -151,7 +151,7 @@ const isVideoSessionMessage = (text: string) => {
   }
 };
 
-export function scanAccessUnit(buf: Uint8Array): { isKey: boolean; sps: Uint8Array | null } {
+function scanAccessUnit(buf: Uint8Array): { isKey: boolean; sps: Uint8Array | null } {
   let isKey = false;
   let sps: Uint8Array | null = null;
   const len = buf.length;
@@ -186,7 +186,7 @@ const AVCC_TAGS: Record<number, AvccChunk["type"] | undefined> = {
   4: "seed",
 };
 
-export class AvccDemuxer {
+class AvccDemuxer {
   private buffer = new Uint8Array(64 * 1024);
   private length = 0;
 

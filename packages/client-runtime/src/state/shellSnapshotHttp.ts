@@ -14,7 +14,7 @@ import { executeAuthenticatedEnvironmentHttpRequest } from "./environmentHttpAut
 
 const DEFAULT_SHELL_SNAPSHOT_TIMEOUT_MS = 20_000;
 
-export const fetchEnvironmentShellSnapshot = Effect.fn(
+const fetchEnvironmentShellSnapshot = Effect.fn(
   "clientRuntime.state.fetchEnvironmentShellSnapshot",
 )(function* (input: {
   readonly prepared: PreparedConnection;

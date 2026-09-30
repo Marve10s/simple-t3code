@@ -54,7 +54,7 @@ function quoteSystemdValue(value: string): string {
     : escaped;
 }
 
-export function bootServiceBaseDirOf(contents: string): string | undefined {
+function bootServiceBaseDirOf(contents: string): string | undefined {
   const systemd = /^Environment=T3CODE_HOME=(.*)$/m.exec(contents)?.[1];
   if (systemd !== undefined) {
     const raw = systemd.trim();
@@ -78,7 +78,7 @@ export interface BootServicePlan {
   readonly unitPath: string;
 }
 
-export function renderBootServiceUnit(plan: BootServicePlan): string {
+function renderBootServiceUnit(plan: BootServicePlan): string {
   return [
     "[Unit]",
     "Description=T3 Code server",
@@ -108,7 +108,7 @@ function escapeXmlText(value: string): string {
   return value.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;");
 }
 
-export function renderBootServicePlist(
+function renderBootServicePlist(
   plan: BootServicePlan,
   options: { readonly homeDir: string; readonly environmentPath: string },
 ): string {
@@ -456,7 +456,7 @@ export interface BootServiceHost {
   readonly execPath: string;
 }
 
-export const make = Effect.fn("cloud.boot_service.make")(function* (input: {
+const make = Effect.fn("cloud.boot_service.make")(function* (input: {
   readonly baseDir: string;
   readonly logsDir: string;
   readonly cliVersion: string;

@@ -106,7 +106,7 @@ export function launcherOwnsVersionsDir(
   return relative.length > 0 && !relative.startsWith("..") && !path.isAbsolute(relative);
 }
 
-export const repointLauncher = Effect.fn("cli.update.repoint_launcher")(function* (input: {
+const repointLauncher = Effect.fn("cli.update.repoint_launcher")(function* (input: {
   readonly launchedAs: string | undefined;
   readonly versionsDir: string;
   readonly targetEntryPath: string;

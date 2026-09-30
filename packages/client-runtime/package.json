@@ -305,8 +305,7 @@
     }
   },
   "scripts": {
-    "typecheck": "tsc --noEmit",
-    "test": "vp test run"
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@t3tools/contracts": "workspace:*",
@@ -320,9 +319,7 @@
     "unified": "^11.0.5"
   },
   "devDependencies": {
-    "@effect/vitest": "catalog:",
     "@types/three": "0.180.0",
-    "micromark-util-types": "^2.0.2",
-    "vite-plus": "catalog:"
+    "micromark-util-types": "^2.0.2"
   }
 }

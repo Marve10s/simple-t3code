@@ -14,7 +14,7 @@ export class ProviderEventLoggers extends Context.Service<
   }
 >()("t3/provider/Layers/ProviderEventLoggers") {}
 
-export const NoOpProviderEventLoggers: ProviderEventLoggers["Service"] = {
+const NoOpProviderEventLoggers: ProviderEventLoggers["Service"] = {
   native: undefined,
   canonical: undefined,
 };

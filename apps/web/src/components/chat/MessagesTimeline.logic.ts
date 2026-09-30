@@ -14,10 +14,7 @@ import {
   toolGroupSummaryKind,
   type ToolGroupSummaryKind,
 } from "@t3tools/client-runtime/work-log/presentation";
-export {
-  normalizeCompactToolLabel,
-  toolGroupAction,
-} from "@t3tools/client-runtime/work-log/presentation";
+export { toolGroupAction } from "@t3tools/client-runtime/work-log/presentation";
 import {
   formatDuration,
   inferCheckpointTurnCountByTurnId,
@@ -421,7 +418,7 @@ export interface StableMessagesTimelineRowsState {
   result: MessagesTimelineRow[];
 }
 
-export function computeMessageDurationStart(
+function computeMessageDurationStart(
   messages: ReadonlyArray<TimelineDurationMessage>,
 ): Map<string, string> {
   const result = new Map<string, string>();
@@ -857,7 +854,7 @@ function buildRevertTurnCountByUserMessageId(input: {
   return byUserMessageId;
 }
 
-export function deriveMessagesTimelineRows(input: {
+function deriveMessagesTimelineRows(input: {
   timelineEntries: ReadonlyArray<TimelineEntry>;
   latestTurn?: TimelineLatestTurn | null;
   runningTurnId?: TurnId | null;
@@ -1365,7 +1362,7 @@ export function deriveMessagesTimelineRows(input: {
   return rows;
 }
 
-export const WORKTREE_SETUP_ROW_ID = "worktree-setup-row";
+const WORKTREE_SETUP_ROW_ID = "worktree-setup-row";
 
 type MessagesTimelineRowsInput = Parameters<typeof deriveMessagesTimelineRows>[0];
 

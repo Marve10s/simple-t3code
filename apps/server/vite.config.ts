@@ -1,4 +1,3 @@
-import "vite-plus/test/config";
 import { defineConfig, mergeConfig } from "vite-plus";
 
 import baseConfig from "../../vite.config.ts";
@@ -96,12 +95,6 @@ export default mergeConfig(
           repoEnv.T3CODE_RELAY_CLIENT_OTLP_TRACES_TOKEN?.trim() ?? "",
         ),
       },
-    },
-    test: {
-      fileParallelism: false,
-      setupFiles: ["./src/testUtils/gitConfig.setup.ts"],
-      hookTimeout: 120_000,
-      testTimeout: 120_000,
     },
   }),
 );

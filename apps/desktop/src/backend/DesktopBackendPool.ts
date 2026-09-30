@@ -26,7 +26,7 @@ const { logWarning: logBackendPoolWarning } =
 
 export type BackendInstanceId = DesktopBackendManager.BackendInstanceId;
 export const BackendInstanceId = DesktopBackendManager.BackendInstanceId;
-export const PRIMARY_INSTANCE_ID = DesktopBackendManager.PRIMARY_INSTANCE_ID;
+const PRIMARY_INSTANCE_ID = DesktopBackendManager.PRIMARY_INSTANCE_ID;
 export type DesktopBackendInstance = DesktopBackendManager.DesktopBackendInstance;
 export type BackendInstanceSpec = DesktopBackendManager.BackendInstanceSpec;
 
@@ -295,26 +295,3 @@ export const layer = Layer.effect(
     });
   }),
 );
-
-export const layerTest = (
-  instances: readonly DesktopBackendInstance[],
-): Layer.Layer<DesktopBackendPool> =>
-  Layer.effect(
-    DesktopBackendPool,
-    Effect.gen(function* () {
-      if (instances.length === 0) {
-        return yield* Effect.die("DesktopBackendPool.layerTest requires at least one instance");
-      }
-      const byId = new Map<BackendInstanceId, DesktopBackendInstance>(
-        instances.map((instance) => [instance.id, instance] as const),
-      );
-      const primary = instances[0]!;
-      return DesktopBackendPool.of({
-        get: (id) => Effect.succeed(Option.fromNullishOr(byId.get(id))),
-        list: Effect.succeed(Array.from(byId.values())),
-        primary: Effect.succeed(primary),
-        register: () => Effect.die("DesktopBackendPool.layerTest does not support register"),
-        unregister: () => Effect.die("DesktopBackendPool.layerTest does not support unregister"),
-      });
-    }),
-  );

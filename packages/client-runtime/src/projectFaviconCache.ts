@@ -11,9 +11,9 @@ import * as Schema from "effect/Schema";
 
 export const PROJECT_FAVICON_THUMBNAIL_SIZE = 96;
 export const PROJECT_FAVICON_MAX_DATA_URL_LENGTH = 32 * 1024;
-export const PROJECT_FAVICON_MAX_SOURCE_BYTES = 4 * 1024 * 1024;
-export const PROJECT_FAVICON_CACHE_MAX_BYTES = 1024 * 1024;
-export const PROJECT_FAVICON_CACHE_MAX_ENTRIES = 128;
+const PROJECT_FAVICON_MAX_SOURCE_BYTES = 4 * 1024 * 1024;
+const PROJECT_FAVICON_CACHE_MAX_BYTES = 1024 * 1024;
+const PROJECT_FAVICON_CACHE_MAX_ENTRIES = 128;
 
 export interface ProjectFaviconTarget {
   readonly environmentId: EnvironmentId;

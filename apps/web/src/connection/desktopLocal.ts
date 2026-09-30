@@ -45,7 +45,7 @@ export interface DesktopSecondaryBootstrapsReader {
   readonly readSnapshot: () => ReadonlyArray<DesktopEnvironmentBootstrap>;
 }
 
-export function createDesktopSecondaryBootstrapsReader(
+function createDesktopSecondaryBootstrapsReader(
   resolveBridge: () => Pick<DesktopBridge, "getLocalEnvironmentBootstraps"> | undefined,
 ): DesktopSecondaryBootstrapsReader {
   let snapshot: ReadonlyArray<DesktopEnvironmentBootstrap> = [];

@@ -28,7 +28,7 @@ export class PullRequestProviderRegistry extends Context.Service<
   }
 >()("t3/pullRequest/PullRequestProviderRegistry") {}
 
-export function fromProviders(
+function fromProviders(
   providers: ReadonlyArray<PullRequestProviderApi>,
 ): PullRequestProviderRegistry["Service"] {
   const byKind = new Map(providers.map((provider) => [provider.kind, provider]));

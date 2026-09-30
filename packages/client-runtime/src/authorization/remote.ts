@@ -15,11 +15,7 @@ import {
   type RemoteEnvironmentRequestError,
 } from "../rpc/http.ts";
 
-export {
-  RemoteEnvironmentAuthInvalidJsonError,
-  RemoteEnvironmentAuthTimeoutError,
-  RemoteEnvironmentAuthUndeclaredStatusError,
-} from "../rpc/http.ts";
+export { RemoteEnvironmentAuthUndeclaredStatusError } from "../rpc/http.ts";
 export type RemoteEnvironmentAuthError = RemoteEnvironmentRequestError;
 
 const DEFAULT_REMOTE_REQUEST_TIMEOUT_MS = 10_000;
@@ -175,7 +171,7 @@ export const issueRemoteWebSocketTicket = Effect.fn(
   );
 });
 
-export const issueRemoteDpopWebSocketTicket = Effect.fn(
+const issueRemoteDpopWebSocketTicket = Effect.fn(
   "clientRuntime.authorization.issueRemoteDpopWebSocketTicket",
 )(function* (input: {
   readonly httpBaseUrl: string;

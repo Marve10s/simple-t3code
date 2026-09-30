@@ -83,7 +83,7 @@ function detectResourceMonitorLinuxLibc(): ResourceMonitorLinuxLibc {
   }
 }
 
-export const ResourceMonitorHostLinuxLibc = Context.Reference<ResourceMonitorLinuxLibc>(
+const ResourceMonitorHostLinuxLibc = Context.Reference<ResourceMonitorLinuxLibc>(
   "t3/resourceTelemetry/ResourceMonitorHostLinuxLibc",
   {
     defaultValue: detectResourceMonitorLinuxLibc,
@@ -135,7 +135,7 @@ function resourceMonitorRustTarget(
   return undefined;
 }
 
-export const make = Effect.fn("resourceTelemetry.resourceMonitorBinary.make")(function* () {
+const make = Effect.fn("resourceTelemetry.resourceMonitorBinary.make")(function* () {
   const config = yield* ServerConfig;
   const fileSystem = yield* FileSystem.FileSystem;
   const path = yield* Path.Path;

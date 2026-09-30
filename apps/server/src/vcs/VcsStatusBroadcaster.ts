@@ -84,7 +84,7 @@ function addUniqueDiagnosticValue(values: Array<string>, value: string | undefin
   }
 }
 
-export function remoteRefreshFailureDiagnostics(cause: Cause.Cause<unknown>) {
+function remoteRefreshFailureDiagnostics(cause: Cause.Cause<unknown>) {
   const failureTags: Array<string> = [];
   const failureOperations: Array<string> = [];
   const defectTags: Array<string> = [];
@@ -143,7 +143,7 @@ interface StreamStatusOptions {
   readonly automaticRemoteRefreshInterval?: Effect.Effect<Duration.Duration, never>;
 }
 
-export class VcsAutoPullPolicy extends Context.Reference<{
+class VcsAutoPullPolicy extends Context.Reference<{
   readonly isEnabled: (cwd: string) => Effect.Effect<boolean, never>;
 }>("t3/vcs/VcsAutoPullPolicy", {
   defaultValue: () => ({ isEnabled: () => Effect.succeed(false) }),
@@ -168,7 +168,7 @@ export const autoPullPolicyLayer = Layer.effect(
   }),
 );
 
-export function remoteRefreshFailureDelay(
+function remoteRefreshFailureDelay(
   consecutiveFailures: number,
   configuredInterval: Duration.Duration,
 ) {

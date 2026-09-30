@@ -1,6 +1,5 @@
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
-import * as Layer from "effect/Layer";
 import * as Schema from "effect/Schema";
 import * as Scope from "effect/Scope";
 import * as Stream from "effect/Stream";
@@ -28,7 +27,7 @@ export interface AcpAgentOptions {
   readonly logger?: (event: AcpProtocol.AcpProtocolLogEvent) => Effect.Effect<void, never>;
 }
 
-export class AcpAgent extends Context.Service<
+class AcpAgent extends Context.Service<
   AcpAgent,
   {
     readonly raw: {
@@ -466,14 +465,3 @@ export const make = Effect.fn("effect-acp/AcpAgent.make")(function* (
       }),
   });
 });
-
-export const layer = (stdio: Stdio.Stdio, options: AcpAgentOptions = {}): Layer.Layer<AcpAgent> =>
-  Layer.effect(AcpAgent, make(stdio, options));
-
-export const layerStdio = (
-  options: AcpAgentOptions = {},
-): Layer.Layer<AcpAgent, never, Stdio.Stdio> =>
-  Layer.effect(
-    AcpAgent,
-    Effect.flatMap(Effect.service(Stdio.Stdio), (stdio) => make(stdio, options)),
-  );

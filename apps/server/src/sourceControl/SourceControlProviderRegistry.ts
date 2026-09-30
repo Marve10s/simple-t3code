@@ -303,7 +303,7 @@ export const makeWithProviders = Effect.fn("makeSourceControlProviderRegistryWit
   },
 );
 
-export const make = Effect.gen(function* () {
+const make = Effect.gen(function* () {
   const github = yield* GitHubSourceControlProvider.make;
   const gitlab = yield* GitLabSourceControlProvider.make;
   const forgejo = yield* ForgejoSourceControlProvider.make;

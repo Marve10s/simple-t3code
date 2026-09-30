@@ -213,9 +213,7 @@ export const GitHubCliError = Schema.Union([
 ]);
 export type GitHubCliError = typeof GitHubCliError.Type;
 
-export const isGitHubCliError = Schema.is(GitHubCliError);
-
-export function fromVcsError(
+function fromVcsError(
   context: {
     readonly command: "gh";
     readonly cwd: string;

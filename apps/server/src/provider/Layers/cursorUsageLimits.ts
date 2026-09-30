@@ -30,10 +30,7 @@ const CursorUsageResponse = Schema.Struct({
   ),
 });
 
-export function cursorUsageResponseToLimits(
-  response: typeof CursorUsageResponse.Type,
-  checkedAt: string,
-) {
+function cursorUsageResponseToLimits(response: typeof CursorUsageResponse.Type, checkedAt: string) {
   const reset = DateTime.make(Number(response.billingCycleEnd));
   const resetsAt =
     Number(response.billingCycleEnd) > 0 && Option.isSome(reset)

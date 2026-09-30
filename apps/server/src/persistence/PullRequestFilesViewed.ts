@@ -33,7 +33,7 @@ export interface SetPullRequestFilesViewedInput extends PullRequestFilesViewedSc
   readonly viewedAt: string;
 }
 
-export const MAX_FILES_VIEWED_ROWS = 500;
+const MAX_FILES_VIEWED_ROWS = 500;
 
 export interface PullRequestFilesViewedPage {
   readonly files: ReadonlyArray<PullRequestFileViewedMark>;

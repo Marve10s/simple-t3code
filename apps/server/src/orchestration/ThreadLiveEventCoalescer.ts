@@ -48,7 +48,7 @@ function stableToolCallIdentity(event: OrchestrationEvent): string | null {
   return asTrimmedString(payload.toolCallId) ?? asTrimmedString(data?.toolCallId);
 }
 
-export function coalesceLiveToolUpdatedEvents(
+function coalesceLiveToolUpdatedEvents(
   events: ReadonlyArray<OrchestrationEvent>,
 ): ReadonlyArray<OrchestrationEvent> {
   const survivors: Array<OrchestrationEvent> = [];

@@ -191,7 +191,7 @@ const buildPreviewPictureInPictureDataUrl = (): string => {
   return `data:text/html;charset=utf-8,${encodeURIComponent(html)}`;
 };
 
-export const fitPictureInPictureContentSize = (
+const fitPictureInPictureContentSize = (
   current: ReadonlyArray<number>,
   aspectRatio: number,
 ): readonly [width: number, height: number] => {
@@ -210,7 +210,7 @@ export const fitPictureInPictureContentSize = (
   return [Math.round(width), Math.round(height)];
 };
 
-export const recordingFileExtension = (mimeType: string): string => {
+const recordingFileExtension = (mimeType: string): string => {
   const subtype = mimeType.split(";", 1)[0]?.trim().toLowerCase().split("/")[1] ?? "";
   const extension = subtype.replace(/^x-/, "").replace(/[^a-z0-9]/g, "");
   return extension || "video";
@@ -484,23 +484,20 @@ const POPUP_WINDOW_OPTIONS = {
   },
 } satisfies Electron.BrowserWindowConstructorOptions;
 
-export const previewWindowOpenAction = (details: {
+const previewWindowOpenAction = (details: {
   readonly url: string;
   readonly disposition: Electron.HandlerDetails["disposition"];
 }): "popup" | "navigate" =>
   details.disposition === "new-window" && isPopupUrl(details.url) ? "popup" : "navigate";
 
-export const isPreviewRefreshShortcut = (input: Electron.Input): boolean =>
+const isPreviewRefreshShortcut = (input: Electron.Input): boolean =>
   input.type === "keyDown" &&
   input.key.toLowerCase() === "r" &&
   (input.meta || input.control) &&
   !input.shift &&
   !input.alt;
 
-export const isPreviewEditingShortcut = (
-  input: Electron.Input,
-  platform: NodeJS.Platform,
-): boolean => {
+const isPreviewEditingShortcut = (input: Electron.Input, platform: NodeJS.Platform): boolean => {
   const isMac = platform === "darwin";
   if (isMac ? !input.meta || input.control : !input.control || input.meta) return false;
 

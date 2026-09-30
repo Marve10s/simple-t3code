@@ -98,7 +98,7 @@ const cookieHost = (url: string): string => {
   }
 };
 
-export const writeCookies = Effect.fn("BrowserImport.writeCookies")(function* (
+const writeCookies = Effect.fn("BrowserImport.writeCookies")(function* (
   session: { readonly cookies: Pick<Session["cookies"], "set" | "flushStore"> },
   read: CookieReadResult,
 ) {

@@ -14,7 +14,7 @@ export { isHyprlandCaptureSession } from "./linuxCaptureSession.ts";
 
 export const HYPRLAND_CAPTURE_EXECUTABLE = "t3-hyprland-snap-shot";
 export type HyprlandCapturePaths = { readonly bundle: string; readonly dataHome: string };
-export function hyprlandCaptureExecutable(paths: HyprlandCapturePaths) {
+function hyprlandCaptureExecutable(paths: HyprlandCapturePaths) {
   return NodePath.join(paths.dataHome, "t3code", "hyprland-capture", HYPRLAND_CAPTURE_EXECUTABLE);
 }
 

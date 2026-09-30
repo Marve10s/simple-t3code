@@ -1,8 +1,5 @@
 import { makeAggregateState } from "./agentActivityAggregate.ts";
-export {
-  makeAggregateState,
-  TERMINAL_AGENT_ACTIVITY_DISPLAY_TTL_MS,
-} from "./agentActivityAggregate.ts";
+export { makeAggregateState } from "./agentActivityAggregate.ts";
 import type {
   RelayAgentActivityState,
   RelayDeliveryResult,
@@ -14,8 +11,6 @@ import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 
 import { isTerminalPhase } from "./agentActivityPayloads.ts";
-
-export { isExpiredAgentActivityState } from "./agentActivityPayloads.ts";
 import * as AgentActivityRows from "./AgentActivityRows.ts";
 import * as EnvironmentLinks from "../environments/EnvironmentLinks.ts";
 import * as LiveActivities from "./LiveActivities.ts";
@@ -47,7 +42,7 @@ export class AgentActivityPublisher extends Context.Service<
   }
 >()("t3code-relay/agentActivity/AgentActivityPublisher") {}
 
-export const make = Effect.gen(function* () {
+const make = Effect.gen(function* () {
   const rows = yield* AgentActivityRows.AgentActivityRows;
   const links = yield* EnvironmentLinks.EnvironmentLinks;
   const liveActivities = yield* LiveActivities.LiveActivities;

@@ -31,7 +31,7 @@ export class RelayUrlUnavailableError extends Schema.TaggedError<RelayUrlUnavail
   }
 }
 
-export const relayClientConfigEnv = (config: RelayClientConfig & { readonly url: string }) =>
+const relayClientConfigEnv = (config: RelayClientConfig & { readonly url: string }) =>
   ({
     T3CODE_RELAY_URL: config.url,
     T3CODE_MOBILE_OTLP_TRACES_URL: config.mobileTracingUrl,
@@ -51,10 +51,7 @@ export class EnvValueNotSingleLineError extends Schema.TaggedError<EnvValueNotSi
   }
 }
 
-export function reconcileEnvFile(
-  contents: string,
-  entries: Readonly<Record<string, string>>,
-): string {
+function reconcileEnvFile(contents: string, entries: Readonly<Record<string, string>>): string {
   const lines = contents === "" ? [] : contents.replace(/\n$/u, "").split("\n");
   const assignment = /^\s*(?:export\s+)?([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*)$/u;
   const pending = new Map(Object.entries(entries));

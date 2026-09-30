@@ -698,7 +698,7 @@ const createTrace2Monitor = Effect.fnUntraced(function* (
 
 const GIT_CHECKOUT_PROGRESS_LINE = /Updating files:\s+(\d+)%\s+\((\d+)\/(\d+)\)/;
 
-export function parseGitCheckoutProgressLine(
+function parseGitCheckoutProgressLine(
   line: string,
 ): { percent: number; completed: number; total: number } | null {
   const match = GIT_CHECKOUT_PROGRESS_LINE.exec(line);

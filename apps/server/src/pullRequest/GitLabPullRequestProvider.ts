@@ -49,7 +49,7 @@ const MERGE_ACTIONS: ReadonlySet<string> = new Set([
   "disable-auto-merge",
 ]);
 
-export function gitLabViewerPermissions(input: {
+function gitLabViewerPermissions(input: {
   readonly viewerCanMerge: boolean;
 }): PullRequestViewerPermissions {
   return {
@@ -64,7 +64,7 @@ export function gitLabViewerPermissions(input: {
   };
 }
 
-export function gitLabProviderFailure(
+function gitLabProviderFailure(
   error: GitLabPullRequestCli.GitLabPullRequestCliError,
 ): PullRequestProviderFailure {
   if (error._tag === "GitLabCliUnavailableError") return { reason: "missing-tool" };

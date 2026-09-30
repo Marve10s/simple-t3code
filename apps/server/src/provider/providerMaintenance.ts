@@ -222,7 +222,7 @@ function isPnpmGlobalCommandPath(commandPath: string): boolean {
   );
 }
 
-export function npmGlobalPrefixFromCommandPath(
+function npmGlobalPrefixFromCommandPath(
   realCommandPath: string,
   packageName: string,
 ): string | null {
@@ -248,9 +248,7 @@ export interface HomebrewOwnership {
   readonly prefix: string;
 }
 
-export function homebrewOwnershipFromCommandPath(
-  realCommandPath: string,
-): HomebrewOwnership | null {
+function homebrewOwnershipFromCommandPath(realCommandPath: string): HomebrewOwnership | null {
   const match = HOMEBREW_KEG_PATTERN.exec(realCommandPath.replaceAll("\\", "/"));
   if (!match) {
     return null;
@@ -275,10 +273,7 @@ const HomebrewInfoResponse = Schema.Struct({
 
 const decodeHomebrewInfo = Schema.decodeUnknownOption(Schema.fromJsonString(HomebrewInfoResponse));
 
-export function parseHomebrewLatestVersion(
-  infoJson: string,
-  ownership: HomebrewOwnership,
-): string | null {
+function parseHomebrewLatestVersion(infoJson: string, ownership: HomebrewOwnership): string | null {
   const decoded = decodeHomebrewInfo(infoJson);
   if (Option.isNone(decoded)) {
     return null;
@@ -322,7 +317,7 @@ const runHomebrew = Effect.fn("runHomebrew")(function* (
   );
 });
 
-export const resolvePackageManagedProviderMaintenance = Effect.fn(
+const resolvePackageManagedProviderMaintenance = Effect.fn(
   "resolvePackageManagedProviderMaintenance",
 )(function* (
   definition: PackageManagedProviderMaintenanceDefinition,

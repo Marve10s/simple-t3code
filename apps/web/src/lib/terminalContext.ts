@@ -16,7 +16,7 @@ export interface TerminalContextDraft extends TerminalContextSelection {
   createdAt: string;
 }
 
-export const INLINE_TERMINAL_CONTEXT_PLACEHOLDER = "\uFFFC";
+const INLINE_TERMINAL_CONTEXT_PLACEHOLDER = "\uFFFC";
 
 export interface TerminalContextReferenceSource {
   id: string;
@@ -25,7 +25,7 @@ export interface TerminalContextReferenceSource {
   lineEnd: number;
 }
 
-export function formatTerminalContextReference(context: TerminalContextReferenceSource): string {
+function formatTerminalContextReference(context: TerminalContextReferenceSource): string {
   return formatComposerContextReference({
     kind: "terminal",
     contextId: toKindScopedComposerContextId("terminal", context.id),
@@ -37,7 +37,7 @@ export function normalizeTerminalContextText(text: string): string {
   return text.replace(/\r\n/g, "\n").replace(/^\n+|\n+$/g, "");
 }
 
-export function hasTerminalContextText(context: { text: string }): boolean {
+function hasTerminalContextText(context: { text: string }): boolean {
   return normalizeTerminalContextText(context.text).length > 0;
 }
 
@@ -49,26 +49,6 @@ export function filterTerminalContextsWithText<T extends { text: string }>(
   contexts: ReadonlyArray<T>,
 ): T[] {
   return contexts.filter((context) => hasTerminalContextText(context));
-}
-
-function normalizeTerminalContextSelection(
-  selection: TerminalContextSelection,
-): TerminalContextSelection | null {
-  const text = normalizeTerminalContextText(selection.text);
-  const terminalId = selection.terminalId.trim();
-  const terminalLabel = selection.terminalLabel.trim();
-  if (text.length === 0 || terminalId.length === 0 || terminalLabel.length === 0) {
-    return null;
-  }
-  const lineStart = Math.max(1, Math.floor(selection.lineStart));
-  const lineEnd = Math.max(lineStart, Math.floor(selection.lineEnd));
-  return {
-    terminalId,
-    terminalLabel,
-    lineStart,
-    lineEnd,
-    text,
-  };
 }
 
 function formatTerminalContextRange(selection: { lineStart: number; lineEnd: number }): string {

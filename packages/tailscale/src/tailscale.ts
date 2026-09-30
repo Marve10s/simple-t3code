@@ -8,7 +8,7 @@ import { HttpClient, HttpClientRequest } from "effect/unstable/http";
 import { ChildProcess, ChildProcessSpawner } from "effect/unstable/process";
 
 export const DEFAULT_TAILSCALE_SERVE_PORT = 443;
-export const TAILSCALE_STATUS_TIMEOUT = Duration.millis(1_500);
+const TAILSCALE_STATUS_TIMEOUT = Duration.millis(1_500);
 const TAILSCALE_SERVE_TIMEOUT = Duration.seconds(10);
 const TAILSCALE_PROBE_TIMEOUT = Duration.millis(2_500);
 
@@ -176,7 +176,7 @@ export function isTailscaleIpv4Address(address: string): boolean {
   return first === 100 && second >= 64 && second <= 127;
 }
 
-export const parseTailscaleStatus = (
+const parseTailscaleStatus = (
   rawStatusJson: string,
 ): Effect.Effect<TailscaleStatus, TailscaleStatusParseError> =>
   decodeTailscaleStatusJson(rawStatusJson).pipe(

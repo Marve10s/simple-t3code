@@ -73,36 +73,3 @@ export function decodeExtNotificationRegistration<A, I>(
       Effect.flatMap((decoded) => handler(decoded)),
     );
 }
-
-const encoder = new TextEncoder();
-
-const JsonRpcId = Schema.Union([Schema.Number, Schema.String]);
-const JsonRpcHeaders = Schema.Array(Schema.Unknown);
-
-export const jsonRpcRequest = <A, I>(method: string, params: Schema.Codec<A, I>) =>
-  Schema.Struct({
-    jsonrpc: Schema.Literal("2.0"),
-    id: JsonRpcId,
-    method: Schema.Literal(method),
-    params,
-    headers: JsonRpcHeaders.pipe(Schema.withDecodingDefaultKey(Effect.succeed([]))),
-  });
-
-export const jsonRpcNotification = <A, I>(method: string, params: Schema.Codec<A, I>) =>
-  Schema.Struct({
-    jsonrpc: Schema.Literal("2.0"),
-    method: Schema.Literal(method),
-    params,
-  });
-
-export const jsonRpcResponse = <A, I>(result: Schema.Codec<A, I>) =>
-  Schema.Struct({
-    jsonrpc: Schema.Literal("2.0"),
-    id: JsonRpcId,
-    result,
-  });
-
-export const encodeJsonl = <A, I>(schema: Schema.Codec<A, I>, value: A) =>
-  Effect.map(Schema.encodeEffect(Schema.fromJsonString(schema))(value), (encoded) =>
-    encoder.encode(`${encoded}\n`),
-  );

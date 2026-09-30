@@ -50,7 +50,7 @@ const CAPABILITIES: PullRequestCapabilities = {
   labels: true,
 };
 
-export function gitHubViewerPermissions(access: GitHubViewerAccess): PullRequestViewerPermissions {
+function gitHubViewerPermissions(access: GitHubViewerAccess): PullRequestViewerPermissions {
   return {
     ...(access.canWrite ? { stackRebase: true } : {}),
     actions: [
@@ -75,7 +75,7 @@ export function gitHubViewerPermissions(access: GitHubViewerAccess): PullRequest
   };
 }
 
-export function gitHubProviderFailure(
+function gitHubProviderFailure(
   error: GitHubPullRequestCli.GitHubPullRequestCliError,
 ): PullRequestProviderFailure {
   if (error._tag === "GitHubCliUnavailableError") return { reason: "missing-tool" };
@@ -139,7 +139,7 @@ function withWorkflowApprovals(
   ];
 }
 
-export function loginAvatarUrl(login: string, host: string): string | null {
+function loginAvatarUrl(login: string, host: string): string | null {
   return /^[a-z0-9][a-z0-9-]{0,38}$/iu.test(login) ? `https://${host}/${login}.png?size=80` : null;
 }
 

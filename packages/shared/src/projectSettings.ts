@@ -144,15 +144,6 @@ function resolveProjectOverrides(
   return { settings: effective as ServerSettings, sources, overrides };
 }
 
-export function withProjectSettingsOverrides(
-  settings: Pick<ServerSettings, "projectSettingsOverrides">,
-  projectId: ProjectId,
-  next: ProjectSettingsOverrides | null,
-): ServerSettings["projectSettingsOverrides"] {
-  const { [projectId]: _removed, ...rest } = settings.projectSettingsOverrides;
-  return next === null || Object.keys(next).length === 0 ? rest : { ...rest, [projectId]: next };
-}
-
 export function clearProjectSettingsOverrides(
   settings: Pick<ServerSettings, "projectSettingsOverrides">,
   projectId: ProjectId,

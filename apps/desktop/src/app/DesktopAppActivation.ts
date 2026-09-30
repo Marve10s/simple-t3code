@@ -104,7 +104,7 @@ function closeServer(server: NodeNet.Server): Promise<void> {
   return new Promise((resolve) => server.close(() => resolve()));
 }
 
-export async function startDesktopAppControlServer(input: {
+async function startDesktopAppControlServer(input: {
   readonly address: string;
   readonly directory: string | null;
   readonly userId: number | undefined;

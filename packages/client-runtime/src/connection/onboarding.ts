@@ -84,7 +84,7 @@ const resolvePairingTarget = Effect.fn("clientRuntime.connection.onboarding.reso
   },
 );
 
-export const preparePairingRegistration = Effect.fn(
+const preparePairingRegistration = Effect.fn(
   "clientRuntime.connection.onboarding.preparePairingRegistration",
 )(function* (input: PairingConnectionInput) {
   const target = yield* resolvePairingTarget(input);
@@ -151,7 +151,7 @@ const updateBearerConnection = Effect.fn(
   yield* registry.register(registration);
 });
 
-export const prepareBearerConnectionUpdate = Effect.fn(
+const prepareBearerConnectionUpdate = Effect.fn(
   "clientRuntime.connection.onboarding.prepareBearerConnectionUpdate",
 )(function* (options: {
   readonly input: BearerConnectionUpdateInput;
@@ -213,7 +213,7 @@ export const prepareBearerConnectionUpdate = Effect.fn(
   });
 });
 
-export const prepareSshRegistration = Effect.fn(
+const prepareSshRegistration = Effect.fn(
   "clientRuntime.connection.onboarding.prepareSshRegistration",
 )(function* (input: SshConnectionInput) {
   const gateway = yield* ClientCapabilities.SshEnvironmentGateway;

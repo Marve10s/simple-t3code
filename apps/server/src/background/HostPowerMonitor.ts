@@ -48,7 +48,7 @@ function samePowerState(left: HostPowerSnapshot, right: HostPowerSnapshot): bool
   );
 }
 
-export const make = Effect.fn("background.hostPower.make")(function* (
+const make = Effect.fn("background.hostPower.make")(function* (
   initialSnapshot?: HostPowerSnapshot,
 ) {
   const initial = initialSnapshot ?? makeUnknownSnapshot("unknown", yield* DateTime.now);

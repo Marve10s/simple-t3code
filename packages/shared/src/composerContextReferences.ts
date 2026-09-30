@@ -17,7 +17,7 @@ const CONTEXT_LINK = new RegExp(
   "g",
 );
 
-export function formatComposerContextHref(kind: ComposerContextKind, contextId: ComposerContextId) {
+function formatComposerContextHref(kind: ComposerContextKind, contextId: ComposerContextId) {
   return `${COMPOSER_CONTEXT_HREF_PREFIX}${kind}/${contextId}`;
 }
 
@@ -103,7 +103,7 @@ function kindDisplayName(kind: ComposerContextKind): string {
   return spaced.charAt(0).toUpperCase() + spaced.slice(1);
 }
 
-export function formatComposerContextProviderMarker(
+function formatComposerContextProviderMarker(
   kind: ComposerContextKind,
   label: string,
   contextId: ComposerContextId,

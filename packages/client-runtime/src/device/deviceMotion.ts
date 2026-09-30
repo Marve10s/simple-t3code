@@ -1,6 +1,6 @@
 import { Quaternion, Vector3 } from "three";
 
-export function rotationVector(rotation: Quaternion) {
+function rotationVector(rotation: Quaternion) {
   const q = rotation.clone().normalize();
   if (q.w < 0) q.set(-q.x, -q.y, -q.z, -q.w);
   const length = Math.hypot(q.x, q.y, q.z);

@@ -1,7 +1,6 @@
 import * as Config from "effect/Config";
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
-import * as Layer from "effect/Layer";
 import * as Redacted from "effect/Redacted";
 import * as Schema from "effect/Schema";
 
@@ -47,9 +46,3 @@ export class RelayConfiguration extends Context.Service<
     readonly managedEndpointCleanupMode?: ManagedEndpointCleanupMode;
   }
 >()("t3code-relay/Config/RelayConfiguration") {}
-
-export const make = (configuration: RelayConfiguration["Service"]) =>
-  RelayConfiguration.of(configuration);
-
-export const layer = (configuration: RelayConfiguration["Service"]) =>
-  Layer.succeed(RelayConfiguration, make(configuration));

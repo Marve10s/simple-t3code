@@ -1,12 +1,12 @@
 import { useEffect, useId, useRef } from "react";
 
-export const LIVE_REFRESH_MIN_INTERVAL_MS = 10_000;
+const LIVE_REFRESH_MIN_INTERVAL_MS = 10_000;
 
-export const LIVE_REFRESH_INTERVAL_MS = 5 * 60_000;
+const LIVE_REFRESH_INTERVAL_MS = 5 * 60_000;
 
-export const LIVE_REFRESH_IDLE_AFTER_MS = 6 * 60_000;
+const LIVE_REFRESH_IDLE_AFTER_MS = 6 * 60_000;
 
-export function shouldLiveRefresh(input: {
+function shouldLiveRefresh(input: {
   readonly visible: boolean;
   readonly now: number;
   readonly lastRefreshedAt: number;
@@ -14,7 +14,7 @@ export function shouldLiveRefresh(input: {
   return input.visible && input.now - input.lastRefreshedAt >= LIVE_REFRESH_MIN_INTERVAL_MS;
 }
 
-export function shouldRefreshOnArrival(input: {
+function shouldRefreshOnArrival(input: {
   readonly visible: boolean;
   readonly now: number;
   readonly lastRefreshedAt: number | undefined;
@@ -25,7 +25,7 @@ export function shouldRefreshOnArrival(input: {
   );
 }
 
-export function shouldRefreshOnInterval(input: {
+function shouldRefreshOnInterval(input: {
   readonly visible: boolean;
   readonly now: number;
   readonly lastRefreshedAt: number;

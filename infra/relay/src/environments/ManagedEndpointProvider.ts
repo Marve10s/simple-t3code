@@ -250,7 +250,7 @@ export class ManagedEndpointTunnelClient extends Context.Service<
   }
 >()("t3code-relay/environments/ManagedEndpointProvider/ManagedEndpointTunnelClient") {}
 
-export const layerTunnelClient = (client: ManagedEndpointTunnelClient["Service"]) =>
+const layerTunnelClient = (client: ManagedEndpointTunnelClient["Service"]) =>
   Layer.succeed(ManagedEndpointTunnelClient, client);
 
 interface ManagedEndpointCnameRecordInput {
@@ -302,7 +302,7 @@ export class ManagedEndpointDnsClient extends Context.Service<
   }
 >()("t3code-relay/environments/ManagedEndpointProvider/ManagedEndpointDnsClient") {}
 
-export const layerDnsClient = (client: ManagedEndpointDnsClient["Service"]) =>
+const layerDnsClient = (client: ManagedEndpointDnsClient["Service"]) =>
   Layer.succeed(ManagedEndpointDnsClient, client);
 
 const requireCloudflareSettings = Effect.fnUntraced(function* (
@@ -355,7 +355,7 @@ function isLoopbackOrigin(origin: RelayManagedEndpointOrigin): boolean {
   );
 }
 
-export function isManagedEndpointNotFound(cause: unknown): boolean {
+function isManagedEndpointNotFound(cause: unknown): boolean {
   if (typeof cause !== "object" || cause === null) {
     return false;
   }
@@ -383,7 +383,7 @@ const ignoreNotFound = <A>(
     }),
   );
 
-export const make = Effect.gen(function* () {
+const make = Effect.gen(function* () {
   const config = yield* RelayConfiguration.RelayConfiguration;
   const crypto = yield* Crypto.Crypto;
   const tunnels = yield* ManagedEndpointTunnelClient;
@@ -1230,7 +1230,7 @@ export const make = Effect.gen(function* () {
   });
 });
 
-export const layer = Layer.effect(ManagedEndpointProvider, make);
+const layer = Layer.effect(ManagedEndpointProvider, make);
 
 export const layerCloudflareBindings = (
   tunnelClient: Cloudflare.Tunnel.ReadWriteTunnelClient,

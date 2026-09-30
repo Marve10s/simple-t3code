@@ -477,7 +477,7 @@ const gitCommand = (
       : {}),
   });
 
-export const makeVcsDriverShape = Effect.fn("makeGitVcsDriverShape")(function* () {
+const makeVcsDriverShape = Effect.fn("makeGitVcsDriverShape")(function* () {
   const fileSystem = yield* FileSystem.FileSystem;
   const path = yield* Path.Path;
   const vcsProcess = yield* VcsProcess.VcsProcess;
@@ -1175,10 +1175,9 @@ export const makeVcsDriver = Effect.gen(function* () {
   return VcsDriver.VcsDriver.of(driver);
 });
 
-export const make = Effect.gen(function* () {
+const make = Effect.gen(function* () {
   const git = yield* makeGitVcsDriverCore();
   return GitVcsDriver.of(git);
 });
 
-export const vcsLayer = Layer.effect(VcsDriver.VcsDriver, makeVcsDriver);
 export const layer = Layer.effect(GitVcsDriver, make);

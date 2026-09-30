@@ -180,7 +180,7 @@ const deviceHostEnvironment = (
     : environment;
 };
 
-export const make = Effect.fn("LocalDeviceHost.make")(function* () {
+const make = Effect.fn("LocalDeviceHost.make")(function* () {
   const spawner = yield* ChildProcessSpawner.ChildProcessSpawner;
   const config = yield* ServerConfig.ServerConfig;
   const path = yield* Path.Path;
@@ -719,10 +719,3 @@ export const make = Effect.fn("LocalDeviceHost.make")(function* () {
 });
 
 export const layer = Layer.effect(DeviceHost.DeviceHost, make());
-
-export const __testing = {
-  AgentDeviceDaemonFile,
-  androidSdk,
-  platformReason,
-  deviceHostEnvironment,
-};

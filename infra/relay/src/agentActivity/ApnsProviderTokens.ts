@@ -9,7 +9,7 @@ import {
   type ApnsJwtSigningInput,
 } from "./apnsJwt.ts";
 
-export const APNS_JWT_REUSE_SECONDS = 45 * 60;
+const APNS_JWT_REUSE_SECONDS = 45 * 60;
 
 export class ApnsProviderTokens extends Context.Service<
   ApnsProviderTokens,
@@ -25,15 +25,11 @@ interface CachedProviderToken {
 
 const isolateTokenCache = new Map<string, CachedProviderToken>();
 
-export function __resetApnsProviderTokenCacheForTest(): void {
-  isolateTokenCache.clear();
-}
-
-export function quantizedApnsJwtIssuedAt(nowUnixSeconds: number): number {
+function quantizedApnsJwtIssuedAt(nowUnixSeconds: number): number {
   return Math.floor(nowUnixSeconds / APNS_JWT_REUSE_SECONDS) * APNS_JWT_REUSE_SECONDS;
 }
 
-export const make = () =>
+const make = () =>
   ApnsProviderTokens.of({
     getJwt: Effect.fnUntraced(function* (input) {
       const issuedAtUnixSeconds = quantizedApnsJwtIssuedAt(input.issuedAtUnixSeconds);

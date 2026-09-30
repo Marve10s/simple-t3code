@@ -7,7 +7,6 @@ import * as Schema from "effect/Schema";
 import type { DesktopCaptureExtensionState } from "@t3tools/contracts";
 
 import { GNOME_CAPTURE_FILES, GNOME_CAPTURE_UUID } from "./gnomeCaptureBundle.ts";
-export { isGnomeCaptureSession } from "./linuxCaptureSession.ts";
 
 const SHELL = "org.gnome.Shell";
 const SHELL_PATH = "/org/gnome/Shell";
@@ -35,7 +34,7 @@ const decodeMetadata = Schema.decodeUnknownSync(Schema.fromJsonString(Metadata))
 
 type SetupPaths = { readonly bundle: string; readonly dataHome: string };
 
-export async function installGnomeCaptureBundle({ bundle, dataHome }: SetupPaths) {
+async function installGnomeCaptureBundle({ bundle, dataHome }: SetupPaths) {
   const metadata = decodeMetadata(
     await NodeFSP.readFile(NodePath.join(bundle, "metadata.json"), "utf8"),
   );

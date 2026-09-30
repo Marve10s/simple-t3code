@@ -1,5 +1,5 @@
-export const COMPOSER_FOOTER_COMPACT_BREAKPOINT_PX = 620;
-export const COMPOSER_FOOTER_WIDE_ACTIONS_COMPACT_BREAKPOINT_PX = 780;
+const COMPOSER_FOOTER_COMPACT_BREAKPOINT_PX = 620;
+const COMPOSER_FOOTER_WIDE_ACTIONS_COMPACT_BREAKPOINT_PX = 780;
 const RESTING_COMPOSER_IMAGE_THUMBNAIL_LIMIT = 3;
 
 export function getRestingComposerImagePreviewCounts(imageCount: number): {
@@ -41,7 +41,7 @@ export function shouldUseRestingComposerLayout(input: {
   );
 }
 
-export const COMPOSER_RESTING_EXPANSION_MIN_PX = 94;
+const COMPOSER_RESTING_EXPANSION_MIN_PX = 94;
 
 export function resolveComposerTimelineInset(input: {
   currentInset: number;

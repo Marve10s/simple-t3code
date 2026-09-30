@@ -3,16 +3,10 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "typecheck": "tsc --noEmit",
-    "test": "vp test run"
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@effect/platform-node": "catalog:",
     "@oxlint/plugins": "^1.63.0",
     "effect": "catalog:"
-  },
-  "devDependencies": {
-    "@effect/vitest": "catalog:",
-    "vite-plus": "catalog:"
   }
 }

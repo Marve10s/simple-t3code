@@ -120,66 +120,64 @@ export const PlaywrightInjectedRuntimeError = Schema.Union([
 ]);
 export type PlaywrightInjectedRuntimeError = typeof PlaywrightInjectedRuntimeError.Type;
 
-export const extractPlaywrightInjectedRuntimeSource = Effect.fn(
-  "PlaywrightInjectedRuntime.extractSource",
-)(function* (coreBundle: string, bundlePath: string) {
-  const start = coreBundle.indexOf(PLAYWRIGHT_SOURCE_MARKER);
-  if (start < 0) {
-    return yield* new PlaywrightSourceMarkerNotFoundError({
-      bundlePath,
-      marker: PLAYWRIGHT_SOURCE_MARKER,
-    });
-  }
-  const literalStart = start + PLAYWRIGHT_SOURCE_MARKER.length;
-  const literalEnd = coreBundle.indexOf(PLAYWRIGHT_SOURCE_TERMINATOR, literalStart);
-  if (literalEnd < 0) {
-    return yield* new PlaywrightSourceTerminatorNotFoundError({
-      bundlePath,
-      terminator: PLAYWRIGHT_SOURCE_TERMINATOR,
-    });
-  }
-  const literal = coreBundle.slice(literalStart, literalEnd);
-  const source = yield* Effect.try({
-    try: () =>
-      NodeVM.runInNewContext(literal, Object.create(null), {
-        timeout: PLAYWRIGHT_SOURCE_EVALUATION_TIMEOUT_MS,
-      }),
-    catch: (cause) =>
-      new PlaywrightSourceEvaluationError({
+const extractPlaywrightInjectedRuntimeSource = Effect.fn("PlaywrightInjectedRuntime.extractSource")(
+  function* (coreBundle: string, bundlePath: string) {
+    const start = coreBundle.indexOf(PLAYWRIGHT_SOURCE_MARKER);
+    if (start < 0) {
+      return yield* new PlaywrightSourceMarkerNotFoundError({
         bundlePath,
-        timeoutMs: PLAYWRIGHT_SOURCE_EVALUATION_TIMEOUT_MS,
-        cause,
-      }),
-  });
-  if (typeof source !== "string" || source.length < PLAYWRIGHT_SOURCE_MINIMUM_LENGTH) {
-    return yield* new PlaywrightSourceValidationError({
-      bundlePath,
-      actualType: typeof source,
-      actualLength: typeof source === "string" ? source.length : null,
-      minimumLength: PLAYWRIGHT_SOURCE_MINIMUM_LENGTH,
-    });
-  }
-  return source;
-});
-
-export const playwrightInjectedRuntimeSource = Effect.fn("PlaywrightInjectedRuntime.source")(
-  function* () {
-    const packageJsonPath = yield* Effect.try({
-      try: () => require.resolve(PLAYWRIGHT_PACKAGE_SPECIFIER),
+        marker: PLAYWRIGHT_SOURCE_MARKER,
+      });
+    }
+    const literalStart = start + PLAYWRIGHT_SOURCE_MARKER.length;
+    const literalEnd = coreBundle.indexOf(PLAYWRIGHT_SOURCE_TERMINATOR, literalStart);
+    if (literalEnd < 0) {
+      return yield* new PlaywrightSourceTerminatorNotFoundError({
+        bundlePath,
+        terminator: PLAYWRIGHT_SOURCE_TERMINATOR,
+      });
+    }
+    const literal = coreBundle.slice(literalStart, literalEnd);
+    const source = yield* Effect.try({
+      try: () =>
+        NodeVM.runInNewContext(literal, Object.create(null), {
+          timeout: PLAYWRIGHT_SOURCE_EVALUATION_TIMEOUT_MS,
+        }),
       catch: (cause) =>
-        new PlaywrightPackageResolveError({
-          specifier: PLAYWRIGHT_PACKAGE_SPECIFIER,
+        new PlaywrightSourceEvaluationError({
+          bundlePath,
+          timeoutMs: PLAYWRIGHT_SOURCE_EVALUATION_TIMEOUT_MS,
           cause,
         }),
     });
-    const bundlePath = NodePath.join(NodePath.dirname(packageJsonPath), "lib/coreBundle.js");
-    const coreBundle = yield* Effect.tryPromise({
-      try: () => NodeFSP.readFile(bundlePath, "utf8"),
-      catch: (cause) => new PlaywrightCoreBundleReadError({ bundlePath, cause }),
-    });
-    return yield* extractPlaywrightInjectedRuntimeSource(coreBundle, bundlePath);
+    if (typeof source !== "string" || source.length < PLAYWRIGHT_SOURCE_MINIMUM_LENGTH) {
+      return yield* new PlaywrightSourceValidationError({
+        bundlePath,
+        actualType: typeof source,
+        actualLength: typeof source === "string" ? source.length : null,
+        minimumLength: PLAYWRIGHT_SOURCE_MINIMUM_LENGTH,
+      });
+    }
+    return source;
   },
 );
+
+const playwrightInjectedRuntimeSource = Effect.fn("PlaywrightInjectedRuntime.source")(function* () {
+  const packageJsonPath = yield* Effect.try({
+    try: () => require.resolve(PLAYWRIGHT_PACKAGE_SPECIFIER),
+    catch: (cause) =>
+      new PlaywrightPackageResolveError({
+        specifier: PLAYWRIGHT_PACKAGE_SPECIFIER,
+        cause,
+      }),
+  });
+  const bundlePath = NodePath.join(NodePath.dirname(packageJsonPath), "lib/coreBundle.js");
+  const coreBundle = yield* Effect.tryPromise({
+    try: () => NodeFSP.readFile(bundlePath, "utf8"),
+    catch: (cause) => new PlaywrightCoreBundleReadError({ bundlePath, cause }),
+  });
+  return yield* extractPlaywrightInjectedRuntimeSource(coreBundle, bundlePath);
+});
 
 export const playwrightInjectedRuntimeInstallExpression = Effect.fn(
   "PlaywrightInjectedRuntime.installExpression",

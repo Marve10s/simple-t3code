@@ -273,7 +273,7 @@ export type ShellEnvironmentReader = (
   execFile?: ExecFileSyncLike,
 ) => Partial<Record<string, string>>;
 
-export const readEnvironmentFromLoginShell: ShellEnvironmentReader = (
+const readEnvironmentFromLoginShell: ShellEnvironmentReader = (
   shell,
   names,
   execFile = NodeChildProcess.execFileSync,
@@ -303,30 +303,30 @@ export type WindowsShellEnvironmentReader = (
   options?: WindowsEnvironmentProbeOptions,
 ) => Partial<Record<string, string>>;
 
-export const WindowsShellEnvironment = Context.Reference<WindowsShellEnvironmentReader>(
+const WindowsShellEnvironment = Context.Reference<WindowsShellEnvironmentReader>(
   "@t3tools/shared/shell/WindowsShellEnvironment",
   {
     defaultValue: () => readEnvironmentFromWindowsShell,
   },
 );
 
-export const CommandAvailability = Context.Reference<CommandAvailabilityChecker>(
+const CommandAvailability = Context.Reference<CommandAvailabilityChecker>(
   "@t3tools/shared/shell/CommandAvailability",
   {
     defaultValue: () => isCommandAvailable,
   },
 );
 
-export function readEnvironmentFromWindowsShell(
+function readEnvironmentFromWindowsShell(
   names: ReadonlyArray<string>,
   execFile?: ExecFileSyncLike,
 ): Partial<Record<string, string>>;
-export function readEnvironmentFromWindowsShell(
+function readEnvironmentFromWindowsShell(
   names: ReadonlyArray<string>,
   options?: WindowsEnvironmentProbeOptions,
   execFile?: ExecFileSyncLike,
 ): Partial<Record<string, string>>;
-export function readEnvironmentFromWindowsShell(
+function readEnvironmentFromWindowsShell(
   names: ReadonlyArray<string>,
   optionsOrExecFile?: WindowsEnvironmentProbeOptions | ExecFileSyncLike,
   maybeExecFile?: ExecFileSyncLike,
@@ -388,7 +388,7 @@ function sanitizePathEntry(entry: string, platform: NodeJS.Platform): string {
   return platform === "win32" ? entry.replaceAll('"', "") : entry;
 }
 
-export function mergePathValues(
+function mergePathValues(
   preferredPath: string | undefined,
   inheritedPath: string | undefined,
   platform: NodeJS.Platform,
@@ -680,7 +680,7 @@ export const isCommandAvailable = Effect.fn("shell.isCommandAvailable")(function
   );
 });
 
-export function resolveKnownWindowsCliDirs(env: NodeJS.ProcessEnv): ReadonlyArray<string> {
+function resolveKnownWindowsCliDirs(env: NodeJS.ProcessEnv): ReadonlyArray<string> {
   const appData = env.APPDATA?.trim();
   const localAppData = env.LOCALAPPDATA?.trim();
   const userProfile = env.USERPROFILE?.trim();

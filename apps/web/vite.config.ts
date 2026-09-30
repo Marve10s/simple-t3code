@@ -4,8 +4,6 @@ import react, { reactCompilerPreset } from "@vitejs/plugin-react";
 import babel from "@rolldown/plugin-babel";
 import { tanstackRouter } from "@tanstack/router-plugin/vite";
 import compression from "compression";
-import { defineProject, type TestProjectInlineConfiguration } from "vite-plus/test/config";
-import "vite-plus/test/config";
 import { defineConfig, type Connect, type Plugin } from "vite-plus";
 import pkg from "./package.json" with { type: "json" };
 
@@ -58,17 +56,6 @@ const buildSourcemap: boolean | "hidden" =
     : sourcemapEnv === "hidden"
       ? "hidden"
       : true;
-
-const unitTestProject = {
-  extends: true,
-  test: {
-    name: "unit",
-    include: ["src/**/*.test.{ts,tsx}"],
-    hookTimeout: 15_000,
-    testTimeout: 15_000,
-    setupFiles: ["../../packages/shared/src/testing/longTempDir.ts"],
-  },
-} satisfies TestProjectInlineConfiguration;
 
 function resolveDevProxyTarget(
   backendPort: string | undefined,
@@ -221,9 +208,6 @@ export default defineConfig(() => {
       emptyOutDir: true,
       manifest: true,
       sourcemap: buildSourcemap,
-    },
-    test: {
-      projects: [defineProject(unitTestProject)],
     },
   };
 });

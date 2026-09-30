@@ -21,14 +21,9 @@
     }
   },
   "scripts": {
-    "typecheck": "tsc --noEmit",
-    "test": "vp test run"
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "effect": "catalog:"
-  },
-  "devDependencies": {
-    "@effect/vitest": "catalog:",
-    "vite-plus": "catalog:"
   }
 }

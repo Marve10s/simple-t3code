@@ -364,7 +364,7 @@ export interface PullRequestStatsScope {
 
 const MAX_PULL_REQUEST_STATS_REFS = 500;
 
-export function pullRequestStatsKeysToRequest(
+function pullRequestStatsKeysToRequest(
   entriesByKey: ReadonlyMap<string, EnvironmentPullRequestEntry>,
   enteredKeys: ReadonlySet<string>,
   batches: ReadonlyArray<PullRequestStatsBatch>,
@@ -385,7 +385,7 @@ export function pullRequestStatsKeysToRequest(
   );
 }
 
-export function pullRequestStatsBatches(
+function pullRequestStatsBatches(
   entriesByKey: ReadonlyMap<string, EnvironmentPullRequestEntry>,
   keys: ReadonlySet<string>,
 ): ReadonlyArray<PullRequestStatsBatch> {
@@ -784,7 +784,7 @@ export function rankPullRequestMatches<Entry extends PullRequestListEntry>(
   });
 }
 
-export function rankPullRequestsByMergeReadiness<Entry extends PullRequestListEntry>(
+function rankPullRequestsByMergeReadiness<Entry extends PullRequestListEntry>(
   entries: ReadonlyArray<Entry>,
   hasMeasuredSize: (entry: Entry) => boolean = (entry) => entry.additions + entry.deletions > 0,
 ): ReadonlyArray<Entry> {
@@ -822,7 +822,7 @@ function rankByTierThenRecency<Entry extends PullRequestListEntry>(
   });
 }
 
-export function rankPullRequestsBlockedOnAuthor<Entry extends PullRequestListEntry>(
+function rankPullRequestsBlockedOnAuthor<Entry extends PullRequestListEntry>(
   entries: ReadonlyArray<Entry>,
 ): ReadonlyArray<Entry> {
   return rankByTierThenRecency(entries, (entry) => {
@@ -836,7 +836,7 @@ export function rankPullRequestsBlockedOnAuthor<Entry extends PullRequestListEnt
   });
 }
 
-export function rankPullRequestsBlockedOnReviewer<Entry extends PullRequestListEntry>(
+function rankPullRequestsBlockedOnReviewer<Entry extends PullRequestListEntry>(
   entries: ReadonlyArray<Entry>,
 ): ReadonlyArray<Entry> {
   return rankByTierThenRecency(entries, (entry) => (entry.state === "open" ? 0 : 1));

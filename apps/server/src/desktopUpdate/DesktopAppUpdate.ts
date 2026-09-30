@@ -52,7 +52,7 @@ export class DesktopAppUpdate extends Context.Service<
   }
 >()("t3/desktopUpdate/DesktopAppUpdate") {}
 
-export const make = Effect.fn("desktopUpdate.desktopAppUpdate.make")(function* () {
+const make = Effect.fn("desktopUpdate.desktopAppUpdate.make")(function* () {
   const config = yield* ServerConfig;
   const crypto = yield* Crypto.Crypto;
   const receiver = yield* DesktopTelemetryReceiver.DesktopTelemetryReceiver;

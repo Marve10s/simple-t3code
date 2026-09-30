@@ -24,7 +24,7 @@ export class ThreadPlanProgressService extends Context.Service<
   }
 >()("t3/orchestration/ThreadPlanProgress/ThreadPlanProgressService") {}
 
-export function make(): ThreadPlanProgressService["Service"] {
+function make(): ThreadPlanProgressService["Service"] {
   const progressByThreadId = new Map<string, ThreadPlanProgress>();
 
   return {

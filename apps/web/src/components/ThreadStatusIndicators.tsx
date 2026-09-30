@@ -103,7 +103,7 @@ export function useLinkedThreadPullRequest(
   }, [current, detail]);
 }
 
-export function linkedPullRequestSnapshotStatus(
+function linkedPullRequestSnapshotStatus(
   link: ThreadPullRequestLink,
 ): LinkedThreadPullRequestStatus | null {
   const snapshot = link.snapshot;
@@ -144,7 +144,7 @@ export interface ThreadPullRequestBadgePresentation {
   readonly text: string | number;
 }
 
-export function resolveThreadPullRequestBadgePresentation({
+function resolveThreadPullRequestBadgePresentation({
   badge,
   number,
   url,

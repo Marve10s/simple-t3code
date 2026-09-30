@@ -78,7 +78,7 @@ function formatValue(key: keyof ServerSettings, value: unknown): string {
   return "Custom";
 }
 
-export function settingInheritanceLayers(
+function settingInheritanceLayers(
   target: ScopedSettingsTarget,
   environmentSettings: ServerSettings,
   key: keyof ServerSettings,

@@ -14,7 +14,6 @@ import {
 import * as Schema from "effect/Schema";
 import type { SnapShotKeyChord } from "@t3tools/contracts";
 import { HYPRLAND_CAPTURE_ACTION, portalShortcutTrigger } from "./linuxCaptureSession.ts";
-export { portalShortcutTrigger } from "./linuxCaptureSession.ts";
 
 const PORTAL = "org.freedesktop.portal.Desktop";
 const PATH = "/org/freedesktop/portal/desktop";

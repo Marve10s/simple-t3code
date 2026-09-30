@@ -22,14 +22,14 @@ const decodeCapabilities = Schema.decodeUnknownSync(
 );
 export type KdeCapturePaths = { readonly bundle: string; readonly dataHome: string };
 
-export function kdeCapturePaths(paths: KdeCapturePaths) {
+function kdeCapturePaths(paths: KdeCapturePaths) {
   return {
     executable: NodePath.join(paths.dataHome, "t3code", "kde-capture", KDE_CAPTURE_EXECUTABLE),
     desktop: NodePath.join(paths.dataHome, "applications", DESKTOP_FILE),
   };
 }
 
-export function kdeCaptureDesktopEntry(executable: string): string {
+function kdeCaptureDesktopEntry(executable: string): string {
   return [
     "[Desktop Entry]",
     "Type=Application",

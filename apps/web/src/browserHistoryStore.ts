@@ -13,9 +13,9 @@ import { resolveStorage } from "./lib/storage";
 export type BrowserHistoryEntry = { url: string; lastVisitedAt: number; title?: string };
 
 export const BROWSER_HISTORY_MAX_ENTRIES_PER_PROJECT = 50;
-export const BROWSER_HISTORY_MAX_PROJECTS = 20;
+const BROWSER_HISTORY_MAX_PROJECTS = 20;
 const BROWSER_HISTORY_MAX_URL_LENGTH = 2048;
-export const BROWSER_HISTORY_MAX_TITLE_LENGTH = 512;
+const BROWSER_HISTORY_MAX_TITLE_LENGTH = 512;
 const MAX_VALID_DATE_MS = 8_640_000_000_000_000;
 
 export function isValidHistoryTimestamp(value: unknown): value is number {
@@ -24,7 +24,7 @@ export function isValidHistoryTimestamp(value: unknown): value is number {
   );
 }
 
-export function normalizeHistoryUrl(raw: string): string | null {
+function normalizeHistoryUrl(raw: string): string | null {
   let parsed: URL;
   try {
     parsed = new URL(normalizePreviewUrl(raw));
@@ -56,7 +56,7 @@ function isStableLocalUrl(normalized: string): boolean {
   return isLocalLoopbackHost(host) || host === "0.0.0.0";
 }
 
-export function upsertHistoryEntry(
+function upsertHistoryEntry(
   entries: ReadonlyArray<BrowserHistoryEntry>,
   url: string,
   at: number,
@@ -83,7 +83,7 @@ export function upsertHistoryEntry(
   return next.slice(0, BROWSER_HISTORY_MAX_ENTRIES_PER_PROJECT);
 }
 
-export function evictExcessProjects(
+function evictExcessProjects(
   byProjectKey: Record<string, BrowserHistoryEntry[]>,
 ): Record<string, BrowserHistoryEntry[]> {
   const keys = Object.keys(byProjectKey);
@@ -97,7 +97,7 @@ export function evictExcessProjects(
   return Object.fromEntries(kept.map((key) => [key, byProjectKey[key] ?? []]));
 }
 
-export function migratePersistedBrowserHistoryState(persistedState: unknown): {
+function migratePersistedBrowserHistoryState(persistedState: unknown): {
   byProjectKey: Record<string, BrowserHistoryEntry[]>;
 } {
   if (!persistedState || typeof persistedState !== "object") return { byProjectKey: {} };
@@ -292,7 +292,7 @@ export const useBrowserHistoryStore = create<BrowserHistoryStoreState>()(
   ),
 );
 
-export function mergeBrowserHistoryState(
+function mergeBrowserHistoryState(
   persistedState: unknown,
   currentState: BrowserHistoryStoreState,
 ): BrowserHistoryStoreState {
@@ -385,14 +385,4 @@ export function useThreadRecentHistory(
       return entries && entries.length > 0 ? entries.slice(0, limit) : EMPTY_HISTORY;
     }),
   );
-}
-
-export function resetBrowserHistoryForTests(): void {
-  useBrowserHistoryStore.setState({
-    byProjectKey: {},
-    projectKeyByThreadKey: {},
-    pendingVisitsByThreadKey: {},
-    pendingTitlesByThreadKey: {},
-  });
-  useBrowserHistoryStore.persist.clearStorage();
 }

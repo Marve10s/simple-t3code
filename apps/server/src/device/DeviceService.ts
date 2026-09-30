@@ -143,7 +143,7 @@ interface ServiceState {
 const vendorPrefix = (platform: DevicePlatform) =>
   platform === "ios" ? "/vendor/serve-sim" : "/vendor/serve-emu";
 
-export const makeWithHosts = Effect.fn("DeviceService.makeWithHosts")(function* (
+const makeWithHosts = Effect.fn("DeviceService.makeWithHosts")(function* (
   hosts: ReadonlyMap<DeviceHostId, DeviceHost.DeviceHost["Service"]>,
   testHost: DeviceService["Service"]["testHost"] = (host) =>
     Effect.fail(

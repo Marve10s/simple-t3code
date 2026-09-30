@@ -60,7 +60,7 @@ function parseDetectionCacheKey(key: string): {
   };
 }
 
-export const make = Effect.gen(function* () {
+const make = Effect.gen(function* () {
   const projectConfig = yield* VcsProjectConfig.VcsProjectConfig;
   const git = yield* GitVcsDriver.makeVcsDriver;
   const drivers: Partial<Record<VcsDriverKind, VcsDriver.VcsDriver["Service"]>> = {

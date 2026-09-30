@@ -558,7 +558,7 @@ function AccessGatedProviderSettings({
   );
 }
 
-export function EnvironmentProviderSettings({
+function EnvironmentProviderSettings({
   environmentId,
   environmentLabel,
   readOnly = false,

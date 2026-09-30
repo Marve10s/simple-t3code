@@ -202,7 +202,7 @@ interface BufferedNotificationHandler<A> {
   readonly pending: Array<A>;
 }
 
-export const make = Effect.fn("effect-acp/AcpClient.make")(function* (
+const make = Effect.fn("effect-acp/AcpClient.make")(function* (
   stdio: AcpProtocol.AcpStdio,
   options: AcpClientOptions = {},
   terminationError?: Effect.Effect<AcpError.AcpError>,

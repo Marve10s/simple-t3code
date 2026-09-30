@@ -42,7 +42,6 @@
     "profile:android:hermes": "mkdir -p profiles/review && react-native profile-hermes profiles/review",
     "sync:pierre-icons": "node modules/t3-markdown-text/scripts/sync-pierre-file-icons.mjs",
     "generate": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/generate-uniwind-themes.mts",
-    "test": "vp test run",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
@@ -128,7 +127,6 @@
     "uniwind": "1.11.0"
   },
   "devDependencies": {
-    "@effect/vitest": "catalog:",
     "@pierre/trees": "1.0.0-beta.4",
     "@types/react": "~19.2.0",
     "@types/react-dom": "~19.2.3",

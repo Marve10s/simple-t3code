@@ -45,7 +45,7 @@ const unavailableProcess = (): AccessibilityProcess => ({
   close: () => undefined,
 });
 
-export function startSnapShotAccessibilityProcess(workerPath: string): AccessibilityProcess {
+function startSnapShotAccessibilityProcess(workerPath: string): AccessibilityProcess {
   let worker: NodeChildProcess.ChildProcess;
   try {
     worker = NodeChildProcess.fork(workerPath, ["read"], {

@@ -34,7 +34,7 @@ function expandHomePath(input: string, homeDir: string): string {
   return input.replace(/^~(?=$|\/|\\)/u, homeDir);
 }
 
-export const resolveSshConfigIncludePattern = Effect.fnUntraced(function* (
+const resolveSshConfigIncludePattern = Effect.fnUntraced(function* (
   includePattern: string,
   _directory: string,
   homeDir: string,
@@ -170,7 +170,7 @@ function normalizeKnownHostsHostname(rawHost: string): string {
   return firstColonIndex === lastColonIndex ? rawHost.slice(0, lastColonIndex) : rawHost;
 }
 
-export function parseKnownHostsHostnames(raw: string): ReadonlyArray<string> {
+function parseKnownHostsHostnames(raw: string): ReadonlyArray<string> {
   const hostnames = new Set<string>();
 
   for (const line of raw.split(/\r?\n/u)) {

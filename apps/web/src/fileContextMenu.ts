@@ -32,7 +32,7 @@ export interface FileContextMenuTarget {
   readonly repositoryRoot?: string | undefined;
 }
 
-export function resolveFileContextMenuAbsolutePath(target: FileContextMenuTarget): string | null {
+function resolveFileContextMenuAbsolutePath(target: FileContextMenuTarget): string | null {
   const workspaceFilePath = resolveDiffPathForWorkspace({
     filePath: target.filePath,
     workspaceRoot: target.workspaceRoot,
@@ -55,7 +55,7 @@ export interface FileContextMenuCapabilities {
   readonly editorIds: ReadonlyArray<EditorId>;
 }
 
-export function buildFileContextMenuItems(input: {
+function buildFileContextMenuItems(input: {
   readonly hasAbsolutePath: boolean;
   readonly capabilities: FileContextMenuCapabilities;
 }): readonly ContextMenuItem<FileContextMenuAction>[] {

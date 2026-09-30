@@ -92,7 +92,7 @@ function emptyStage(id: WorktreeSetupStageId): WorktreeSetupStage {
   };
 }
 
-export const make = Effect.gen(function* () {
+const make = Effect.gen(function* () {
   const setups = yield* Ref.make(new Map<ThreadId, TrackedSetup>());
   const changes = yield* PubSub.unbounded<{
     readonly threadId: ThreadId;

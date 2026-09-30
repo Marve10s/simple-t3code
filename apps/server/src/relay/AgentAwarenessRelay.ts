@@ -57,7 +57,7 @@ export class AgentAwarenessRelay extends Context.Service<
   }
 >()("t3/relay/AgentAwarenessRelay") {}
 
-export function eventThreadId(event: OrchestrationEvent): ThreadId | null {
+function eventThreadId(event: OrchestrationEvent): ThreadId | null {
   const payload = event.payload as { readonly threadId?: unknown };
   if (typeof payload.threadId === "string") {
     return payload.threadId as ThreadId;
@@ -68,7 +68,7 @@ export function eventThreadId(event: OrchestrationEvent): ThreadId | null {
   return null;
 }
 
-export function shouldPublishAgentAwarenessEvent(event: OrchestrationEvent): boolean {
+function shouldPublishAgentAwarenessEvent(event: OrchestrationEvent): boolean {
   if (event.metadata.historyImport === true) {
     return false;
   }
@@ -94,7 +94,7 @@ export function shouldPublishAgentAwarenessEvent(event: OrchestrationEvent): boo
   }
 }
 
-export function agentAwarenessPublishIdentity(state: RelayAgentActivityState | null): string {
+function agentAwarenessPublishIdentity(state: RelayAgentActivityState | null): string {
   if (state === null) {
     return "null";
   }
@@ -102,7 +102,7 @@ export function agentAwarenessPublishIdentity(state: RelayAgentActivityState | n
   return JSON.stringify(meaningfulState);
 }
 
-export function resolveAgentActivityPublishingStartupState(input: {
+function resolveAgentActivityPublishingStartupState(input: {
   readonly relayConfigured: boolean;
   readonly publishEnabled: boolean;
 }): "waiting-for-link" | "disabled" | "enabled" {
@@ -115,7 +115,7 @@ export function resolveAgentActivityPublishingStartupState(input: {
 const RELAY_AGENT_ACTIVITY_DETAIL_MAX_LENGTH = 160;
 const REDACTED_RELAY_AGENT_FAILURE_DETAIL = "The agent run failed.";
 
-export function sanitizeRelayAgentActivityState(
+function sanitizeRelayAgentActivityState(
   state: RelayAgentActivityState | null,
 ): RelayAgentActivityState | null {
   if (state === null) {
@@ -172,7 +172,7 @@ function deliveryStats(
   };
 }
 
-export function signRelayAgentActivityPublishProof(input: {
+function signRelayAgentActivityPublishProof(input: {
   readonly privateKey: string;
   readonly payload: RelayAgentActivityPublishProofPayload;
 }) {
@@ -226,7 +226,7 @@ function describeThreadShellForAwareness(
   };
 }
 
-export function resolveAgentAwarenessRelayPublishSnapshot(input: {
+function resolveAgentAwarenessRelayPublishSnapshot(input: {
   readonly environmentId: EnvironmentId;
   readonly threadId: ThreadId;
   readonly thread: Option.Option<OrchestrationThreadShell>;
@@ -267,7 +267,7 @@ function terminalWorkSinceStart(thread: OrchestrationThreadShell, startedAt: num
   return Date.parse(thread.latestTurn?.completedAt ?? "") > startedAt;
 }
 
-export function resolveAgentAwarenessRelayActiveThreadIds(input: {
+function resolveAgentAwarenessRelayActiveThreadIds(input: {
   readonly environmentId: EnvironmentId;
   readonly startedAt: number;
   readonly projects: ReadonlyArray<Pick<OrchestrationProjectShell, "id" | "title">>;

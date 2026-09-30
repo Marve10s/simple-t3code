@@ -77,7 +77,7 @@ function addPendingFavicon(
   );
 }
 
-export function resolveBrowserFaviconStorage(): StateStorage {
+function resolveBrowserFaviconStorage(): StateStorage {
   const fallback = createMemoryStorage();
   const shadowedNames = new Set<string>();
   let primary: Storage;
@@ -117,7 +117,7 @@ export function resolveBrowserFaviconStorage(): StateStorage {
   };
 }
 
-export const useBrowserFaviconStore = create<BrowserFaviconStoreState>()(
+const useBrowserFaviconStore = create<BrowserFaviconStoreState>()(
   persist(
     (set) => ({
       byKey: {},
@@ -163,7 +163,7 @@ export const useBrowserFaviconStore = create<BrowserFaviconStoreState>()(
   ),
 );
 
-export function mergeBrowserFaviconState(
+function mergeBrowserFaviconState(
   persistedState: unknown,
   currentState: BrowserFaviconStoreState,
 ): BrowserFaviconStoreState {
@@ -209,7 +209,7 @@ export function useFaviconProjectRefForThread(threadRef: ScopedThreadRef): Scope
   return shellProjectRef ?? registered;
 }
 
-export function recordFaviconForProject(
+function recordFaviconForProject(
   projectRef: ScopedProjectRef,
   favicon: DesktopPreviewFavicon,
   environmentHostname: string | null,
@@ -308,7 +308,7 @@ export function useFaviconForThreadUrl(threadRef: ScopedThreadRef, url: string):
   );
 }
 
-export function lookupFavicon(
+function lookupFavicon(
   byKey: Record<string, BrowserFaviconEntry>,
   projectRef: ScopedProjectRef | null,
   url: string,
@@ -328,13 +328,4 @@ export function lookupFavicon(
   } catch {
     return null;
   }
-}
-
-export function resetBrowserFaviconsForTests(): void {
-  useBrowserFaviconStore.setState({
-    byKey: {},
-    pendingByThreadKey: {},
-    projectRefByThreadKey: {},
-  });
-  useBrowserFaviconStore.persist.clearStorage();
 }

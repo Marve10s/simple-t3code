@@ -67,7 +67,7 @@ const RECOVERABLE_THREAD_RESUME_ERROR_SNIPPETS = [
   "no rollout found",
 ];
 
-export function hasConfiguredMcpServer(appServerArgs: ReadonlyArray<string> | undefined): boolean {
+function hasConfiguredMcpServer(appServerArgs: ReadonlyArray<string> | undefined): boolean {
   return appServerArgs?.some((argument) => argument.includes("mcp_servers.")) === true;
 }
 
@@ -422,7 +422,7 @@ export function describeMcpElicitation(
   };
 }
 
-export function toMcpElicitationResponse(
+function toMcpElicitationResponse(
   payload: EffectCodexSchema.McpServerElicitationRequestParams,
   decision: ProviderApprovalDecision,
 ): EffectCodexSchema.McpServerElicitationRequestResponse {
@@ -608,7 +608,7 @@ function buildCodexTurnInstructions(input: {
 const SKILL_MENTION_PATTERN =
   /(^|\s)\p{Sc}(?![0-9][0-9_]*(?:[kKmMbBtT]|[eE][0-9]+)?(?:\s|$))(?=[a-zA-Z0-9:_-]*[a-zA-Z])([a-zA-Z0-9][a-zA-Z0-9:_-]*)(?=\s|$)/gu;
 
-export function buildTurnStartParams(input: {
+function buildTurnStartParams(input: {
   readonly threadId: string;
   readonly runtimeMode: RuntimeMode;
   readonly prompt?: string;
@@ -687,7 +687,7 @@ function classifyCodexStderrLine(rawLine: string): { readonly message: string } 
   return { message: line };
 }
 
-export function isRecoverableThreadResumeError(error: unknown): boolean {
+function isRecoverableThreadResumeError(error: unknown): boolean {
   const message = (error instanceof Error ? error.message : String(error)).toLowerCase();
   if (!message.includes("thread")) {
     return false;
@@ -720,7 +720,7 @@ interface CodexThreadOpenClient {
   >;
 }
 
-export const openCodexThread = (input: {
+const openCodexThread = (input: {
   readonly client: CodexThreadOpenClient;
   readonly threadId: ThreadId;
   readonly runtimeMode: RuntimeMode;
@@ -821,7 +821,7 @@ function readNotificationThreadId(notification: CodexServerNotification): string
   }
 }
 
-export function makeMemoryConsolidationNotificationFilter(): (
+function makeMemoryConsolidationNotificationFilter(): (
   notification: CodexServerNotification,
 ) => boolean {
   const threadIds = new Set<string>();
@@ -1071,7 +1071,7 @@ const CHILD_CHATTER_METHODS: ReadonlySet<string> = new Set([
   "thread/started",
 ]);
 
-export function routeCodexChildNotification(method: string): CodexChildNotificationRoute {
+function routeCodexChildNotification(method: string): CodexChildNotificationRoute {
   if (CHILD_AGENT_EVENT_METHODS.has(method)) {
     return "agent-event";
   }
@@ -1176,7 +1176,7 @@ const readCodexHistoryMode = Effect.fn("readCodexHistoryMode")(function* (
   return metadata.thread.historyMode;
 });
 
-export const readCodexThread = Effect.fn("readCodexThread")(function* (
+const readCodexThread = Effect.fn("readCodexThread")(function* (
   client: CodexHistoryClient,
   threadId: string,
 ): Effect.fn.Return<CodexThreadSnapshot, CodexErrors.CodexAppServerError> {
@@ -1219,7 +1219,7 @@ export const readCodexThread = Effect.fn("readCodexThread")(function* (
   return { threadId, turns };
 });
 
-export const rollbackCodexThread = Effect.fn("rollbackCodexThread")(function* (
+const rollbackCodexThread = Effect.fn("rollbackCodexThread")(function* (
   client: CodexHistoryClient,
   threadId: string,
   numTurns: number,

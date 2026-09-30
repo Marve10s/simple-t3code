@@ -39,9 +39,7 @@ function versionCore(version: string): string {
   return version.replace(/[-+].*$/, "");
 }
 
-export function resolveVersionMismatch(
-  serverVersion: string | null | undefined,
-): VersionMismatch | null {
+function resolveVersionMismatch(serverVersion: string | null | undefined): VersionMismatch | null {
   const normalizedClientVersion = normalizeVersion(APP_VERSION);
   const normalizedServerVersion = normalizeVersion(serverVersion);
   if (!normalizedClientVersion || !normalizedServerVersion) {

@@ -30,7 +30,7 @@ export function latestWorkspaceMutationId(
   return null;
 }
 
-export function workspaceMutationRefreshToken(
+function workspaceMutationRefreshToken(
   resourceKey: string,
   mutationId: string | null,
 ): string | null {

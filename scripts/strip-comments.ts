@@ -8,7 +8,7 @@ import { parseSync } from "oxc-parser";
 const SCRIPT_EXTENSIONS = new Set([".ts", ".tsx", ".mts", ".cts", ".js", ".jsx", ".mjs", ".cjs"]);
 const PLAIN_JS_EXTENSIONS = new Set([".js", ".jsx", ".mjs", ".cjs"]);
 const EXCLUDED_PATH =
-  /(^|\/)(node_modules|dist|dist-electron|\.repos|vendor|fixtures|__fixtures__|__snapshots__|patches|\.vite-plus)\/|\.gen\.[cm]?[jt]sx?$|(^|\/)generated[^/]*$/;
+  /(^|\/)(node_modules|dist|dist-electron|\.repos|vendor|fixtures|__fixtures__|__snapshots__|patches|\.vite-plus)\/|\.gen(erated)?\.[cm]?[jt]sx?$|(^|\/)generated[^/]*$/;
 
 const DIRECTIVE =
   /^[\s*]*(eslint-|oxlint-|@ts-(expect-error|ignore|nocheck|check)\b|@effect-diagnostics|@vite-ignore|[@#]__(PURE|NO_SIDE_EFFECTS)__|@vitest-environment|@jsx|webpack[A-Z]|prettier-ignore|oxfmt-ignore|(istanbul|c8|v8) ignore|@license|@preserve)/;
@@ -31,9 +31,8 @@ function keepComment(comment: Comment, plainJs: boolean): boolean {
 }
 
 /**
- * Doc comments can carry tags that tools act on: Effect diagnostics
- * (`@effect-expect-leaking`), knip (`@public`, `@internal`) and TypeScript
- * (`@deprecated`). Such a comment shrinks to just those tags.
+ * @effect-expect-leaking`), knip (`@public`, `@internal`) and TypeScript
+ * @deprecated
  */
 function toolTagsOnly(comment: Comment): string | null {
   if (comment.type !== "Block") return null;
@@ -47,7 +46,6 @@ function toolTagsOnly(comment: Comment): string | null {
     : `/**\n${tags.map((tag) => ` * ${tag}`).join("\n")}\n */`;
 }
 
-/** Removes the given ranges, dropping lines that held nothing but a comment. */
 type Range = readonly [start: number, end: number, replacement?: string];
 
 function removeRanges(text: string, ranges: ReadonlyArray<Range>): string {
@@ -79,7 +77,6 @@ function removeRanges(text: string, ranges: ReadonlyArray<Range>): string {
   return result;
 }
 
-/** Spans of JSX children that hold only a comment; those braces go with the comment. */
 function emptyJsxContainers(node: unknown, spans: Array<readonly [number, number]>) {
   if (Array.isArray(node)) {
     for (const child of node) emptyJsxContainers(child, spans);

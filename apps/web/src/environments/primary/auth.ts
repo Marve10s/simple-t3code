@@ -79,10 +79,6 @@ export class PrimaryEnvironmentPairingCredentialRejectedError extends Schema.Tag
   }
 }
 
-export const isPrimaryEnvironmentPairingCredentialRejectedError = Schema.is(
-  PrimaryEnvironmentPairingCredentialRejectedError,
-);
-
 export class PrimaryEnvironmentAuthSessionTimeoutError extends Schema.TaggedError<PrimaryEnvironmentAuthSessionTimeoutError>()(
   "PrimaryEnvironmentAuthSessionTimeoutError",
   {
@@ -156,7 +152,7 @@ export function stripPairingTokenFromUrl() {
   window.history.replaceState({}, document.title, next.toString());
 }
 
-export function takePairingTokenFromUrl(): string | null {
+function takePairingTokenFromUrl(): string | null {
   const token = peekPairingTokenFromUrl();
   if (!token) {
     return null;
@@ -267,7 +263,7 @@ const TRANSIENT_BOOTSTRAP_STATUS_CODES = new Set([502, 503, 504]);
 const BOOTSTRAP_RETRY_TIMEOUT_MS = 15_000;
 const BOOTSTRAP_RETRY_STEP_MS = 500;
 
-export async function retryTransientBootstrap<T>(operation: () => Promise<T>): Promise<T> {
+async function retryTransientBootstrap<T>(operation: () => Promise<T>): Promise<T> {
   const startedAt = Date.now();
   while (true) {
     try {
@@ -460,9 +456,4 @@ export async function resolveInitialServerAuthGateState(): Promise<ServerAuthGat
         bootstrapPromise = null;
       }
     });
-}
-
-export function __resetServerAuthBootstrapForTests() {
-  bootstrapPromise = null;
-  resolvedAuthenticatedGateState = null;
 }

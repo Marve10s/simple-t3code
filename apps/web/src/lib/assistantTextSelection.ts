@@ -47,7 +47,7 @@ function splitsSurrogatePair(text: string, offset: number): boolean {
   return before >= 0xd800 && before <= 0xdbff && after >= 0xdc00 && after <= 0xdfff;
 }
 
-export function createAssistantTextSelector(
+function createAssistantTextSelector(
   text: string,
   rawStart: number,
   rawEnd: number,
@@ -74,7 +74,7 @@ export function createAssistantTextSelector(
   };
 }
 
-export function findAssistantCitationText(
+function findAssistantCitationText(
   text: string,
   selector: AssistantTextSelector,
 ): { start: number; end: number } | null {

@@ -55,7 +55,7 @@ export type RegionSnapShotProcess = {
   readonly close: () => void;
 };
 
-export function startRegionSnapShotProcess(
+function startRegionSnapShotProcess(
   workerPath: string,
   fork: (workerPath: string) => RegionSnapShotChild = forkRegionSnapShotChild,
 ): RegionSnapShotProcess {

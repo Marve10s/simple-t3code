@@ -23,9 +23,8 @@ import {
   resolveAntigravityUserHome,
 } from "./Drivers/AntigravitySkills.ts";
 
-export const ANTIGRAVITY_AUTH_STDOUT_PREFIX =
-  "Open the following link to authenticate the ACP server: ";
-export const ANTIGRAVITY_AUTH_BROWSER_MARKER = "__T3_ANTIGRAVITY_AUTH_URL__";
+const ANTIGRAVITY_AUTH_STDOUT_PREFIX = "Open the following link to authenticate the ACP server: ";
+const ANTIGRAVITY_AUTH_BROWSER_MARKER = "__T3_ANTIGRAVITY_AUTH_URL__";
 export const ANTIGRAVITY_SIGN_IN_REQUIRED_MESSAGE =
   "Sign in to Antigravity in Settings before you continue.";
 
@@ -93,7 +92,7 @@ export interface AntigravityAuthConfig {
   readonly gcpLocation: string;
 }
 
-export const ANTIGRAVITY_PERSONAL_AUTH: AntigravityAuthConfig = {
+const ANTIGRAVITY_PERSONAL_AUTH: AntigravityAuthConfig = {
   authMethod: "oauth-personal",
   apiKey: "",
   gcpProject: "",
@@ -134,7 +133,7 @@ export function antigravityAuthConfigIssue(auth: AntigravityAuthConfig): string 
   }
 }
 
-export function antigravityProfileSettings(auth: AntigravityAuthConfig): string {
+function antigravityProfileSettings(auth: AntigravityAuthConfig): string {
   const gcp = {
     ...(auth.gcpProject ? { project: auth.gcpProject } : {}),
     ...(auth.gcpLocation ? { location: auth.gcpLocation } : {}),

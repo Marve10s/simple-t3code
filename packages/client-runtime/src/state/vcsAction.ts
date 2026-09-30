@@ -145,7 +145,7 @@ export const VcsActionExecutionError = Schema.Union([
 ]);
 export type VcsActionExecutionError = typeof VcsActionExecutionError.Type;
 
-export const EMPTY_VCS_ACTION_STATE = Object.freeze<VcsActionState>({
+const EMPTY_VCS_ACTION_STATE = Object.freeze<VcsActionState>({
   isRunning: false,
   operation: null,
   actionId: null,
@@ -177,14 +177,14 @@ const EMPTY_VCS_ACTION_ATOM = Atom.make(EMPTY_VCS_ACTION_STATE).pipe(
   Atom.withLabel("vcs-action:null"),
 );
 
-export function getVcsActionTargetKey(target: VcsActionTarget): string | null {
+function getVcsActionTargetKey(target: VcsActionTarget): string | null {
   if (target.environmentId === null || target.cwd === null) {
     return null;
   }
   return JSON.stringify([target.environmentId, target.cwd]);
 }
 
-export function parseVcsActionTargetKey(key: string): ResolvedVcsActionTarget {
+function parseVcsActionTargetKey(key: string): ResolvedVcsActionTarget {
   try {
     const [environmentId, cwd] = decodeVcsActionTargetKey(JSON.parse(key));
     return { environmentId, cwd };
@@ -203,7 +203,7 @@ function createLocalActionId(): string {
   return `local-vcs-action:${nextLocalActionId}`;
 }
 
-export function beginVcsActionState(
+function beginVcsActionState(
   input: BeginVcsActionInput,
 ): VcsActionState & { readonly actionId: string } {
   const actionId = input.actionId ?? createLocalActionId();
@@ -232,15 +232,12 @@ function failVcsActionState(
   };
 }
 
-export function createVcsActionTransportId(
-  target: ResolvedVcsActionTarget,
-  actionId: string,
-): string {
+function createVcsActionTransportId(target: ResolvedVcsActionTarget, actionId: string): string {
   const targetKey = JSON.stringify([target.environmentId, target.cwd]);
   return `${targetKey.length}:${targetKey}${actionId}`;
 }
 
-export function normalizeVcsActionProgressEvent(
+function normalizeVcsActionProgressEvent(
   target: ResolvedVcsActionTarget,
   transportActionId: string,
   actionId: string,
@@ -255,7 +252,7 @@ export function normalizeVcsActionProgressEvent(
   };
 }
 
-export function consumeVcsActionProgress<E, R>(
+function consumeVcsActionProgress<E, R>(
   stream: Stream.Stream<GitActionProgressEvent, E, R>,
   input: {
     readonly target: ResolvedVcsActionTarget;
@@ -314,7 +311,7 @@ export function consumeVcsActionProgress<E, R>(
   });
 }
 
-export function applyVcsActionProgressEvent(
+function applyVcsActionProgressEvent(
   current: VcsActionState,
   event: GitActionProgressEvent,
 ): VcsActionState {

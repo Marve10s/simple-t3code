@@ -36,10 +36,7 @@ const GrokUsageResponse = Schema.Struct({
   ),
 });
 
-export function grokUsageResponseToLimits(
-  response: typeof GrokUsageResponse.Type,
-  checkedAt: string,
-) {
+function grokUsageResponseToLimits(response: typeof GrokUsageResponse.Type, checkedAt: string) {
   const usedPercent = response.config?.creditUsagePercent;
   if (usedPercent === undefined || !Number.isFinite(usedPercent)) {
     return makeUsageLimits({ checkedAt, windows: [] });

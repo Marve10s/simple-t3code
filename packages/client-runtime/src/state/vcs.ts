@@ -52,7 +52,7 @@ function canUseVcsRefsCache(input: VcsListRefsInput): boolean {
   );
 }
 
-export const commitVcsRefsRefresh = Effect.fn("CachedVcsRefsState.commitRefresh")(function* (
+const commitVcsRefsRefresh = Effect.fn("CachedVcsRefsState.commitRefresh")(function* (
   registry: AtomRegistry.AtomRegistry,
   cache: EnvironmentCacheStore["Service"],
   input: {
@@ -112,7 +112,7 @@ export const commitVcsRefsRefresh = Effect.fn("CachedVcsRefsState.commitRefresh"
   );
 });
 
-export const makeCachedVcsRefsChanges = Effect.fn("CachedVcsRefsState.makeChanges")(function* (
+const makeCachedVcsRefsChanges = Effect.fn("CachedVcsRefsState.makeChanges")(function* (
   input: VcsListRefsInput,
   expectedRevision?: number,
   registry?: AtomRegistry.AtomRegistry,

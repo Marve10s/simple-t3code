@@ -21,7 +21,7 @@ export type DuoPanelId = 1 | 3;
 export type DuoHingeLeaf = "left" | "right";
 export type DuoFrameLayout = { width: number; height: number };
 
-export function duoRawPoint(panel: DuoPanelId, x: number, y: number) {
+function duoRawPoint(panel: DuoPanelId, x: number, y: number) {
   return panel === 1 ? { x, y } : { x: y, y: 1 - x };
 }
 export function duoFrameMatches(frame: DuoFrameLayout, screen: DeviceScreenSize) {

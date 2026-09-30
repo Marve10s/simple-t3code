@@ -30,7 +30,7 @@ function publishedThemeColors(
   return { ...base, ...lenientThemeColorOverrides(colors ?? {}) };
 }
 
-export function environmentThemeDefinition(theme: EnvironmentTheme): ThemeDefinition {
+function environmentThemeDefinition(theme: EnvironmentTheme): ThemeDefinition {
   const variants: Partial<Record<ThemeAppearance, ThemeColors>> = {};
   for (const [variantAppearance, variantColors] of Object.entries(theme.variants ?? {})) {
     if (variantAppearance === theme.appearance) continue;
@@ -56,7 +56,7 @@ export function environmentThemeDefinition(theme: EnvironmentTheme): ThemeDefini
   };
 }
 
-export function publishedThemeDefinitions(
+function publishedThemeDefinitions(
   themes: ReadonlyArray<EnvironmentTheme>,
 ): ReadonlyArray<ThemeDefinition> {
   return themes

@@ -97,7 +97,7 @@ export type ThreadCurrentPullRequest =
       readonly top: ThreadPullRequestLink;
     };
 
-export function resolveThreadCurrentPullRequest(
+function resolveThreadCurrentPullRequest(
   links: ReadonlyArray<ThreadPullRequestLink>,
 ): ThreadCurrentPullRequest | null {
   const visible = visibleThreadPullRequests(links);

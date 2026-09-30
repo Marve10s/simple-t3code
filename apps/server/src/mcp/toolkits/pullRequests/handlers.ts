@@ -119,7 +119,7 @@ function entryOf(
   };
 }
 
-export function listThreadPullRequests(
+function listThreadPullRequests(
   thread: Pick<OrchestrationThreadShell, "pullRequests">,
 ): ListThreadPullRequestsResult {
   const chains = resolveThreadPullRequestChains(thread.pullRequests);

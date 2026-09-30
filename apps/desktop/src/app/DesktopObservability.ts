@@ -149,7 +149,7 @@ interface BackendOutputSession {
   readonly byteLength: number;
 }
 
-export function appendBoundedOutputChunk(
+function appendBoundedOutputChunk(
   session: BackendOutputSession,
   streamName: "stdout" | "stderr",
   chunk: Uint8Array,

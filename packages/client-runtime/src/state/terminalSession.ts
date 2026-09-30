@@ -15,7 +15,6 @@ import {
 } from "./terminalOutput.ts";
 
 export {
-  DEFAULT_MAX_TERMINAL_BUFFER_BYTES,
   INITIAL_TERMINAL_OUTPUT_CURSOR,
   readTerminalOutputUpdate,
   terminalOutputText,

@@ -8,12 +8,12 @@ import {
 } from "./composerDraftStore";
 import { createMemoryStorage, type StateStorage } from "./lib/storage";
 
-export const PROMPT_STASH_STORAGE_KEY = "t3code:prompt-stash:v2";
+const PROMPT_STASH_STORAGE_KEY = "t3code:prompt-stash:v2";
 const LEGACY_PROMPT_STASH_STORAGE_KEY = "t3code:prompt-stash:v1";
 const PROMPT_STASH_STORAGE_VERSION = 2;
 
 export const MAX_STASH_ENTRIES = 20;
-export const MAX_STASH_ENTRY_ATTACHMENT_CHARS = 2_700_000;
+const MAX_STASH_ENTRY_ATTACHMENT_CHARS = 2_700_000;
 
 const StashEntrySchema = Schema.Struct({
   id: Schema.String,
@@ -184,9 +184,4 @@ export const usePromptStashStore = create<PromptStashStoreState>()((set, get) =>
   if (persisted) {
     usePromptStashStore.setState({ entries: persisted });
   }
-}
-
-export function writePromptStashStorageForTest(raw: string): void {
-  baseStashStorage.setItem(PROMPT_STASH_STORAGE_KEY, raw);
-  usePromptStashStore.setState({ entries: readPersistedEntries() ?? [] });
 }

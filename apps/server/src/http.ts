@@ -63,7 +63,7 @@ const isSafeInlineMediaMimeType = (mimeType: string): boolean =>
 const isSafeInlineDocumentMimeType = (mimeType: string): boolean =>
   mimeType.toLowerCase() === "application/pdf" || mimeType.toLowerCase() === "text/html";
 
-export function downloadContentDisposition(fileName?: string): string {
+function downloadContentDisposition(fileName?: string): string {
   if (fileName === undefined) {
     return "attachment";
   }
@@ -79,7 +79,7 @@ export function downloadContentDisposition(fileName?: string): string {
   }`;
 }
 
-export function assetResponseHeaders(
+function assetResponseHeaders(
   filePath: string,
   options?: {
     readonly download?: boolean;
@@ -147,7 +147,7 @@ function assetByteRange(header: string, size: bigint) {
   };
 }
 
-export const assetFileResponse = Effect.fn("assetFileResponse")(function* (
+const assetFileResponse = Effect.fn("assetFileResponse")(function* (
   asset: {
     readonly path: string;
     readonly download?: boolean;
@@ -237,7 +237,7 @@ export const browserApiCorsLayer = Layer.unwrap(
   }),
 );
 
-export function isLoopbackHostname(hostname: string): boolean {
+function isLoopbackHostname(hostname: string): boolean {
   const normalizedHostname = hostname
     .trim()
     .toLowerCase()
@@ -245,7 +245,7 @@ export function isLoopbackHostname(hostname: string): boolean {
   return LOOPBACK_HOSTNAMES.has(normalizedHostname);
 }
 
-export function resolveDevRedirectUrl(devUrl: URL, requestUrl: URL): string {
+function resolveDevRedirectUrl(devUrl: URL, requestUrl: URL): string {
   const redirectUrl = new URL(devUrl.toString());
   redirectUrl.pathname = requestUrl.pathname;
   redirectUrl.search = requestUrl.search;

@@ -495,10 +495,7 @@ const resolveEditorLaunch = Effect.fn("resolveEditorLaunch")(function* (
   };
 });
 
-export function buildFileExplorerRevealPowerShellSource(
-  explorerCommand: string,
-  target: string,
-): string {
+function buildFileExplorerRevealPowerShellSource(explorerCommand: string, target: string): string {
   return `$ProgressPreference = 'SilentlyContinue'; Start-Process ${escapePowerShellStringLiteral(explorerCommand)} -ArgumentList ('/select,"' + ${escapePowerShellStringLiteral(target)} + '"')`;
 }
 

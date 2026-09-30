@@ -46,7 +46,7 @@ export interface CursorAcpModelSelectionErrorContext {
   readonly configId?: string;
 }
 
-export function buildCursorAcpSpawnInput(
+function buildCursorAcpSpawnInput(
   cursorSettings: CursorAcpRuntimeCursorSettings | null | undefined,
   cwd: string,
   environment?: NodeJS.ProcessEnv,

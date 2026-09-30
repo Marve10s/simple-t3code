@@ -20,9 +20,7 @@ function getTimestampFormatOptions(
   };
 }
 
-export function resolveTimestampLocale(
-  systemLocale: string | null | undefined,
-): string | undefined {
+function resolveTimestampLocale(systemLocale: string | null | undefined): string | undefined {
   const tag = systemLocale?.trim();
   if (!tag) return undefined;
 
@@ -49,7 +47,7 @@ type LocaleWithWeekInfo = Intl.Locale & {
   getWeekInfo?: () => { readonly firstDay: number };
 };
 
-export function resolveWeekStartsOn(locale: string | undefined): WeekdayIndex | undefined {
+function resolveWeekStartsOn(locale: string | undefined): WeekdayIndex | undefined {
   try {
     const resolved: LocaleWithWeekInfo = new Intl.Locale(
       locale ?? Intl.DateTimeFormat().resolvedOptions().locale,

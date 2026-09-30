@@ -199,22 +199,8 @@ const publishActiveRecordingTabIds = (): void => {
   });
 };
 
-export const BROWSER_RECORDING_STARTUP_SETTLE_TIMEOUT_MS = 5_000;
-export const BROWSER_RECORDING_PAINT_SETTLE_TIMEOUT_MS = 250;
-
-export function readActiveBrowserRecordingTabIds(threadRef?: ScopedThreadRef): ReadonlySet<string> {
-  const tabIds = new Set<string>();
-  for (const recording of activeRecordings.values()) {
-    if (
-      threadRef === undefined ||
-      (recording.threadRef?.environmentId === threadRef.environmentId &&
-        recording.threadRef.threadId === threadRef.threadId)
-    ) {
-      tabIds.add(recording.tabId);
-    }
-  }
-  return tabIds;
-}
+const BROWSER_RECORDING_STARTUP_SETTLE_TIMEOUT_MS = 5_000;
+const BROWSER_RECORDING_PAINT_SETTLE_TIMEOUT_MS = 250;
 
 export function readActiveBrowserRecordingTargets(
   threadRef: ScopedThreadRef,

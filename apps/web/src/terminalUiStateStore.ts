@@ -26,7 +26,7 @@ interface PersistedTerminalUiStateStoreState {
   terminalStateByThreadKey?: Record<string, ThreadTerminalUiState>;
 }
 
-export function migratePersistedTerminalUiStateStoreState(
+function migratePersistedTerminalUiStateStoreState(
   persistedState: unknown,
   _version: number,
 ): PersistedTerminalUiStateStoreState {

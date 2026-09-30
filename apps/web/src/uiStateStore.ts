@@ -3,7 +3,7 @@ import type { PullRequestMergeMethod } from "@t3tools/contracts";
 import { create } from "zustand";
 import { normalizeProjectPathForComparison } from "./lib/projectPaths";
 
-export const PERSISTED_STATE_KEY = "t3code:ui-state:v1";
+const PERSISTED_STATE_KEY = "t3code:ui-state:v1";
 const THREAD_CHANGED_FILES_EXPANSION_VERSION = 2;
 const LEGACY_PERSISTED_STATE_KEYS = [
   "t3code:renderer-state:v8",
@@ -117,7 +117,7 @@ function isPullRequestMergeMethod(value: unknown): value is PullRequestMergeMeth
   return value === "merge" || value === "squash" || value === "rebase";
 }
 
-export function parsePersistedState(parsed: PersistedUiState): UiState {
+function parsePersistedState(parsed: PersistedUiState): UiState {
   const projectExpandedById =
     parsed.projectExpandedById === undefined
       ? (() => {
@@ -207,7 +207,7 @@ function sanitizePersistedThreadChangedFilesExpanded(
   return nextState;
 }
 
-export function persistState(state: UiState): void {
+function persistState(state: UiState): void {
   if (typeof window === "undefined") {
     return;
   }
@@ -241,7 +241,7 @@ export function persistState(state: UiState): void {
 
 const debouncedPersistState = new Debouncer(persistState, { wait: 500 });
 
-export function markThreadVisited(state: UiState, threadId: string, visitedAt: string): UiState {
+function markThreadVisited(state: UiState, threadId: string, visitedAt: string): UiState {
   const visitedAtMs = Date.parse(visitedAt);
   if (!Number.isFinite(visitedAtMs)) {
     return state;
@@ -264,7 +264,7 @@ export function markThreadVisited(state: UiState, threadId: string, visitedAt: s
   };
 }
 
-export function markThreadUnread(
+function markThreadUnread(
   state: UiState,
   threadId: string,
   latestTurnCompletedAt: string | null | undefined,
@@ -289,7 +289,7 @@ export function markThreadUnread(
   };
 }
 
-export function setThreadChangedFilesExpanded(
+function setThreadChangedFilesExpanded(
   state: UiState,
   threadId: string,
   turnId: string,
@@ -312,7 +312,7 @@ export function setThreadChangedFilesExpanded(
   };
 }
 
-export function setDefaultAdvertisedEndpointKey(state: UiState, key: string | null): UiState {
+function setDefaultAdvertisedEndpointKey(state: UiState, key: string | null): UiState {
   const nextKey = key && key.length > 0 ? key : null;
   if (state.defaultAdvertisedEndpointKey === nextKey) {
     return state;
@@ -323,7 +323,7 @@ export function setDefaultAdvertisedEndpointKey(state: UiState, key: string | nu
   };
 }
 
-export function setSidebarProjectScopeKey(state: UiState, projectKey: string | null): UiState {
+function setSidebarProjectScopeKey(state: UiState, projectKey: string | null): UiState {
   const nextKey = sanitizeOptionalKey(projectKey);
   if (state.sidebarProjectScopeKey === nextKey) {
     return state;
@@ -353,7 +353,7 @@ export function resolveProjectExpanded(
   return projectExpandedById[LEGACY_PROJECT_EXPANSION_DEFAULT_KEY] ?? true;
 }
 
-export function setProjectExpanded(
+function setProjectExpanded(
   state: UiState,
   projectIds: string | readonly string[],
   expanded: boolean,
@@ -373,7 +373,7 @@ export function setProjectExpanded(
   };
 }
 
-export function reorderProjects(
+function reorderProjects(
   state: UiState,
   currentProjectOrder: readonly string[],
   draggedProjectIds: readonly string[],

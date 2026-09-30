@@ -108,7 +108,7 @@ function writeSystemMessage(terminal: GhosttyTerminalSurface, message: string): 
   terminal.write(`\r\n[terminal] ${message}\r\n`);
 }
 
-export function writeTerminalOutputUpdate(
+function writeTerminalOutputUpdate(
   terminal: Pick<GhosttyTerminalSurface, "resetAndWrite" | "write">,
   update: TerminalOutputUpdate,
 ): void {
@@ -235,10 +235,10 @@ export function terminalThemeFromApp(mountElement?: HTMLElement | null): Ghostty
   };
 }
 
-export function terminalSelectionLineRange(position: {
-  start: { y: number };
-  end: { y: number };
-}): { lineStart: number; lineEnd: number } {
+function terminalSelectionLineRange(position: { start: { y: number }; end: { y: number } }): {
+  lineStart: number;
+  lineEnd: number;
+} {
   const lineStart = position.start.y + 1;
   return {
     lineStart,
@@ -248,7 +248,7 @@ export function terminalSelectionLineRange(position: {
 
 export type TerminalContextMenuAction = "add-to-chat" | "copy" | "paste";
 
-export function terminalSelectionMenuItems(options?: {
+function terminalSelectionMenuItems(options?: {
   canAddToChat?: boolean;
 }): ContextMenuItem<"add-to-chat" | "copy">[] {
   return [
@@ -259,7 +259,7 @@ export function terminalSelectionMenuItems(options?: {
   ];
 }
 
-export function terminalContextMenuItems(options: {
+function terminalContextMenuItems(options: {
   hasSelection: boolean;
   canAddToChat?: boolean;
 }): ContextMenuItem<TerminalContextMenuAction>[] {
@@ -273,7 +273,7 @@ export function terminalContextMenuItems(options: {
   ];
 }
 
-export function shouldClearTerminalSelectionAction(options: {
+function shouldClearTerminalSelectionAction(options: {
   actionPending: boolean;
   openMenuRequestId: number | null;
   currentRequestId: number;
@@ -281,7 +281,7 @@ export function shouldClearTerminalSelectionAction(options: {
   return options.actionPending || options.openMenuRequestId === options.currentRequestId;
 }
 
-export function shouldHandleTerminalExit(
+function shouldHandleTerminalExit(
   current: TerminalSessionState["status"],
   synchronized: TerminalSessionState["status"],
   alreadyHandled: boolean,

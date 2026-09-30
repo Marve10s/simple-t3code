@@ -15,7 +15,6 @@ const DEFAULT_MAX_AGE_SECONDS = 300;
 
 export const DpopPublicJwk = DpopPublicJwkSchema;
 export type DpopPublicJwk = DpopPublicJwkType;
-export { normalizeDpopHtu };
 
 export const DpopVerificationFailureCode = Schema.Literals([
   "missing_proof",

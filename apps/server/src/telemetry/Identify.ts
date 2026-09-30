@@ -245,7 +245,7 @@ const upsertAnonymousId = Effect.gen(function* () {
   return anonymousId;
 });
 
-export const getTelemetryIdentifierForHome = Effect.fn("getTelemetryIdentifierForHome")(
+const getTelemetryIdentifierForHome = Effect.fn("getTelemetryIdentifierForHome")(
   function* (homeDirectory: string) {
     const codexAccountId = yield* getCodexAccountId(homeDirectory).pipe(
       Effect.catchTags({

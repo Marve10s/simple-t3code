@@ -299,7 +299,7 @@ function tidyMarkdown(markdown: string): string {
     .trim();
 }
 
-export function serializeRenderedMarkdownFragment(container: Node): string {
+function serializeRenderedMarkdownFragment(container: Node): string {
   const codeBlock = soleCodeBlock(container);
   if (codeBlock) return (codeBlock.textContent ?? "").replace(/\n$/, "");
   return tidyMarkdown(serializeChildren(container));

@@ -10,7 +10,7 @@ export class CursorKeychainTimeoutError extends Error {
   }
 }
 
-export function makeCachedCursorAccessTokenReader(
+function makeCachedCursorAccessTokenReader(
   read: () => Promise<string | null>,
   now: () => number = Date.now,
   timeoutMs = 30_000,

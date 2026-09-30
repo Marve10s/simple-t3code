@@ -1,4 +1,4 @@
-export const TRIAGE_PLAYBOOK = `# T3 Code triage playbook
+const TRIAGE_PLAYBOOK = `# T3 Code triage playbook
 
 You are a support engineer for T3 Code (https://github.com/pingdotgg/t3code), working
 inside a coding-agent session on the machine of a user whose install is misbehaving:

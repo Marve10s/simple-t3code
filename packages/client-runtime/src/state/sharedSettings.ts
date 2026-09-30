@@ -5,7 +5,6 @@ import type {
   ServerSettingsPatch,
 } from "@t3tools/contracts";
 import { isModelSelectionProviderEnabled } from "@t3tools/shared/serverSettings";
-import * as Equal from "effect/Equal";
 import * as Struct from "effect/Struct";
 
 import type { EnvironmentConnectionPhase } from "../connection/presentation.ts";
@@ -71,17 +70,6 @@ export function filterSharedServerPatch(
     : Struct.omit(patch, ["continueThreadsAfterServerUpdate"]);
 }
 
-export function pickSharedServerSettings(
-  settings: ServerSettings,
-  capabilities?: Pick<ExecutionEnvironmentCapabilities, "threadRestartContinuation">,
-): ServerSettingsPatch {
-  return filterSharedServerPatch(
-    Struct.pick(settings, SHARED_SERVER_SETTING_KEYS),
-    capabilities,
-    settings,
-  );
-}
-
 export function supportsSharedSettingsSync(environment: {
   readonly connection: { readonly phase: EnvironmentConnectionPhase };
   readonly serverConfig: {
@@ -104,47 +92,4 @@ export interface SharedSettingsEnvironment {
   readonly capabilities?:
     | Pick<ExecutionEnvironmentCapabilities, "threadRestartContinuation">
     | undefined;
-}
-
-export function findSharedSettingsMismatches(input: {
-  readonly primaryEnvironmentId: EnvironmentId | null;
-  readonly primarySettings: ServerSettings | null;
-  readonly primaryCapabilities?:
-    | Pick<ExecutionEnvironmentCapabilities, "threadRestartContinuation">
-    | undefined;
-  readonly environments: ReadonlyArray<SharedSettingsEnvironment>;
-}): ReadonlyArray<{ readonly environmentId: EnvironmentId; readonly label: string }> {
-  if (input.primaryEnvironmentId === null || input.primarySettings === null) {
-    return [];
-  }
-  const primarySettings = pickSharedServerSettings(
-    input.primarySettings,
-    input.primaryCapabilities,
-  );
-  return input.environments.flatMap((environment) => {
-    if (
-      environment.environmentId === input.primaryEnvironmentId ||
-      !environment.syncEligible ||
-      environment.settings === null
-    ) {
-      return [];
-    }
-    const expected = filterSharedServerPatch(
-      primarySettings,
-      environment.capabilities,
-      environment.settings,
-      input.primarySettings ?? undefined,
-    );
-    let actual = filterSharedServerPatch(
-      pickSharedServerSettings(environment.settings, environment.capabilities),
-      input.primaryCapabilities,
-      environment.settings,
-    );
-    if (!expected.textGenerationModelSelection) {
-      actual = Struct.omit(actual, ["textGenerationModelSelection"]);
-    }
-    return Equal.equals(actual, expected)
-      ? []
-      : [{ environmentId: environment.environmentId, label: environment.label }];
-  });
 }

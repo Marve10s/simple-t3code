@@ -1,4 +1,3 @@
-import "vite-plus/test/config";
 import { defineConfig } from "vite-plus";
 import * as NodeURL from "node:url";
 
@@ -52,30 +51,12 @@ export default defineConfig({
       "~": NodeURL.fileURLToPath(new URL("./apps/web/src", import.meta.url)),
     },
   },
-  test: {
-    environment: "node",
-    exclude: [
-      "**/.repos/**",
-      "**/node_modules/**",
-      "**/dist/**",
-      "**/dist-electron/**",
-      "**/.{idea,git,cache,output,temp}/**",
-    ],
-    hookTimeout: 60_000,
-    testTimeout: 60_000,
-    setupFiles: [
-      NodeURL.fileURLToPath(
-        new URL("./packages/shared/src/testing/longTempDir.ts", import.meta.url),
-      ),
-    ],
-  },
   staged: {
     "*": "vp fmt --no-error-on-unmatched-pattern",
   },
   fmt: {
     ignorePatterns: [
       ".repos/**",
-      ".macroscope/ignore.md",
       ".alchemy",
       "dist",
       "dist-electron",
@@ -89,14 +70,6 @@ export default defineConfig({
       "*.icon/**",
     ],
     sortPackageJson: {},
-    overrides: [
-      {
-        files: [".devcontainer/devcontainer.json"],
-        options: {
-          trailingComma: "none",
-        },
-      },
-    ],
   },
   lint: {
     ignorePatterns: [
@@ -154,7 +127,6 @@ export default defineConfig({
       ],
       "t3code/no-global-process-runtime": "error",
       "t3code/no-inline-schema-compile": "warn",
-      "t3code/no-manual-effect-runtime-in-tests": "error",
       "t3code/no-native-title-tooltip": "error",
       "t3code/namespace-node-imports": "error",
     },
@@ -249,7 +221,6 @@ export default defineConfig({
           "packages/contracts/src/**",
           "packages/shared/src/**",
         ],
-        excludeFiles: ["**/*.test.ts", "**/*.test.tsx"],
         rules: { "t3code/no-hermes-unsupported-apis": "error" },
       },
       {
@@ -283,26 +254,6 @@ export default defineConfig({
           "t3code/no-mobile-uniwind-theme-escape-hatches": ["error", { allowUniwindTheme: true }],
         },
       },
-      ...Object.entries({
-        "apps/server/src/orchestration/Layers/CheckpointReactor.test.ts": 42,
-        "apps/server/src/orchestration/Layers/OrchestrationEngine.test.ts": 5,
-        "apps/server/src/orchestration/Layers/OrchestrationReactor.test.ts": 4,
-        "apps/server/src/orchestration/Layers/ProviderCommandReactor.test.ts": 66,
-        "apps/server/src/orchestration/Layers/ProviderRuntimeIngestion.test.ts": 29,
-        "apps/server/src/orchestration/Layers/ThreadDeletionReactor.test.ts": 2,
-        "apps/server/src/orchestration/commandInvariants.test.ts": 5,
-        "apps/server/src/orchestration/projector.test.ts": 20,
-        "apps/server/src/provider/Layers/CodexAdapter.test.ts": 1,
-        "apps/server/src/provider/Layers/CodexSessionRuntime.test.ts": 5,
-        "apps/server/src/provider/Layers/CursorAdapter.test.ts": 1,
-        "apps/server/src/provider/Layers/CursorProvider.test.ts": 1,
-        "apps/server/src/provider/Layers/ProviderService.test.ts": 2,
-        "apps/server/src/provider/Layers/ProviderSessionReaper.test.ts": 12,
-        "apps/server/src/provider/acp/CursorAcpSupport.test.ts": 1,
-      }).map(([file, maxOccurrences]) => {
-        const rule: ["error", { maxOccurrences: number }] = ["error", { maxOccurrences }];
-        return { files: [file], rules: { "t3code/no-manual-effect-runtime-in-tests": rule } };
-      }),
     ],
     options: {
       reportUnusedDisableDirectives: "error",

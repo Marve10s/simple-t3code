@@ -164,14 +164,14 @@ async function discardDatabaseBackup(baseDir: string, updateId: string): Promise
   await syncDirectory(NodePath.dirname(backupDir));
 }
 
-export async function readServiceState(filePath: string): Promise<ServiceState> {
+async function readServiceState(filePath: string): Promise<ServiceState> {
   const contents = await NodeFSP.readFile(filePath, "utf8");
   const state = parseServiceState(contents);
   if (state === undefined) throw new Error("Service state is invalid or unsupported.");
   return state;
 }
 
-export async function writeServiceState(filePath: string, state: ServiceState): Promise<void> {
+async function writeServiceState(filePath: string, state: ServiceState): Promise<void> {
   const directory = NodePath.dirname(filePath);
   await NodeFSP.mkdir(directory, { recursive: true, mode: 0o700 });
   const tempPath = NodePath.join(
@@ -257,7 +257,7 @@ const stopMarkerPath = (baseDir: string) =>
 const restartPendingPath = (baseDir: string) =>
   NodePath.join(baseDir, "runtime", SERVICE_RESTART_PENDING_FILE);
 
-export class Launcher {
+class Launcher {
   readonly #baseDir: string;
   readonly #statePath: string;
   #state: ServiceState;

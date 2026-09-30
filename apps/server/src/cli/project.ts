@@ -166,7 +166,7 @@ export const ProjectCommandError = Schema.Union([
 ]);
 export type ProjectCommandError = typeof ProjectCommandError.Type;
 
-export function projectCommandErrorFromLiveServerRequest(cause: unknown): ProjectCommandError {
+function projectCommandErrorFromLiveServerRequest(cause: unknown): ProjectCommandError {
   if (isEnvironmentHttpCommonError(cause)) {
     return new ProjectLiveServerDeclaredResponseError({
       operation: "callLiveServer",

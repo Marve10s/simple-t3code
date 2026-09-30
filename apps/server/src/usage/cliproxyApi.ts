@@ -99,7 +99,7 @@ const decodeConsumeResponse = Schema.decodeUnknownEffect(
 const CODEX_BASE = "https://chatgpt.com/backend-api/wham";
 const CREDIT_URL = `${CODEX_BASE}/rate-limit-reset-credits`;
 
-export function creditRedeemRequestId(accountId: string, creditId: string): string {
+function creditRedeemRequestId(accountId: string, creditId: string): string {
   const bytes = NodeCrypto.createHash("sha1")
     .update(Buffer.from("6f1c2a9e2d4b4c1e9a7f3b8d5e0c1a42", "hex"))
     .update(`${accountId}:${creditId}`)

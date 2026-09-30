@@ -98,7 +98,7 @@ const fetchDescriptor = Effect.fn("clientRuntime.connection.remote.fetchDescript
   );
 });
 
-export const make = Effect.gen(function* () {
+const make = Effect.gen(function* () {
   const serviceScope = yield* Scope.Scope;
   const signer = yield* ManagedRelay.ManagedRelayDpopSigner;
   const relay = yield* ManagedRelay.ManagedRelayClient;

@@ -130,7 +130,7 @@ function readProviderConfigBoolean(config: unknown, key: string, defaultValue = 
   return typeof value === "boolean" ? value : defaultValue;
 }
 
-export function nextProviderConfigWithFieldValue(
+function nextProviderConfigWithFieldValue(
   config: unknown,
   field: ProviderSettingsFieldModel,
   value: string | boolean,

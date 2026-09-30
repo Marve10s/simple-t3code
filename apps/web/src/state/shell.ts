@@ -47,7 +47,7 @@ export const allEnvironmentShellsBootstrappedAtom = Atom.make((get) => {
   return true;
 }).pipe(Atom.withLabel("web-all-environment-shells-bootstrapped"));
 
-export function createAllEnvironmentProjectSnapshotsReadyAtom(input: {
+function createAllEnvironmentProjectSnapshotsReadyAtom(input: {
   readonly catalogValueAtom: Atom.Atom<EnvironmentCatalogState>;
   readonly shellStateValueAtom: (environmentId: EnvironmentId) => Atom.Atom<EnvironmentShellState>;
   readonly requiresPrimaryEnvironment: boolean;

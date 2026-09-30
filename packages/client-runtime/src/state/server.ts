@@ -126,7 +126,7 @@ export class ServerUpdateTerminalError extends Schema.TaggedError<ServerUpdateTe
 
 const SERVER_UPDATE_RESUME_TIMEOUT = Duration.minutes(4);
 
-export function matchesServerUpdateReadyEvent(
+function matchesServerUpdateReadyEvent(
   result: ServerSelfUpdateResult,
   event: ServerLifecycleStreamReadyEvent,
 ): boolean {
@@ -135,7 +135,7 @@ export function matchesServerUpdateReadyEvent(
     : event.payload.updateOutcome?.id === result.updateId;
 }
 
-export function matchesServerUpdateResumeEvent(
+function matchesServerUpdateResumeEvent(
   result: ServerSelfUpdateResult,
   event: ServerLifecycleStreamReadyEvent,
 ): boolean {
@@ -145,7 +145,7 @@ export function matchesServerUpdateResumeEvent(
   );
 }
 
-export function validateServerUpdateReadyEvent(
+function validateServerUpdateReadyEvent(
   result: ServerSelfUpdateResult,
   event: ServerLifecycleStreamReadyEvent,
 ): Effect.Effect<void, ServerUpdateTerminalError> {
@@ -170,7 +170,7 @@ export function validateServerUpdateReadyEvent(
   );
 }
 
-export function nudgeReconnectDuringUpdateRestart(input: {
+function nudgeReconnectDuringUpdateRestart(input: {
   readonly stateChanges: Stream.Stream<
     {
       readonly phase: string;
@@ -195,7 +195,7 @@ export function nudgeReconnectDuringUpdateRestart(input: {
   );
 }
 
-export function waitForNextEnvironmentReconnect<E>(
+function waitForNextEnvironmentReconnect<E>(
   stateChanges: Stream.Stream<{ readonly phase: string }, E>,
 ): Effect.Effect<void, E> {
   return stateChanges.pipe(
@@ -206,35 +206,35 @@ export function waitForNextEnvironmentReconnect<E>(
   );
 }
 
-export const runDesktopCommitWithReconnectObserver = Effect.fn(
-  "runDesktopCommitWithReconnectObserver",
-)(function* <EState, ECommit>(
-  stateChanges: Stream.Stream<{ readonly phase: string }, EState>,
-  commit: Effect.Effect<void, ECommit>,
-) {
-  const armed = yield* Deferred.make<void>();
-  const reconnected = yield* Deferred.make<void>();
-  const observer = yield* stateChanges.pipe(
-    Stream.tap(() => Deferred.succeed(armed, undefined)),
-    waitForNextEnvironmentReconnect,
-    Effect.andThen(Deferred.succeed(reconnected, undefined)),
-    Effect.forkChild,
-  );
-  yield* Deferred.await(armed);
-  const commitExit = yield* commit.pipe(Effect.exit);
-  if (Exit.isSuccess(commitExit)) {
-    yield* Fiber.interrupt(observer);
-    return;
-  }
-  if (!isLegacyUpdateHandoffLoss(commitExit.cause)) {
-    yield* Fiber.interrupt(observer);
+const runDesktopCommitWithReconnectObserver = Effect.fn("runDesktopCommitWithReconnectObserver")(
+  function* <EState, ECommit>(
+    stateChanges: Stream.Stream<{ readonly phase: string }, EState>,
+    commit: Effect.Effect<void, ECommit>,
+  ) {
+    const armed = yield* Deferred.make<void>();
+    const reconnected = yield* Deferred.make<void>();
+    const observer = yield* stateChanges.pipe(
+      Stream.tap(() => Deferred.succeed(armed, undefined)),
+      waitForNextEnvironmentReconnect,
+      Effect.andThen(Deferred.succeed(reconnected, undefined)),
+      Effect.forkChild,
+    );
+    yield* Deferred.await(armed);
+    const commitExit = yield* commit.pipe(Effect.exit);
+    if (Exit.isSuccess(commitExit)) {
+      yield* Fiber.interrupt(observer);
+      return;
+    }
+    if (!isLegacyUpdateHandoffLoss(commitExit.cause)) {
+      yield* Fiber.interrupt(observer);
+      return yield* Effect.failCause(commitExit.cause);
+    }
+    yield* Deferred.await(reconnected).pipe(Effect.timeout(SERVER_UPDATE_RESUME_TIMEOUT));
     return yield* Effect.failCause(commitExit.cause);
-  }
-  yield* Deferred.await(reconnected).pipe(Effect.timeout(SERVER_UPDATE_RESUME_TIMEOUT));
-  return yield* Effect.failCause(commitExit.cause);
-});
+  },
+);
 
-export const waitForDesktopUpdateTarget = Effect.fn("waitForDesktopUpdateTarget")(function* <
+const waitForDesktopUpdateTarget = Effect.fn("waitForDesktopUpdateTarget")(function* <
   EReady,
   ECommit,
 >(
@@ -260,7 +260,7 @@ export const waitForDesktopUpdateTarget = Effect.fn("waitForDesktopUpdateTarget"
   });
 });
 
-export function serverUpdateStateForProgressEvent(
+function serverUpdateStateForProgressEvent(
   fromVersion: string,
   targetVersion: string,
   event: ServerSelfUpdateProgressEvent,
@@ -273,7 +273,7 @@ export function serverUpdateStateForProgressEvent(
   };
 }
 
-export function serverUpdateStateForServerVersion(
+function serverUpdateStateForServerVersion(
   state: ServerUpdateState,
   serverVersion: string | null,
 ): ServerUpdateState {
@@ -303,7 +303,7 @@ function isRpcSocketError(error: unknown): boolean {
   }
 }
 
-export function isLegacyUpdateHandoffLoss(cause: Cause.Cause<unknown>): boolean {
+function isLegacyUpdateHandoffLoss(cause: Cause.Cause<unknown>): boolean {
   if (Cause.hasInterruptsOnly(cause)) {
     return true;
   }
@@ -313,7 +313,7 @@ export function isLegacyUpdateHandoffLoss(cause: Cause.Cause<unknown>): boolean 
   );
 }
 
-export function resolveServerUpdateProgressResult<E>(
+function resolveServerUpdateProgressResult<E>(
   targetVersion: string,
   terminal: Option.Option<ServerSelfUpdateResult>,
   streamExit: Exit.Exit<void, E>,
@@ -342,99 +342,99 @@ export interface ServerConfigSubscriptionOptions {
   readonly usageLimitsCommand?: boolean;
 }
 
-export const makeEnvironmentServerConfigState = Effect.fn("EnvironmentServerConfigState.make")(
-  function* (subscription: ServerConfigSubscriptionOptions) {
-    const supervisor = yield* EnvironmentSupervisor;
-    const cache = yield* EnvironmentCacheStore;
-    const environmentId = supervisor.target.environmentId;
-    const cachedConfig = yield* cache.loadServerConfig(environmentId).pipe(
+const makeEnvironmentServerConfigState = Effect.fn("EnvironmentServerConfigState.make")(function* (
+  subscription: ServerConfigSubscriptionOptions,
+) {
+  const supervisor = yield* EnvironmentSupervisor;
+  const cache = yield* EnvironmentCacheStore;
+  const environmentId = supervisor.target.environmentId;
+  const cachedConfig = yield* cache.loadServerConfig(environmentId).pipe(
+    Effect.catch((error) =>
+      Effect.logWarning("Could not load cached server configuration.").pipe(
+        Effect.annotateLogs({
+          environmentId,
+          ...safeErrorLogAttributes(error),
+        }),
+        Effect.as(Option.none<ServerConfig>()),
+      ),
+    ),
+  );
+  const state = yield* SubscriptionRef.make<Option.Option<ServerConfigProjection>>(
+    Option.map(cachedConfig, (cached) => ({
+      config: withoutEnvironmentThemes(cached),
+      latestEvent: cachedConfigSnapshotEvent(withoutEnvironmentThemes(cached)),
+      source: "cache" as const,
+    })),
+  );
+  const persistence = yield* Queue.sliding<ServerConfig>(1);
+  const pendingPersistence = yield* Ref.make<Option.Option<ServerConfig>>(Option.none());
+
+  const persist = Effect.fn("EnvironmentServerConfigState.persist")(function* (
+    config: ServerConfig,
+  ) {
+    return yield* cache.saveServerConfig(environmentId, withoutEnvironmentThemes(config)).pipe(
+      Effect.as(true),
       Effect.catch((error) =>
-        Effect.logWarning("Could not load cached server configuration.").pipe(
+        Effect.logWarning("Could not persist cached server configuration.").pipe(
           Effect.annotateLogs({
             environmentId,
             ...safeErrorLogAttributes(error),
           }),
-          Effect.as(Option.none<ServerConfig>()),
+          Effect.as(false),
         ),
       ),
     );
-    const state = yield* SubscriptionRef.make<Option.Option<ServerConfigProjection>>(
-      Option.map(cachedConfig, (cached) => ({
-        config: withoutEnvironmentThemes(cached),
-        latestEvent: cachedConfigSnapshotEvent(withoutEnvironmentThemes(cached)),
-        source: "cache" as const,
-      })),
+  });
+
+  const persistPending = Effect.fn("EnvironmentServerConfigState.persistPending")(function* (
+    config: ServerConfig,
+  ) {
+    if (!(yield* persist(config))) {
+      return;
+    }
+    yield* Ref.update(pendingPersistence, (pending) =>
+      Option.isSome(pending) && pending.value === config ? Option.none() : pending,
     );
-    const persistence = yield* Queue.sliding<ServerConfig>(1);
-    const pendingPersistence = yield* Ref.make<Option.Option<ServerConfig>>(Option.none());
+  });
 
-    const persist = Effect.fn("EnvironmentServerConfigState.persist")(function* (
-      config: ServerConfig,
-    ) {
-      return yield* cache.saveServerConfig(environmentId, withoutEnvironmentThemes(config)).pipe(
-        Effect.as(true),
-        Effect.catch((error) =>
-          Effect.logWarning("Could not persist cached server configuration.").pipe(
-            Effect.annotateLogs({
-              environmentId,
-              ...safeErrorLogAttributes(error),
-            }),
-            Effect.as(false),
-          ),
-        ),
-      );
-    });
+  yield* Stream.fromQueue(persistence).pipe(
+    Stream.debounce("500 millis"),
+    Stream.runForEach(persistPending),
+    Effect.forkScoped,
+  );
 
-    const persistPending = Effect.fn("EnvironmentServerConfigState.persistPending")(function* (
-      config: ServerConfig,
-    ) {
-      if (!(yield* persist(config))) {
-        return;
-      }
-      yield* Ref.update(pendingPersistence, (pending) =>
-        Option.isSome(pending) && pending.value === config ? Option.none() : pending,
-      );
-    });
+  yield* subscribe(WS_METHODS.subscribeServerConfig, {
+    ...(subscription.environmentThemes === true ? { environmentThemes: true } : {}),
+    ...(subscription.usageLimitSources === true ? { usageLimitSources: true } : {}),
+    ...(subscription.usageLimitsCommand === true ? { usageLimitsCommand: true } : {}),
+  }).pipe(
+    Stream.runForEach((event) =>
+      Effect.gen(function* () {
+        const next = applyServerConfigProjection(yield* SubscriptionRef.get(state), event);
+        if (Option.isNone(next)) {
+          return;
+        }
+        yield* Ref.set(pendingPersistence, Option.some(next.value.config));
+        yield* SubscriptionRef.set(state, next);
+        yield* Queue.offer(persistence, next.value.config);
+      }),
+    ),
+    Effect.forkScoped,
+  );
 
-    yield* Stream.fromQueue(persistence).pipe(
-      Stream.debounce("500 millis"),
-      Stream.runForEach(persistPending),
-      Effect.forkScoped,
-    );
-
-    yield* subscribe(WS_METHODS.subscribeServerConfig, {
-      ...(subscription.environmentThemes === true ? { environmentThemes: true } : {}),
-      ...(subscription.usageLimitSources === true ? { usageLimitSources: true } : {}),
-      ...(subscription.usageLimitsCommand === true ? { usageLimitsCommand: true } : {}),
-    }).pipe(
-      Stream.runForEach((event) =>
-        Effect.gen(function* () {
-          const next = applyServerConfigProjection(yield* SubscriptionRef.get(state), event);
-          if (Option.isNone(next)) {
-            return;
-          }
-          yield* Ref.set(pendingPersistence, Option.some(next.value.config));
-          yield* SubscriptionRef.set(state, next);
-          yield* Queue.offer(persistence, next.value.config);
+  yield* Effect.addFinalizer(() =>
+    Ref.get(pendingPersistence).pipe(
+      Effect.flatMap(
+        Option.match({
+          onNone: () => Effect.void,
+          onSome: (config) => persist(config).pipe(Effect.asVoid),
         }),
       ),
-      Effect.forkScoped,
-    );
+    ),
+  );
 
-    yield* Effect.addFinalizer(() =>
-      Ref.get(pendingPersistence).pipe(
-        Effect.flatMap(
-          Option.match({
-            onNone: () => Effect.void,
-            onSome: (config) => persist(config).pipe(Effect.asVoid),
-          }),
-        ),
-      ),
-    );
-
-    return state;
-  },
-);
+  return state;
+});
 
 function serverConfigStateChanges(
   environmentId: EnvironmentId,
@@ -459,7 +459,7 @@ function serverConfigStateChanges(
   );
 }
 
-export function applyServerWelcomeEvent(
+function applyServerWelcomeEvent(
   current: EnvironmentServerWelcomeState,
   session: RpcSession,
   event: {
@@ -482,13 +482,13 @@ export interface EnvironmentServerWelcomeState {
   readonly welcome: ServerLifecycleWelcomePayload | null;
 }
 
-export function resolveServerWelcomeState(
+function resolveServerWelcomeState(
   state: EnvironmentServerWelcomeState,
 ): ServerLifecycleWelcomePayload | null {
   return state.currentSession === state.welcomeSession ? state.welcome : null;
 }
 
-export const makeEnvironmentServerWelcomeState = Effect.fn("EnvironmentServerWelcomeState.make")(
+const makeEnvironmentServerWelcomeState = Effect.fn("EnvironmentServerWelcomeState.make")(
   function* () {
     const supervisor = yield* EnvironmentSupervisor;
     const initialSession = Option.getOrNull(yield* SubscriptionRef.get(supervisor.session));
@@ -574,7 +574,7 @@ function serverWelcomeStateChanges(environmentId: EnvironmentId) {
   );
 }
 
-export function resolveServerConfigValue(
+function resolveServerConfigValue(
   projection: ServerConfigProjection | null,
   initialConfig: ServerConfig | null,
 ): ServerConfig | null {

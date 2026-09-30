@@ -261,7 +261,7 @@ const openArchive = Effect.fn("AntigravityInstallation.openArchive")(function* (
   return { entryCount: opened.zip.entryCount, next, streamEntry };
 });
 
-export const makeAntigravityInstallation = Effect.fn("AntigravityInstallation.make")(function* (
+const makeAntigravityInstallation = Effect.fn("AntigravityInstallation.make")(function* (
   options: AntigravityInstallationOptions,
 ) {
   const fs = yield* FileSystem.FileSystem;

@@ -32,7 +32,7 @@ const decodeTraceSpanLine = Schema.decodeUnknownOption(
   ),
 );
 
-export function makeTraceSpanSummary(sinceMs = -Infinity) {
+function makeTraceSpanSummary(sinceMs = -Infinity) {
   const byName = new Map<string, { durations: number[]; interrupted: number; failures: number }>();
   let spanCount = 0;
   let skippedLineCount = 0;

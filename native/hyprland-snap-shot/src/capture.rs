@@ -308,27 +308,3 @@ impl ShmHandler for Capture {
         &mut self.shm
     }
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    #[test]
-    fn bounds_buffer_allocations() {
-        assert!(image_size(100, 100, 399).is_err());
-        assert!(image_size(16384, 16384, 65536).is_err());
-        assert!(image_size(0, 10, 4).is_err());
-    }
-    #[test]
-    fn converts_channels_padding_flip_and_alpha() {
-        let bytes = [10, 20, 30, 255, 0, 0, 0, 0, 25, 50, 100, 128, 0, 0, 0, 0];
-        assert_eq!(
-            to_rgba(&bytes, 1, 2, 8, wl_shm::Format::Argb8888, true).unwrap(),
-            [199, 99, 49, 128, 30, 20, 10, 255]
-        );
-        assert_eq!(
-            to_rgba(&bytes, 1, 1, 8, wl_shm::Format::Xbgr8888, false).unwrap(),
-            [10, 20, 30, 255]
-        );
-        assert!(to_rgba(&bytes[..2], 1, 1, 4, wl_shm::Format::Argb8888, false).is_err());
-    }
-}

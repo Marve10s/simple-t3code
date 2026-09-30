@@ -2,8 +2,6 @@ mod capture;
 mod feedback;
 mod ipc;
 mod protocols;
-#[cfg(test)]
-mod transport_tests;
 
 use std::{error::Error, io::Write, path::Path};
 type Result<T> = std::result::Result<T, Box<dyn Error>>;

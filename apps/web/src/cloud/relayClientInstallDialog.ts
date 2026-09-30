@@ -117,10 +117,3 @@ export function completeRelayClientInstallDialogClose(): void {
     publish(idleState);
   }
 }
-
-export function resetRelayClientInstallDialogForTests(): void {
-  resolveConfirmation?.(false);
-  resolveConfirmation = null;
-  publish(idleState);
-  listeners.clear();
-}

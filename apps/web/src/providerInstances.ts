@@ -140,7 +140,7 @@ function getProviderInstanceEntry(
   return deriveProviderInstanceEntries(providers).find((entry) => entry.instanceId === instanceId);
 }
 
-export function getDefaultProviderInstanceModel(
+function getDefaultProviderInstanceModel(
   providers: ReadonlyArray<ServerProvider>,
   instanceId: ProviderInstanceId,
 ): string | undefined {
@@ -173,7 +173,7 @@ export function resolveSelectableProviderInstanceEntry(
   );
 }
 
-export function resolveSelectableProviderInstance(
+function resolveSelectableProviderInstance(
   providers: ReadonlyArray<ServerProvider>,
   instanceId: ProviderInstanceId | undefined,
 ): ProviderInstanceId | undefined {

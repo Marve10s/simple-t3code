@@ -19,7 +19,7 @@ function isPickedStackFrame(value: unknown): boolean {
   );
 }
 
-export function isPickedElementPayload(value: unknown): value is PickedElementPayload {
+function isPickedElementPayload(value: unknown): value is PickedElementPayload {
   if (typeof value !== "object" || value === null) return false;
   const c = value as Record<string, unknown>;
   if (typeof c["pageUrl"] !== "string") return false;

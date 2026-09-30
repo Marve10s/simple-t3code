@@ -31,7 +31,7 @@ const requireForNodePty = NodeModule.createRequire(import.meta.url);
 const loadNodePty: NodePtyModuleLoader = () =>
   Promise.resolve().then(() => requireForNodePty("node-pty") as typeof import("node-pty"));
 
-export const NodePtyModuleLoaderRef = Context.Reference<NodePtyModuleLoader>(
+const NodePtyModuleLoaderRef = Context.Reference<NodePtyModuleLoader>(
   "server/terminal/NodePtyModuleLoader",
   { defaultValue: () => loadNodePty },
 );
@@ -210,7 +210,7 @@ class NodePtyProcess implements PtyAdapter.PtyProcess {
   }
 }
 
-export const make = Effect.fn("NodePtyAdapter.make")(function* () {
+const make = Effect.fn("NodePtyAdapter.make")(function* () {
   const loadNodePtyModule = yield* NodePtyModuleLoaderRef;
   const fs = yield* FileSystem.FileSystem;
   const path = yield* Path.Path;

@@ -49,7 +49,7 @@ export const IOS_PHONE_SHAPE: DeviceShapeProfile = {
   },
 };
 
-export const IOS_TABLET_SHAPE: DeviceShapeProfile = {
+const IOS_TABLET_SHAPE: DeviceShapeProfile = {
   id: "ios-tablet",
   bezel: 0.065,
   bodyRadius: 0.105,
@@ -72,7 +72,7 @@ export const IOS_TABLET_SHAPE: DeviceShapeProfile = {
   },
 };
 
-export const ANDROID_PHONE_SHAPE: DeviceShapeProfile = {
+const ANDROID_PHONE_SHAPE: DeviceShapeProfile = {
   id: "android-phone",
   bezel: 0.035,
   bodyRadius: 0.115,

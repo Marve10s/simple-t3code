@@ -3,7 +3,6 @@ import {
   isProviderAvailable,
   resolveProviderInstanceEnabled,
   type ModelSelection,
-  type ProjectId,
   type ProjectScopedServerSettingKey,
   type ProjectSettingsOverrides,
   type ProviderDriverKind,
@@ -27,35 +26,8 @@ const ServerSettingsJson = fromLenientJson(ServerSettings);
 const decodeServerSettingsJson = Schema.decodeUnknownOption(ServerSettingsJson);
 
 /** @deprecated */
-export function resolveProjectAgentBrowserAccess(
-  settings: Pick<
-    ServerSettings,
-    "enableAgentBrowserAccess" | "projectAgentBrowserAccessOverrides" | "projectSettingsOverrides"
-  >,
-  projectId: ProjectId,
-): boolean {
-  return (
-    settings.projectSettingsOverrides[projectId]?.enableAgentBrowserAccess ??
-    settings.projectAgentBrowserAccessOverrides[projectId] ??
-    settings.enableAgentBrowserAccess
-  );
-}
 
 /** @deprecated */
-export function resolveProjectAutoPull(
-  settings: Pick<
-    ServerSettings,
-    "defaultAutoPull" | "projectAutoPullOverrides" | "projectSettingsOverrides"
-  >,
-  projectId: ProjectId,
-  legacyAutoPull: boolean | undefined,
-): boolean {
-  return (
-    settings.projectSettingsOverrides[projectId]?.defaultAutoPull ??
-    settings.projectAutoPullOverrides[projectId] ??
-    (legacyAutoPull === true || settings.defaultAutoPull)
-  );
-}
 
 type LegacyProviderSettings = ServerSettings["providers"][keyof ServerSettings["providers"]];
 

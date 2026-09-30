@@ -19,7 +19,7 @@ export function normalizeSearchQuery(
     : trimmed.toLowerCase();
 }
 
-export function scoreSubsequenceMatch(value: string, query: string): number | null {
+function scoreSubsequenceMatch(value: string, query: string): number | null {
   if (!query) return 0;
 
   let queryIndex = 0;

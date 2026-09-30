@@ -11,7 +11,7 @@ import type { EnvironmentRegistry } from "../connection/registry.ts";
 import { subscribe } from "../rpc/client.ts";
 import { createEnvironmentSubscriptionAtomFamily } from "./runtime.ts";
 
-export const EMPTY_AUTH_ACCESS_SNAPSHOT: AuthAccessSnapshot = {
+const EMPTY_AUTH_ACCESS_SNAPSHOT: AuthAccessSnapshot = {
   pairingLinks: [],
   clientSessions: [],
 };
@@ -25,7 +25,7 @@ function upsertByKey<A>(
   return [...values.filter((value) => key(value) !== nextKey), next];
 }
 
-export function applyAuthAccessStreamEvent(
+function applyAuthAccessStreamEvent(
   current: AuthAccessSnapshot,
   event: AuthAccessStreamEvent,
 ): AuthAccessSnapshot {

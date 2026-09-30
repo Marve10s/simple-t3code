@@ -75,7 +75,7 @@ function resolveClientKind(): ClientActivityReportInput["clientKind"] {
   return window.desktopBridge ? "desktop-renderer" : "web";
 }
 
-export function wasRecentlyInteracted(lastInteractionAtMs: number, observedAtMs: number): boolean {
+function wasRecentlyInteracted(lastInteractionAtMs: number, observedAtMs: number): boolean {
   return (
     lastInteractionAtMs <= observedAtMs &&
     observedAtMs - lastInteractionAtMs <= RECENT_INTERACTION_WINDOW_MS
@@ -141,7 +141,7 @@ function retainBackgroundScope(environmentId: EnvironmentId, scope: BackgroundSc
   };
 }
 
-export function observeBackgroundActivitySubscription(
+function observeBackgroundActivitySubscription(
   observation: EnvironmentRpcSubscriptionObservation,
 ): Effect.Effect<Effect.Effect<void>> {
   const scope = scopeForSubscription(observation);
@@ -152,14 +152,6 @@ export function observeBackgroundActivitySubscription(
     const release = retainBackgroundScope(observation.environmentId as EnvironmentId, scope);
     return Effect.sync(release);
   });
-}
-
-export function retainedBackgroundScopes(
-  environmentId: EnvironmentId,
-): ReadonlyArray<BackgroundScope> {
-  return Array.from(retainedScopes.values(), (entry) =>
-    entry.environmentId === environmentId ? entry.scope : null,
-  ).filter((scope): scope is BackgroundScope => scope !== null);
 }
 
 export const backgroundActivityObserverLayer = Layer.succeed(

@@ -65,7 +65,7 @@ export class PullRequestReadCache extends Context.Service<
   }
 >()("t3/pullRequest/PullRequestReadCache") {}
 
-export const make = Effect.gen(function* () {
+const make = Effect.gen(function* () {
   const backing = yield* KeyValueStore.KeyValueStore;
   const crypto = yield* Crypto.Crypto;
   const clock = yield* Clock.Clock;

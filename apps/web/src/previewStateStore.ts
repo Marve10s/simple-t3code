@@ -55,7 +55,7 @@ const emptyPreviewStateAtom = Atom.make<ThreadPreviewState>(EMPTY_THREAD_PREVIEW
   Atom.withLabel("preview:empty-thread"),
 );
 
-export const previewStateAtom = Atom.family((threadKey: string) =>
+const previewStateAtom = Atom.family((threadKey: string) =>
   Atom.make<ThreadPreviewState>(EMPTY_THREAD_PREVIEW_STATE).pipe(
     Atom.keepAlive,
     Atom.withLabel(`preview:thread:${threadKey}`),
@@ -440,16 +440,3 @@ export function isPreviewSupportedInRuntime(): boolean {
   if (typeof window === "undefined") return false;
   return Boolean(window.desktopBridge?.preview);
 }
-
-export function resetPreviewStateForTests(): void {
-  for (const threadKey of changedPreviewThreadKeys) {
-    appAtomRegistry.set(previewStateAtom(threadKey), EMPTY_THREAD_PREVIEW_STATE);
-  }
-  changedPreviewThreadKeys.clear();
-  appAtomRegistry.set(activePreviewThreadKeysAtom, { keys: new Set<string>() });
-}
-
-export const __testing = {
-  EMPTY_THREAD_PREVIEW_STATE,
-  RECENT_URL_LIMIT: PREVIEW_RECENT_URL_LIMIT,
-};

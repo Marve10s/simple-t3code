@@ -36,7 +36,7 @@ export function useDiscoveredLocalServers(
   );
 }
 
-export function mergeServers(input: {
+function mergeServers(input: {
   scanner: ReadonlyArray<DiscoveredLocalServer & { requestedUrl: string }>;
   configuredUrls: ReadonlyArray<string>;
   configuredUrlProbing?: boolean;

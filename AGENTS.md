@@ -183,13 +183,22 @@ This checkout is SimpleT3Code, a personal fork of T3 Code restyled after the Cod
 ### No comments
 
 - The codebase carries no comments. The only exceptions are ones a tool acts on: lint and type-checker directives (`oxlint-`, `eslint-`, `@ts-expect-error`, `@effect-diagnostics`), bundler and test-runner hints (`@vite-ignore`, `@__PURE__`, `@vitest-environment`), triple-slash references, licence blocks, JSDoc types in plain JavaScript files, and doc tags tools read (`@effect-*`, `@public`, `@internal`, `@deprecated`, shrunk to the bare tag). This overrides the upstream guidance above about explaining code in comments.
-- Do not write new comments. After merging upstream, run `pnpm strip-comments --write`, then `vp fmt` on the changed files, and type-check before committing. Without `--write` the script only reports what it would remove.
+- Do not write new comments. `pnpm strip-comments --write` removes any that arrive; without `--write` it only reports what it would remove.
+
+### No tests
+
+- The fork carries no automated tests, test runner config, or test-only dependencies. Do not add tests, and ignore the upstream guidance above about writing tests or running `vp test`.
+- Verify a change with `pnpm typecheck`, `vp lint`, and `vp run build:desktop`, plus a run of the built app for anything user-visible.
+
+### Merging upstream
+
+- Run `pnpm merge-upstream` (or `pnpm merge-upstream <ref>`; the default is `upstream/main` when an `upstream` remote exists, otherwise `origin/main`). It fetches and merges without committing, keeps test files and anything the fork deleted out of the tree, keeps our README and CONTRIBUTING, strips comments, and formats.
+- Then resolve the conflicts it lists, remove any test scripts, `test` config blocks, or test-only dependencies the merge brought back, run `pnpm install` if a `package.json` changed, and verify as above before committing.
 
 ### Identity and data
 
 - The desktop app is `SimpleT3Code` (`com.marve10s.simplet3code`) with the URL scheme `simplet3code`. It stores data in `~/.simplet3` and its Electron profile in `~/Library/Application Support/simplet3code`, and has no update feed, so it can never update itself into upstream T3 Code.
 - On first launch, when `~/.simplet3/userdata/state.sqlite` does not exist yet, it copies T3 Code's history from `~/.t3/userdata` with `VACUUM INTO`. Two servers must never share one live event store, so never point SimpleT3Code at `~/.t3`.
-- Desktop tests assert SimpleT3Code names and paths. When upstream adds identity tests, update the expected strings instead of reverting the identity.
 
 ### Layout
 

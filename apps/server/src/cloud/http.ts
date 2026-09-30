@@ -153,7 +153,7 @@ function stringToBytes(value: string): Uint8Array {
   return new TextEncoder().encode(value);
 }
 
-export function consumeCloudReplayGuards(input: {
+function consumeCloudReplayGuards(input: {
   readonly secrets: ServerSecretStore.ServerSecretStore["Service"];
   readonly names: ReadonlyArray<string>;
   readonly value: Uint8Array;
@@ -319,7 +319,7 @@ function endpointRequestPort(url: URL): number {
   return Number(url.port || (url.protocol === "https:" ? 443 : 80));
 }
 
-export function parseManagedEndpointLocalOrigin(localOrigin: string) {
+function parseManagedEndpointLocalOrigin(localOrigin: string) {
   const url = new URL(localOrigin);
   if (
     localOrigin !== localOrigin.trim() ||
@@ -362,14 +362,14 @@ function isAllowedEndpointOrigin(input: {
   return input.origin.localHttpPort === endpointRequestPort(url);
 }
 
-export function isSupportedLinkProviderKind(request: RelayLinkProofRequest): boolean {
+function isSupportedLinkProviderKind(request: RelayLinkProofRequest): boolean {
   return (
     request.endpoint.providerKind === "cloudflare_tunnel" ||
     request.endpoint.providerKind === "manual"
   );
 }
 
-export function linkProofScopes(
+function linkProofScopes(
   request: RelayLinkProofRequest,
 ): RelayEnvironmentLinkProofPayload["scopes"] {
   return request.endpoint.providerKind === "cloudflare_tunnel"
@@ -865,15 +865,6 @@ const reconcileDesiredCloudLinkWith = Effect.fn("environment.cloud.reconcileDesi
     CloudCliAuthorizationError: failCloudCliTokenManagerError,
     CloudCliAuthorizationTimeoutError: failCloudCliTokenManagerError,
   }),
-);
-
-export const reconcileDesiredCloudLink = Effect.fn("environment.cloud.reconcileDesiredLink")(
-  function* (localOrigin: string) {
-    const dependencies = yield* cloudHttpDependencies;
-    return yield* dependencies.endpointRuntime.withLinkStateLock(
-      reconcileDesiredCloudLinkWith(dependencies, localOrigin),
-    );
-  },
 );
 
 export const reconcileDesiredCloudLinkIfStillDesired = Effect.fn(

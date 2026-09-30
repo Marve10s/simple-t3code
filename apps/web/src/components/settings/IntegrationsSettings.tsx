@@ -117,7 +117,7 @@ type BrowserProfileDataBridge = Pick<
   "clearCookies" | "clearCache"
 >;
 
-export async function clearBrowserProfileData(
+async function clearBrowserProfileData(
   bridge: BrowserProfileDataBridge | null,
   environmentIds: ReadonlyArray<EnvironmentId>,
   profileId: string,
@@ -133,7 +133,7 @@ export async function clearBrowserProfileData(
   );
 }
 
-export function browserProfileRemovalAvailable(
+function browserProfileRemovalAvailable(
   bridgeAvailable: boolean,
   environmentsReady: boolean,
   environmentCount: number,
@@ -160,7 +160,7 @@ class ProfileLimitReachedError extends Error {
   }
 }
 
-export const importFailureReason = (cause: unknown): BrowserImportFailureReason => {
+const importFailureReason = (cause: unknown): BrowserImportFailureReason => {
   const message = String((cause as { message?: unknown } | undefined)?.message ?? "");
   return (
     BrowserImportFailureReason.literals.find((reason) => message.includes(`failed: ${reason}.`)) ??

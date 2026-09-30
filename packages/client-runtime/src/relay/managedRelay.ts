@@ -219,7 +219,7 @@ export class ManagedRelayDpopSigner extends Context.Service<
   }
 >()("@t3tools/client-runtime/relay/managedRelay/ManagedRelayDpopSigner") {}
 
-export const MANAGED_RELAY_REQUEST_TIMEOUT_MS = 10_000;
+const MANAGED_RELAY_REQUEST_TIMEOUT_MS = 10_000;
 
 export interface ManagedRelayAccessTokenCacheEntry {
   readonly accountId: string;

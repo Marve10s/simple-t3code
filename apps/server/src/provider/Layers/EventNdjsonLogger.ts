@@ -362,7 +362,7 @@ function boundProviderEventForLogging(event: unknown): unknown {
   return summarizeProviderEvent(event);
 }
 
-export function writeBatchedMessages(
+function writeBatchedMessages(
   sink: Pick<RotatingFileSink, "write">,
   records: ReadonlyArray<PendingRecord>,
   maxBytes: number,

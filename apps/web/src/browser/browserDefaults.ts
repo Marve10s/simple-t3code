@@ -47,7 +47,7 @@ const toBrowserDefaults = (settings: {
   };
 };
 
-export function getBrowserDefaults(): BrowserDefaults {
+function getBrowserDefaults(): BrowserDefaults {
   return toBrowserDefaults(getClientSettings());
 }
 
@@ -78,7 +78,7 @@ export function browserDefaultOpenProfileId(
   return defaults.profileId;
 }
 
-export const FALLBACK_RESPONSIVE_VIEWPORT_SIZE = { width: 1024, height: 768 } as const;
+const FALLBACK_RESPONSIVE_VIEWPORT_SIZE = { width: 1024, height: 768 } as const;
 
 export function browserResponsiveViewportForToggle(input: {
   readonly defaults?: BrowserDefaults;

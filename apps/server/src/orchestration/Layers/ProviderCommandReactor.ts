@@ -127,7 +127,7 @@ function providerErrorLabel(value: string | undefined): string {
   return normalized && normalized.length > 0 ? normalized : "unknown";
 }
 
-export function providerErrorLabelFromInstanceHint(input: {
+function providerErrorLabelFromInstanceHint(input: {
   readonly instanceId?: string | undefined;
   readonly modelSelectionInstanceId?: string | undefined;
   readonly sessionProvider?: string | undefined;

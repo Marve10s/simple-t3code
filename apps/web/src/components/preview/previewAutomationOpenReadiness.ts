@@ -6,7 +6,7 @@ import {
   type PreviewViewportSetting,
 } from "@t3tools/contracts";
 
-export const DEFAULT_PREVIEW_AUTOMATION_VIEWPORT = {
+const DEFAULT_PREVIEW_AUTOMATION_VIEWPORT = {
   _tag: "freeform",
   width: 1280,
   height: 800,

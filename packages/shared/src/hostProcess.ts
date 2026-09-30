@@ -92,5 +92,3 @@ export const HostProcessUserId = Context.Reference<number | undefined>(
     defaultValue: () => process.getuid?.(),
   },
 );
-
-export const isHostWindows = Effect.map(HostProcessPlatform, (platform) => platform === "win32");

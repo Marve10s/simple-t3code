@@ -17,7 +17,6 @@ import {
 import * as Schema from "effect/Schema";
 import { isKdeCaptureSession, type KdeCapturePaths } from "./KdeSnapShot.ts";
 import { isGnomeCaptureSession, readPortalPng, resizeLinuxCapture } from "./linuxCaptureSession.ts";
-export { readPortalPng, resizeLinuxCapture } from "./linuxCaptureSession.ts";
 import { isHyprlandCaptureSession, type HyprlandCapturePaths } from "./HyprlandSnapShot.ts";
 
 const PORTAL = "org.freedesktop.portal.Desktop";
@@ -97,7 +96,7 @@ function unavailable(error: unknown): boolean {
   );
 }
 
-export class LinuxCaptureConnection {
+class LinuxCaptureConnection {
   private readonly bus: MessageBus;
   private readonly disconnected: Promise<never>;
   private uniqueName = "";

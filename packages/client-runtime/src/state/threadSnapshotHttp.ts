@@ -20,7 +20,7 @@ export interface ThreadSnapshotWindow {
   readonly beforeCursor?: string;
 }
 
-export const fetchEnvironmentThreadSnapshot = Effect.fn(
+const fetchEnvironmentThreadSnapshot = Effect.fn(
   "clientRuntime.state.fetchEnvironmentThreadSnapshot",
 )(function* (input: {
   readonly prepared: PreparedConnection;

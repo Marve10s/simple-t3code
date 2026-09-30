@@ -19,7 +19,7 @@ import { HttpClient, HttpClientRequest, HttpClientResponse } from "effect/unstab
 import { ChildProcess, ChildProcessSpawner } from "effect/unstable/process";
 import { HostProcessArchitecture, HostProcessPlatform } from "./hostProcess.ts";
 
-export const CLOUDFLARED_VERSION = "2026.5.2";
+const CLOUDFLARED_VERSION = "2026.5.2";
 const CLOUDFLARED_PATH_ENV_NAME = "T3CODE_CLOUDFLARED_PATH";
 
 export type RelayClientExecutableSource = "override" | "managed" | "path";
@@ -44,7 +44,7 @@ export type RelayClientStatus =
 
 export type AvailableRelayClient = Extract<RelayClientStatus, { readonly status: "available" }>;
 
-export class RelayClientInstallError extends Data.TaggedError("RelayClientInstallError")<{
+class RelayClientInstallError extends Data.TaggedError("RelayClientInstallError")<{
   readonly reason:
     | "download_failed"
     | "invalid_checksum"
@@ -169,7 +169,7 @@ const wrapInstallFailure =
       ),
     );
 
-export const makeCloudflaredRelayClient = Effect.fn("cloudflared.make")(function* (
+const makeCloudflaredRelayClient = Effect.fn("cloudflared.make")(function* (
   options: CloudflaredRelayClientOptions,
 ): Effect.fn.Return<
   RelayClientShape,

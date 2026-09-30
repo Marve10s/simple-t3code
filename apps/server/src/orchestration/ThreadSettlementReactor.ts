@@ -51,7 +51,7 @@ function autoSettlementConfigured(settings: ServerSettingsValue): boolean {
 }
 
 /** @internal */
-export function autoSettlementSettingsKey(settings: ServerSettingsValue): string {
+function autoSettlementSettingsKey(settings: ServerSettingsValue): string {
   return JSON.stringify([
     settings.sidebarAutoSettleOnMerge,
     settings.sidebarAutoSettleAfterDays,

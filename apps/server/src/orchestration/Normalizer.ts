@@ -23,7 +23,7 @@ import { ServerConfig } from "../config.ts";
 import { parseBase64DataUrl } from "../imageMime.ts";
 import * as WorkspacePaths from "../workspace/WorkspacePaths.ts";
 
-export const canonicalizeClientCommandTimestamps = (
+const canonicalizeClientCommandTimestamps = (
   command: ClientOrchestrationCommand,
   receivedAt: IsoDateTime,
 ): ClientOrchestrationCommand => {
