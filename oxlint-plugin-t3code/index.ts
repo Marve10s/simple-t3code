@@ -6,6 +6,7 @@ import noHermesUnsupportedApis from "./rules/no-hermes-unsupported-apis.ts";
 import noInlineSchemaCompile from "./rules/no-inline-schema-compile.ts";
 import noMobileUniwindThemeEscapeHatches from "./rules/no-mobile-uniwind-theme-escape-hatches.ts";
 import noNativeTitleTooltip from "./rules/no-native-title-tooltip.ts";
+import noComments from "./rules/no-comments.ts";
 
 export default definePlugin({
   meta: {
@@ -18,5 +19,6 @@ export default definePlugin({
     "no-inline-schema-compile": noInlineSchemaCompile,
     "no-mobile-uniwind-theme-escape-hatches": noMobileUniwindThemeEscapeHatches,
     "no-native-title-tooltip": noNativeTitleTooltip,
+    "no-comments": noComments,
   },
 });

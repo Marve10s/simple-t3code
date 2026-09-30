@@ -57,6 +57,7 @@ import {
   isDesktopUpdateButtonDisabled,
   resolveDesktopUpdateButtonAction,
 } from "../../components/desktopUpdate.logic";
+import { showSimpleDesktopUpdateDownloadResult } from "../codex/codexDesktopUpdates";
 import { ProviderModelPicker } from "../chat/ProviderModelPicker";
 import { TraitsPicker } from "../chat/TraitsPicker";
 import {
@@ -325,15 +326,18 @@ function AboutVersionSection() {
     const action = updateState ? resolveDesktopUpdateButtonAction(updateState) : "none";
 
     if (action === "download") {
-      void bridge.downloadUpdate().catch((error: unknown) => {
-        toastManager.add(
-          stackedThreadToast({
-            type: "error",
-            title: "Could not download update",
-            description: error instanceof Error ? error.message : "Download failed.",
-          }),
-        );
-      });
+      void bridge
+        .downloadUpdate()
+        .then(showSimpleDesktopUpdateDownloadResult)
+        .catch((error: unknown) => {
+          toastManager.add(
+            stackedThreadToast({
+              type: "error",
+              title: "Could not download update",
+              description: error instanceof Error ? error.message : "Download failed.",
+            }),
+          );
+        });
       return;
     }
 
@@ -410,7 +414,7 @@ function AboutVersionSection() {
       ? !canCheckForUpdate(updateState)
       : isDesktopUpdateButtonDisabled(updateState);
 
-  const actionLabel: Record<string, string> = { download: "Download", install: "Install" };
+  const actionLabel: Record<string, string> = { download: "Open downloads", install: "Install" };
   const statusLabel: Record<string, string> = {
     checking: "Checking…",
     downloading: "Downloading…",
@@ -420,7 +424,7 @@ function AboutVersionSection() {
     actionLabel[action] ?? statusLabel[updateState?.status ?? ""] ?? "Check for Updates";
   const description =
     action === "download" || action === "install"
-      ? "Update available."
+      ? "Download the new build, quit SimpleT3Code, then replace the app or run its installer."
       : "Current version of the application.";
 
   return (
@@ -449,7 +453,7 @@ function AboutVersionSection() {
       {hasDesktopBridge ? (
         <SettingsRow
           title="Update track"
-          description="Use stable releases or nightly builds. Switch back anytime."
+          description="SimpleT3Code updates come from its GitHub releases and install manually."
           control={
             <Select
               value={selectedUpdateChannel}
@@ -470,9 +474,6 @@ function AboutVersionSection() {
               <SelectPopup align="end" alignItemWithTrigger={false}>
                 <SelectItem hideIndicator value="latest">
                   Stable
-                </SelectItem>
-                <SelectItem hideIndicator value="nightly">
-                  Nightly
                 </SelectItem>
               </SelectPopup>
             </Select>

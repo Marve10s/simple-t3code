@@ -215,7 +215,6 @@ const userDigits = MARKETING_STATS.users.replaceAll(",", "").padStart(7, "0").sp
       let windowX = 0;
       let windowY = 0;
 
-      // Keep the entire window above the taskbar, including after a viewport resize.
       function moveWindow(x: number, y: number) {
         if (!salesWindow || document.body.classList.contains("maximized")) return;
         const rect = salesWindow.getBoundingClientRect();

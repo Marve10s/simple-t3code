@@ -432,10 +432,6 @@ const mobileEndorsementRows = [
     return null;
   }
 
-  // Macs always get the arm64 build. Browsers cannot reliably tell Apple Silicon
-  // from Intel (the UA lies, GPU strings lie), and a wrong guess hands an Apple
-  // Silicon user a broken app. Intel users pick their build on /download.
-  // Do NOT add arch detection back here.
   function pickAsset(assets: ReleaseAsset[], platform: Platform): string | null {
     if (platform.os === "win") {
       return assets.find((a) => a.name.endsWith("-x64.exe"))?.browser_download_url ?? null;

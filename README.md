@@ -19,7 +19,17 @@ Same agents, same history, a quieter interface.
 
 ## Quick start
 
-There are no prebuilt downloads yet, so you build the app from source. On macOS:
+Download SimpleT3Code from the [latest release](https://github.com/Marve10s/simple-t3code/releases/latest):
+
+| Platform | Download                                          |
+| -------- | ------------------------------------------------- |
+| macOS    | DMG, `arm64` for Apple Silicon or `x64` for Intel |
+| Windows  | EXE installer, `x64` or `arm64`                   |
+| Linux    | AppImage, `x64` or `arm64`                        |
+
+These builds are unsigned. If macOS blocks opening the app, follow [Apple's instructions](https://support.apple.com/en-us/102445) for opening an app from an unidentified developer.
+
+To build from source on macOS:
 
 ```bash
 git clone https://github.com/Marve10s/simple-t3code.git
@@ -154,7 +164,11 @@ SimpleT3Code only reads T3 Code's data, and only once. Delete `~/.simplet3` to s
 
 ## Staying up to date
 
-SimpleT3Code follows T3 Code's `main` branch. To pull in the latest upstream changes:
+The app checks SimpleT3Code's GitHub releases. When an update is available, click the update button above Settings to open its downloads. Download the build for your computer, quit SimpleT3Code, then replace the app or run the installer. Chats and settings stay in your existing data directory. Installation is manual.
+
+Every push to this repository's `main` branch builds macOS, Windows, and Linux releases. For source builds, pull `main` and rebuild.
+
+To merge changes from the upstream T3 Code project into your own checkout:
 
 ```bash
 git remote add upstream https://github.com/pingdotgg/t3code.git   # once

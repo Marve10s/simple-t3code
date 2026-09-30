@@ -1728,7 +1728,7 @@ const makeSshEnvironmentManager = Effect.fn("ssh/tunnel.SshEnvironmentManager.ma
   return SshEnvironmentManager.of({ ensureEnvironment, disconnectEnvironment });
 });
 
-/** @effect-expect-leaking ChildProcessSpawner | FileSystem | HttpClient | NetService | Path | SshPasswordPrompt */
+// @effect-diagnostics-next-line leakingRequirements:off
 export class SshEnvironmentManager extends Context.Service<
   SshEnvironmentManager,
   SshEnvironmentManagerShape

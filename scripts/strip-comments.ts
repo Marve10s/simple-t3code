@@ -12,9 +12,11 @@ const EXCLUDED_PATH =
 
 const DIRECTIVE =
   /^[\s*]*(eslint-|oxlint-|@ts-(expect-error|ignore|nocheck|check)\b|@effect-diagnostics|@vite-ignore|[@#]__(PURE|NO_SIDE_EFFECTS)__|@vitest-environment|@jsx|webpack[A-Z]|prettier-ignore|oxfmt-ignore|(istanbul|c8|v8) ignore|@license|@preserve)/;
-const TOOL_TAG_LINE = /@effect-[\w-]+\b.*|@(public|internal|deprecated|alpha|beta)\b/;
+const TOOL_TAG_LINE = /@(effect-[\w-]+|public|internal|deprecated|alpha|beta)\b/;
 const JSDOC_TYPE =
   /@(type|typedef|callback|template|satisfies|import)\b|@(param|returns?|property|prop)\s*\{/;
+const LICENSE_BLOCK =
+  /(?:^|\n)[\s*]*(?:Copyright\s+(?:\([cC]\)|©|\d{4})|SPDX-License-Identifier:|(?:The )?(?:MIT|Apache|BSD|ISC|Mozilla Public|GNU[^\n]*) License\b)/i;
 
 interface Comment {
   readonly type: "Line" | "Block";
@@ -25,15 +27,12 @@ interface Comment {
 
 function keepComment(comment: Comment, plainJs: boolean): boolean {
   if (comment.type === "Block" && comment.value.startsWith("!")) return true;
+  if (comment.type === "Block" && LICENSE_BLOCK.test(comment.value)) return true;
   if (comment.type === "Line" && /^\/\s*<(reference|amd-module)/.test(comment.value)) return true;
   if (DIRECTIVE.test(comment.value)) return true;
   return plainJs && comment.type === "Block" && JSDOC_TYPE.test(comment.value);
 }
 
-/**
- * @effect-expect-leaking`), knip (`@public`, `@internal`) and TypeScript
- * @deprecated
- */
 function toolTagsOnly(comment: Comment): string | null {
   if (comment.type !== "Block") return null;
   const tags = comment.value

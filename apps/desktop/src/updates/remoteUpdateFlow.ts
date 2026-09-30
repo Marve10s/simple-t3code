@@ -1,4 +1,5 @@
 import type { DesktopUpdateRemoteOutcome, DesktopUpdateState } from "@t3tools/contracts";
+import { manualUpdateRequired } from "../app/SimpleDesktopUpdates.ts";
 
 export type RemoteDesktopUpdateStep =
   | { readonly action: "check" }
@@ -17,7 +18,6 @@ export interface RemoteDesktopUpdateAttempts {
 }
 
 const MAX_REMOTE_UPDATE_CHECKS = 2;
-const MAX_REMOTE_UPDATE_DOWNLOADS = 3;
 
 function isInstallableDesktopUpdateState(state: DesktopUpdateState): boolean {
   return (
@@ -47,14 +47,7 @@ export function nextRemoteDesktopUpdateStep(
     return { action: "wait" };
   }
   if (state.status === "available") {
-    if (attempts.downloads >= MAX_REMOTE_UPDATE_DOWNLOADS) {
-      return {
-        action: "done",
-        outcome: "failed",
-        reason: state.message ?? "The desktop app failed to download the update.",
-      };
-    }
-    return { action: "download" };
+    return manualUpdateRequired;
   }
   if (state.status === "up-to-date") {
     if (attempts.checks === 0) {

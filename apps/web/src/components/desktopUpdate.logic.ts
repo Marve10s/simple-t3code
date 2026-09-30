@@ -1,8 +1,9 @@
 import type { DesktopUpdateActionResult, DesktopUpdateState } from "@t3tools/contracts";
+import { SIMPLE_DESKTOP_RELEASES_URL } from "./codex/codexDesktopUpdates";
 
 export type DesktopUpdateButtonAction = "download" | "install" | "none";
 
-const DESKTOP_RELEASE_HISTORY_URL = "https://github.com/pingdotgg/t3code/releases";
+const DESKTOP_RELEASE_HISTORY_URL = SIMPLE_DESKTOP_RELEASES_URL;
 const DESKTOP_RELEASE_TAG_URL = `${DESKTOP_RELEASE_HISTORY_URL}/tag`;
 
 export function getDesktopUpdateDownloadedVersion(state: DesktopUpdateState): string | null {
@@ -61,12 +62,12 @@ export function getArm64IntelBuildWarningDescription(state: DesktopUpdateState):
   if (action === "install") {
     return "This Mac has Apple Silicon, but T3 Code is still running the Intel build under Rosetta. Restart to install the downloaded Apple Silicon build.";
   }
-  return "This Mac has Apple Silicon, but T3 Code is still running the Intel build under Rosetta. The next app update will replace it with the native Apple Silicon build.";
+  return "This Mac has Apple Silicon, but SimpleT3Code is running the Intel build under Rosetta. Download and install the arm64 build to use it natively.";
 }
 
 export function getDesktopUpdateButtonTooltip(state: DesktopUpdateState): string {
   if (state.status === "available") {
-    return `Update ${state.availableVersion ?? "available"} ready to download`;
+    return `Update ${state.availableVersion ?? "available"} available. Open downloads and install it manually.`;
   }
   if (state.status === "downloading") {
     const progress =

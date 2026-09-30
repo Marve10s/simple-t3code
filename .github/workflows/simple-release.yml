@@ -1,0 +1,262 @@
+name: SimpleT3Code release
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: simple-release
+  cancel-in-progress: false
+  queue: max
+
+jobs:
+  quality:
+    if: github.repository == 'Marve10s/simple-t3code' && github.ref == 'refs/heads/main'
+    uses: ./.github/workflows/simple-ci.yml
+
+  bundle:
+    needs: quality
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - name: Checkout
+        shell: bash
+        run: |
+          set -euo pipefail
+          git init .
+          git remote add origin "${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}.git"
+          git fetch --no-tags --depth=1 origin "$GITHUB_SHA"
+          git sparse-checkout set --no-cone '/*' '!/.repos/'
+          git checkout --detach FETCH_HEAD
+      - name: Setup Vite+
+        uses: voidzero-dev/setup-vp@250f29ce396baf5e8f24498e17c0dfdebabc26eb
+        with:
+          node-version-file: package.json
+          cache: true
+          run-install: true
+      - name: Set release version
+        id: version
+        run: |
+          version="0.1.${GITHUB_RUN_NUMBER}"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          node scripts/update-release-package-versions.ts "$version"
+      - name: Install native build libraries
+        run: sudo apt-get update && sudo apt-get install -y libsecret-1-dev pkg-config
+      - name: Build desktop bundle
+        run: vp run build:desktop
+      - name: Verify preload bundle
+        run: node apps/desktop/scripts/verify-preload-bundle.mjs
+      - name: Upload desktop bundle
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: js-bundle
+          path: |
+            apps/server/dist
+            apps/desktop/dist-electron
+          if-no-files-found: error
+          retention-days: 2
+
+  desktop_mac_arm64:
+    needs: bundle
+    uses: ./.github/workflows/release-desktop.yml
+    with:
+      label: macOS Apple Silicon
+      runner: macos-15
+      platform: mac
+      target: dmg
+      arch: arm64
+      rust_target: aarch64-apple-darwin
+      resource_key: darwin-arm64
+      cli_archive: false
+      version: ${{ needs.bundle.outputs.version }}
+      ref: ${{ github.sha }}
+      release_channel: stable
+      relay_client_tracing: false
+      clerk_publishable_key: ""
+      clerk_jwt_template: ""
+      clerk_cli_oauth_client_id: ""
+      relay_url: ""
+
+  desktop_mac_x64:
+    needs: bundle
+    uses: ./.github/workflows/release-desktop.yml
+    with:
+      label: macOS Intel
+      runner: macos-15-intel
+      platform: mac
+      target: dmg
+      arch: x64
+      rust_target: x86_64-apple-darwin
+      resource_key: darwin-x64
+      cli_archive: false
+      version: ${{ needs.bundle.outputs.version }}
+      ref: ${{ github.sha }}
+      release_channel: stable
+      relay_client_tracing: false
+      clerk_publishable_key: ""
+      clerk_jwt_template: ""
+      clerk_cli_oauth_client_id: ""
+      relay_url: ""
+
+  desktop_linux_x64:
+    needs: bundle
+    uses: ./.github/workflows/release-desktop.yml
+    with:
+      label: Linux x64
+      runner: ubuntu-24.04
+      platform: linux
+      target: AppImage
+      arch: x64
+      rust_target: x86_64-unknown-linux-gnu
+      resource_key: linux-x64
+      cli_archive: true
+      version: ${{ needs.bundle.outputs.version }}
+      ref: ${{ github.sha }}
+      release_channel: stable
+      relay_client_tracing: false
+      clerk_publishable_key: ""
+      clerk_jwt_template: ""
+      clerk_cli_oauth_client_id: ""
+      relay_url: ""
+
+  desktop_linux_arm64:
+    needs: bundle
+    uses: ./.github/workflows/release-desktop.yml
+    with:
+      label: Linux ARM64
+      runner: ubuntu-24.04-arm
+      platform: linux
+      target: AppImage
+      arch: arm64
+      rust_target: aarch64-unknown-linux-gnu
+      resource_key: linux-arm64
+      cli_archive: true
+      version: ${{ needs.bundle.outputs.version }}
+      ref: ${{ github.sha }}
+      release_channel: stable
+      relay_client_tracing: false
+      clerk_publishable_key: ""
+      clerk_jwt_template: ""
+      clerk_cli_oauth_client_id: ""
+      relay_url: ""
+
+  desktop_win_x64:
+    needs: [bundle, desktop_linux_x64]
+    uses: ./.github/workflows/release-desktop.yml
+    with:
+      label: Windows x64
+      runner: windows-2025
+      platform: win
+      target: nsis
+      arch: x64
+      rust_target: x86_64-pc-windows-msvc
+      resource_key: win32-x64
+      cli_archive: false
+      version: ${{ needs.bundle.outputs.version }}
+      ref: ${{ github.sha }}
+      release_channel: stable
+      relay_client_tracing: false
+      clerk_publishable_key: ""
+      clerk_jwt_template: ""
+      clerk_cli_oauth_client_id: ""
+      relay_url: ""
+
+  desktop_win_arm64:
+    needs: [bundle, desktop_linux_arm64]
+    uses: ./.github/workflows/release-desktop.yml
+    with:
+      label: Windows ARM64
+      runner: windows-11-arm
+      platform: win
+      target: nsis
+      arch: arm64
+      rust_target: aarch64-pc-windows-msvc
+      resource_key: win32-arm64
+      cli_archive: false
+      version: ${{ needs.bundle.outputs.version }}
+      ref: ${{ github.sha }}
+      release_channel: stable
+      relay_client_tracing: false
+      clerk_publishable_key: ""
+      clerk_jwt_template: ""
+      clerk_cli_oauth_client_id: ""
+      relay_url: ""
+
+  publish:
+    needs:
+      [
+        bundle,
+        desktop_mac_arm64,
+        desktop_mac_x64,
+        desktop_linux_x64,
+        desktop_linux_arm64,
+        desktop_win_x64,
+        desktop_win_arm64,
+      ]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout
+        shell: bash
+        run: |
+          set -euo pipefail
+          git init .
+          git remote add origin "${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}.git"
+          git fetch --no-tags --depth=1 origin "$GITHUB_SHA"
+          git sparse-checkout set --no-cone '/*' '!/.repos/'
+          git checkout --detach FETCH_HEAD
+      - name: Setup Vite+
+        uses: voidzero-dev/setup-vp@250f29ce396baf5e8f24498e17c0dfdebabc26eb
+        with:
+          node-version-file: package.json
+          cache: true
+          run-install: true
+      - name: Download desktop installers and metadata
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+        with:
+          pattern: desktop-*
+          merge-multiple: true
+          path: release-assets
+      - name: Merge architecture manifests
+        run: |
+          set -euo pipefail
+          node scripts/merge-update-manifests.ts --platform mac release-assets/latest-mac.yml release-assets/latest-mac-x64.yml
+          rm release-assets/latest-mac-x64.yml
+          node scripts/merge-update-manifests.ts --platform win release-assets/latest-win-x64.yml release-assets/latest-win-arm64.yml release-assets/latest.yml
+          rm release-assets/latest-win-x64.yml release-assets/latest-win-arm64.yml
+          rm -f release-assets/builder-debug.yml
+      - name: Write checksums
+        run: |
+          cd release-assets
+          sha256sum SimpleT3Code-* > SHA256SUMS
+      - name: Write installation instructions
+        run: |
+          cat > release-notes.md <<'EOF'
+          Download the build for your operating system and architecture. These builds are unsigned.
+
+          - macOS: use `arm64` for Apple Silicon or `x64` for Intel. Open the DMG, quit SimpleT3Code, then replace the app in Applications. If macOS blocks opening it, follow [Apple's instructions](https://support.apple.com/en-us/102445) for opening an app from an unidentified developer.
+          - Windows: download the EXE, quit SimpleT3Code, then run the installer.
+          - Linux: download the AppImage, quit SimpleT3Code, make the new file executable, then launch it.
+
+          Chats and settings remain in your existing SimpleT3Code data directory. The in-app update button opens these downloads; installation is manual.
+          EOF
+      - name: Publish GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_VERSION: ${{ needs.bundle.outputs.version }}
+        run: |
+          set -euo pipefail
+          tag="v${RELEASE_VERSION}"
+          if ! gh release view "$tag" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release create "$tag" --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --title "SimpleT3Code ${RELEASE_VERSION}" --draft --generate-notes --notes-file release-notes.md
+          fi
+          gh release upload "$tag" release-assets/* --repo "$GITHUB_REPOSITORY" --clobber
+          gh release edit "$tag" --repo "$GITHUB_REPOSITORY" --draft=false --latest

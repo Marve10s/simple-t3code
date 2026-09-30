@@ -40,7 +40,7 @@ type DesktopLifecycleRegistrationServices =
   | DesktopLifecycleRuntimeServices
   | ElectronWindow.ElectronWindow;
 
-/** @effect-expect-leaking DesktopEnvironment | DesktopShutdown | DesktopState | DesktopWindow | ElectronApp | ElectronTheme | ElectronWindow */
+// @effect-diagnostics-next-line leakingRequirements:off
 export class DesktopLifecycle extends Context.Service<
   DesktopLifecycle,
   {

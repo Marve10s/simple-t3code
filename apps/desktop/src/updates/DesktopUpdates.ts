@@ -28,6 +28,7 @@ import * as DesktopConfig from "../app/DesktopConfig.ts";
 import * as DesktopEnvironment from "../app/DesktopEnvironment.ts";
 import * as DesktopObservability from "../app/DesktopObservability.ts";
 import * as DesktopState from "../app/DesktopState.ts";
+import * as SimpleDesktopUpdates from "../app/SimpleDesktopUpdates.ts";
 import * as ElectronUpdater from "../electron/ElectronUpdater.ts";
 import * as ElectronWindow from "../electron/ElectronWindow.ts";
 import * as IpcChannels from "../ipc/channels.ts";
@@ -276,6 +277,7 @@ export const make = Effect.gen(function* () {
   const environment = yield* DesktopEnvironment.DesktopEnvironment;
   const fileSystem = yield* FileSystem.FileSystem;
   const desktopSettings = yield* DesktopAppSettings.DesktopAppSettings;
+  const openSimpleUpdateDownload = yield* SimpleDesktopUpdates.make;
 
   const appUpdateYmlConfigRef = yield* Ref.make<Option.Option<AppUpdateYmlConfig>>(Option.none());
   const activeUpdateActionRef = yield* Ref.make<Option.Option<UpdateAction>>(Option.none());
@@ -449,7 +451,11 @@ export const make = Effect.gen(function* () {
 
   const downloadAvailableUpdate = Effect.gen(function* () {
     const state = yield* Ref.get(updateStateRef);
-    if (!(yield* Ref.get(updaterConfiguredRef)) || state.status !== "available") {
+    if (
+      !(yield* Ref.get(updaterConfiguredRef)) ||
+      (state.status !== "available" &&
+        !(state.status === "error" && state.errorContext === "download" && state.availableVersion))
+    ) {
       return { accepted: false, completed: false };
     }
 
@@ -458,6 +464,18 @@ export const make = Effect.gen(function* () {
     }
 
     return yield* Effect.gen(function* () {
+      if (!config.mockUpdates) {
+        const opened = yield* openSimpleUpdateDownload(state.availableVersion);
+        yield* setState(
+          opened
+            ? { ...state, status: "available", errorContext: null, message: null }
+            : reduceDesktopUpdateStateOnDownloadFailure(
+                state,
+                "Could not open the release downloads. Please try again.",
+              ),
+        );
+        return { accepted: true, completed: false };
+      }
       yield* setState(reduceDesktopUpdateStateOnDownloadStart(state));
       yield* electronUpdater.setDisableDifferentialDownload(
         isArm64HostRunningIntelBuild(environment.runtimeInfo),

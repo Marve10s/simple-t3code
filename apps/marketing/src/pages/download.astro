@@ -172,7 +172,6 @@ const imageProps = {
   const changelogLink = document.getElementById("changelog-link") as HTMLAnchorElement;
   const releasesPageLink = document.getElementById("releases-page-link") as HTMLAnchorElement;
   const tabs = page.querySelectorAll<HTMLButtonElement>(".channel-toggle button");
-  // Only release-asset links; mobile store cards have no data-asset and keep their href.
   const cards = page.querySelectorAll<HTMLAnchorElement>("a[data-asset]");
 
   function readChannel(): ReleaseChannel {
@@ -200,10 +199,8 @@ const imageProps = {
 
     try {
       const release = await fetchLatestRelease(channel);
-      // A toggle click while the fetch was in flight wins; drop the stale result.
       if (page.dataset.channel !== channel) return;
 
-      // Stable shows its version. Nightly shows how fresh the build is; the tag is noise.
       versionLabel.textContent =
         channel === "nightly"
           ? `Built ${relativeAge(release.published_at)}`
