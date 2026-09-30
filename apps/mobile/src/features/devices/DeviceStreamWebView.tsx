@@ -103,7 +103,6 @@ function DeviceStreamDocumentView({
     setError(message);
     setStatus("error");
   };
-  // The shared transport owns video timeouts once the document acknowledges startup.
   const bootstrapTimedOut = useEffectEvent(() =>
     fail("Device viewer could not start. Reconnect to try again."),
   );
@@ -115,7 +114,6 @@ function DeviceStreamDocumentView({
   const source = useMemo(
     () => ({
       html: deviceStreamDocument(configuration, deviceStreamScript),
-      // Android WebCodecs needs a secure document; streams still use the environment's URLs.
       baseUrl: Platform.OS === "android" ? "https://localhost/" : "file:///",
     }),
     [configuration],

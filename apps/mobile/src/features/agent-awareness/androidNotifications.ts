@@ -31,7 +31,6 @@ export function configureAndroidAgentNotifications(
   native?.configure?.(deviceId, userId, appScheme(), ongoingEnabled);
 }
 
-/** Posts a staged relay payload for the showcase capture; false when unsupported. */
 export function showAndroidShowcaseAgentActivity(data: Record<string, string>): boolean {
   if (!native?.showShowcaseActivity) return false;
   native.showShowcaseActivity(appScheme(), data);

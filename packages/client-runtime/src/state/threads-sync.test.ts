@@ -158,7 +158,6 @@ const makeHarness = Effect.fn("TestEnvironmentThreads.makeHarness")(function* (o
   const supervisorState = yield* SubscriptionRef.make<SupervisorConnectionState>(
     AVAILABLE_CONNECTION_STATE,
   );
-  // Preserve queued event batches while failing at the first error.
   const streamFrom = (queue: Queue.Queue<TestThreadInput>) =>
     Stream.fromQueue(queue).pipe(
       Stream.chunks,
@@ -507,8 +506,6 @@ describe("EnvironmentThreads", () => {
           return "Not applied";
         },
       });
-      // The reducer reads the title after it advances the cursor. Hold only
-      // the data write so closing the scope interrupts that exact interval.
       yield* first.threadState.semaphore.take(1);
       yield* Queue.offer(first.inputs, update);
       yield* Deferred.await(applying);
@@ -652,8 +649,6 @@ describe("EnvironmentThreads", () => {
     Effect.gen(function* () {
       const harness = yield* makeHarness({ cached: BASE_THREAD });
 
-      // The warm cache reaches live from the cached data, and a live event
-      // applies on top of it.
       yield* Queue.offer(harness.inputs, titleUpdated("Live title", CACHED_SNAPSHOT_SEQUENCE + 1));
       yield* awaitThreadState(
         harness.observed,
@@ -663,8 +658,6 @@ describe("EnvironmentThreads", () => {
           value.data.value.title === "Live title",
       );
 
-      // The subscription resumed from the cached sequence and never fetched the
-      // full snapshot over HTTP.
       expect(yield* Ref.get(harness.lastSubscribeAfterSequence)).toBe(CACHED_SNAPSHOT_SEQUENCE);
       expect(yield* Ref.get(harness.loaderCalls)).toBe(0);
     }),
@@ -723,8 +716,6 @@ describe("EnvironmentThreads", () => {
       const harness = yield* makeHarness({
         httpSnapshot: Option.some({ snapshotSequence: 1, thread: httpThread }),
       });
-      // No socket snapshot is pushed; only a live event arrives over the socket.
-      // It can only be applied if the HTTP snapshot already seeded the thread.
       yield* Queue.offer(harness.inputs, titleUpdated("Live title", 2));
 
       const state = yield* awaitThreadState(
@@ -736,8 +727,6 @@ describe("EnvironmentThreads", () => {
       );
 
       expect(Option.getOrThrow(state.data).title).toBe("Live title");
-      // Cold cache: the full snapshot was loaded over HTTP and the socket
-      // resumed from that snapshot's sequence.
       expect(yield* Ref.get(harness.loaderCalls)).toBeGreaterThanOrEqual(1);
       expect(yield* Ref.get(harness.lastSubscribeAfterSequence)).toBe(1);
     }),
@@ -1043,8 +1032,6 @@ describe("EnvironmentThreads", () => {
         yield* awaitThreadState(harness.observed, (value) => value.status === "live");
         const before = yield* Ref.get(harness.stateChangeCount);
 
-        // Both events arrive in one transport batch: the session settles and the
-        // next turn starts before the fold publishes.
         yield* Queue.offerAll(harness.inputs, [
           sessionSet("ready", "turn-1", CACHED_SNAPSHOT_SEQUENCE + 1),
           sessionSet("running", "turn-2", CACHED_SNAPSHOT_SEQUENCE + 2),
@@ -1059,8 +1046,6 @@ describe("EnvironmentThreads", () => {
         yield* TestClock.adjust("500 millis");
         yield* Effect.yieldNow;
 
-        // The settled state reached the cache under its own sequence even
-        // though the batch ended on a running session.
         const saved = (yield* Ref.get(harness.savedThreads)).at(-1);
         expect(saved?.thread.session?.status).toBe("ready");
         expect(saved?.snapshotSequence).toBe(CACHED_SNAPSHOT_SEQUENCE + 1);

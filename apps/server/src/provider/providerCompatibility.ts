@@ -9,8 +9,6 @@ import { satisfiesSemverRange } from "@t3tools/shared/semver";
 import * as Schema from "effect/Schema";
 import packageJson from "../../package.json" with { type: "json" };
 
-// Deliberately uses the shared CLI gate syntax: comparator groups joined by ||.
-// Prereleases and unrecognized release tags remain unknown.
 const StableVersion = TrimmedNonEmptyString.pipe(
   Schema.check(Schema.makeFilter((value) => /^\d+\.\d+\.\d+$/.test(value))),
 );
@@ -67,8 +65,6 @@ export function resolveProviderCompatibility(
   );
   if (!policy) return undefined;
   const unprefixed = version?.replace(/^v/, "");
-  // Cursor appends a build hash to its date; Google's ACP runtime uses a release prefix.
-  // Strip only these driver-specific forms, keeping semver prereleases unknown.
   const stable =
     driver === "cursor"
       ? unprefixed?.replace(/^(\d{4}\.\d{2}\.\d{2})-[a-f0-9]+$/, "$1")
@@ -99,7 +95,6 @@ export function resolveProviderCompatibility(
   };
 }
 
-/** A remote policy replaces its matching bundled policy; omission keeps the bundle. */
 export function applyProviderCompatibility(
   snapshot: ServerProvider,
   policies: ReadonlyArray<ProviderCompatibilityPolicy> | undefined,

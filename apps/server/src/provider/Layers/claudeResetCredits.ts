@@ -1,12 +1,3 @@
-/**
- * Claude banked resets (the CLI's `cedar_ember` program). The CLI reads the
- * grants from the OAuth usage endpoint and claims one against the
- * organization; this module does the same with the credentials the CLI keeps
- * in its config directory. macOS keeps them in the keychain, so there the
- * feature is not offered.
- *
- * @module provider/Layers/claudeResetCredits
- */
 import * as NodeOS from "node:os";
 import type {
   ProviderConsumeResetCreditOutcome,
@@ -91,17 +82,11 @@ class ClaudeResetCreditError extends Schema.TaggedError<ClaudeResetCreditError>(
 
 const isClaudeResetCreditError = Schema.is(ClaudeResetCreditError);
 
-/**
- * Every reset failure except `requestFailed` and `unconfirmed` is final:
- * Claude answered, or nothing was sent. An unanswered or unconfirmed claim
- * retries with the same request id.
- */
 export const isSettledClaudeResetCreditFailure = (error: unknown) =>
   isClaudeResetCreditError(error) &&
   error.reason !== "requestFailed" &&
   error.reason !== "unconfirmed";
 
-/** Rejects unparseable and calendar-invalid timestamps such as February 30. */
 const isFutureTimestamp = (value: string, nowMs: number) => {
   if (!COMPLETE_TIMESTAMP.test(value)) return false;
   const [year, month, day] = value.slice(0, 10).split("-").map(Number);
@@ -110,7 +95,6 @@ const isFutureTimestamp = (value: string, nowMs: number) => {
   );
 };
 
-/** Grants that are paused or past `ends_at` cannot be claimed and do not count. */
 export function claudeResetCreditsToContract(
   block: unknown,
   nowMs: number,
@@ -163,10 +147,6 @@ const withClaudeHeaders = (token: string, version: string) =>
     "user-agent": `claude-cli/${version} (external, cli)`,
   });
 
-/**
- * Reads the banked resets for the login in `configDir`. Any failure reads as
- * "no resets" so the usage bars never break on this optional extra.
- */
 export const readClaudeResetCredits = Effect.fn("readClaudeResetCredits")(
   function* (configDir: string, version: string) {
     const token = yield* readAccessToken(configDir);
@@ -189,7 +169,6 @@ export const readClaudeResetCredits = Effect.fn("readClaudeResetCredits")(
   Effect.orElseSucceed(() => undefined),
 );
 
-/** The CLI keeps the account record beside its settings, or in the home directory by default. */
 export const claudeAccountConfigPath = (configDir: string | undefined) =>
   Effect.map(Path.Path, (path) =>
     configDir ? path.join(configDir, ".claude.json") : path.join(NodeOS.homedir(), ".claude.json"),
@@ -202,10 +181,6 @@ const CLAIM_OUTCOMES = {
   ineligible: "noCredit",
 } as const satisfies Record<string, ProviderConsumeResetCreditOutcome>;
 
-/**
- * Claims `grantId`. `requestId` is the idempotency key: a retry with the same
- * id is the same claim. Ids are checked before anything is sent.
- */
 export const consumeClaudeResetCredit = Effect.fn("consumeClaudeResetCredit")(function* (input: {
   readonly configDir: string;
   readonly accountConfigPath: string;
@@ -261,8 +236,6 @@ export const consumeClaudeResetCredit = Effect.fn("consumeClaudeResetCredit")(fu
   if (body.result === "cooldown") {
     return yield* new ClaudeResetCreditError({ reason: "coolingDown" });
   }
-  // Claude could not say whether the claim landed, so, like the CLI, keep the
-  // request id and let the retry ask about the same claim.
   if (body.result === "unavailable") {
     return yield* new ClaudeResetCreditError({ reason: "unconfirmed" });
   }

@@ -1,7 +1,5 @@
 import type { DuoPose } from "@t3tools/client-runtime/device/duo-control";
 
-// Bitrig 0.25's toolbar glyphs. The fold outlines follow the native toolbar;
-// the rounded stance contours are ported from SimulatorFoldingPoseGlyph's SwiftUI paths.
 const stancePaths = {
   laptop:
     "M2.7351 12.9857 L15.8128 11.4159 L14.4114 3.3787 C14.1943 2.134 13.1275 1.2319 12.0283 1.3639 L2.9308 2.4559 C1.8317 2.5879 1.1167 3.7038 1.3337 4.9485 L2.7351 12.9857 Z M2.7351 12.9857 L15.8128 11.4159 L19.9103 12.8914 C20.5449 13.1199 20.1683 13.4121 19.0692 13.5441 L9.9717 14.6361 C8.8725 14.7681 7.4672 14.6898 6.8326 14.4612 L2.7351 12.9857 Z",

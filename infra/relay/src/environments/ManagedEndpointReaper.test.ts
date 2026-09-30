@@ -192,7 +192,6 @@ function harness(input?: {
           return false;
         }
         if (request.expectedTunnelId !== undefined) {
-          // Surface Cloudflare failures the same way the real release does.
           yield* tunnelClient.delete(request.expectedTunnelId).pipe(
             Effect.mapError(
               (cause) =>
@@ -725,7 +724,6 @@ describe("ManagedEndpointReaper", () => {
         timestamp: "2026-08-25T11:00:00.000Z",
       }),
     );
-    // The first 100 candidates always fail to delete.
     const state = harness({
       tunnels: entries,
       allocations: recoverableOwners(entries),

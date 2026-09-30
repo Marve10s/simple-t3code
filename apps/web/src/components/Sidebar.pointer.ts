@@ -2,7 +2,6 @@ import { useLayoutEffect, type PointerEvent as ReactPointerEvent } from "react";
 import { type SensorProps } from "@dnd-kit/core";
 import { getOwnerDocument, getWindow } from "@dnd-kit/utilities";
 
-// Search unmounts the drag context while its owning Sidebar remains mounted.
 export function SidebarDragLifecycle({ onUnmount }: { onUnmount: () => void }) {
   useLayoutEffect(() => onUnmount, [onUnmount]);
   return null;
@@ -14,8 +13,6 @@ type Options = {
   onFinish: (started: boolean) => void;
 };
 
-/** A sidebar gesture ends on release, cancellation, or loss of its window.
- * Own the listeners so unmounting the list can cancel the sensor too. */
 export class SidebarPointerSensor {
   static activators = [
     {
@@ -62,8 +59,6 @@ export class SidebarPointerSensor {
 
   private move = (event: PointerEvent) => {
     if (this.phase === "finished" || event.pointerId !== this.pointer.pointerId) return;
-    // A release outside the window can be missed. Never activate or continue
-    // a drag when the initiating button is no longer held.
     if ((event.buttons & 1) === 0) return this.cancel();
     const coordinates = { x: event.clientX, y: event.clientY };
     if (this.phase === "pending") {
@@ -122,15 +117,10 @@ export class SidebarPointerSensor {
     this.document.removeEventListener("dragstart", this.preventDefault);
     this.document.removeEventListener("contextmenu", this.preventDefault);
     this.document.removeEventListener("selectionchange", this.clearSelection);
-    // Cancellation can precede release by an arbitrary amount of time. Consume
-    // that release click, or let a fresh pointerdown end suppression if release
-    // happened outside the document. Ordinary clicks never install this guard.
     if (!aborted) {
       this.document.addEventListener("pointerdown", this.clearClickSuppression, { capture: true });
     }
     try {
-      // Release the sidebar preview before dnd-kit clears its transforms.
-      // Its public end/cancel event can be omitted before its first layout.
       this.props.options.onFinish(!aborted);
     } finally {
       if (aborted) this.props.onAbort(this.props.active);

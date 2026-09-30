@@ -8,14 +8,6 @@ import { scopedThreadKey } from "../lib/scopedEntities";
 import { appAtomRegistry } from "./atom-registry";
 import type { QueuedThreadMessage } from "./thread-outbox-model";
 
-/**
- * A new task navigates to its thread screen the moment it is queued, before the
- * server has created the thread. Until the shell arrives the screen renders a
- * stand-in built from the queued creation. The outcome recorded by the outbox
- * drain covers the two windows that stand-in cannot: the gap between delivery
- * and the first turn (keep showing setup) and a rejected creation
- * (the drain restored the content into the project draft; offer to reopen it).
- */
 export type PendingThreadCreationOutcome =
   | { readonly kind: "delivered"; readonly message: QueuedThreadMessage }
   | { readonly kind: "failed"; readonly message: QueuedThreadMessage; readonly reason: string };
@@ -25,7 +17,6 @@ export type PendingThreadCreation = {
   readonly outcome: PendingThreadCreationOutcome | null;
 };
 
-/** Keep the screen's creation state until its detail can take over the pill. */
 export function resolvePendingThreadCreation(input: {
   readonly threadKey: string | null;
   readonly pending: PendingThreadCreation | null;
@@ -51,9 +42,6 @@ export function resolvePendingThreadCreation(input: {
     detail?.session?.status === "interrupted"
   )
     return null;
-  // Message delivery and turn startup are separate events. The prompt alone
-  // cannot replace the preparing pill; wait for the turn's timing too. Retain
-  // the local creation if the outbox has already collected its shell outcome.
   if (
     detail !== null &&
     detail.latestTurn !== null &&
@@ -89,18 +77,8 @@ export function clearPendingThreadCreationOutcome(threadKey: string): void {
   appAtomRegistry.set(pendingThreadCreationOutcomesAtom, next);
 }
 
-/**
- * Whether the queued prompt still has to stand in for the real message.
- *
- * The server creates the thread, then builds the worktree, and only then
- * starts the turn, so the thread shell and an empty detail arrive seconds
- * ahead of the prompt. Keying this on the shell's arrival left the thread
- * showing "No conversation yet" for that whole window. The queued message id
- * is reused as the delivered message id, so its presence is the exact signal.
- */
 export function isPendingThreadCreationVisible(input: {
   readonly creationMessageId: string;
-  /** Null while no detail has loaded; empty during a worktree checkout. */
   readonly loadedMessageIds: ReadonlyArray<string> | null;
 }): boolean {
   return !input.loadedMessageIds?.includes(input.creationMessageId);
@@ -114,10 +92,6 @@ export function pendingThreadCreationMessage(
     role: "user",
     text: message.text,
     context: message.context,
-    // Deliberately no attachments. Their ids are local draft ids the server
-    // cannot resolve, so the feed's attachment rows would sit on a spinner
-    // that only ends when the real message arrives — and never, if the
-    // creation is rejected. The delivered message renders them moments later.
     turnId: null,
     streaming: false,
     createdAt: message.createdAt,
@@ -125,10 +99,6 @@ export function pendingThreadCreationMessage(
   };
 }
 
-/**
- * Thread shell shaped from a queued creation. `modelSelection` is required on
- * the shell; a creation is only sendable with one, so the fallback never sends.
- */
 export function pendingThreadCreationShell(
   message: QueuedThreadMessage,
 ): EnvironmentThreadShell | null {

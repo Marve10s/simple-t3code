@@ -58,16 +58,12 @@ import { resolveProjectSettings } from "@t3tools/shared/projectSettings";
 import { canReplaceThreadTitle } from "../threadTitles.ts";
 
 const providerTurnKey = (threadId: ThreadId, turnId: TurnId) => `${threadId}:${turnId}`;
-// Suffixed, not prefixed: `clearTurnStateForSession` sweeps by thread prefix.
 const segmentStateKey = (threadId: ThreadId, turnId: TurnId, role: MessageStreamRole) =>
   role === "reasoning"
     ? `${providerTurnKey(threadId, turnId)}:reasoning`
     : providerTurnKey(threadId, turnId);
 const providerTaskKey = (threadId: ThreadId, taskId: string) => `${threadId}:${taskId}`;
 
-// Fallback when the in-memory description cache no longer has the task name
-// (server restart, session-exit sweep, TTL/capacity eviction): earlier
-// task.started/task.progress activities for the task are persisted with it.
 function findTaskTitleInActivities(
   activities: ReadonlyArray<{ readonly kind: string; readonly payload: unknown }> | undefined,
   taskId: string,
@@ -115,10 +111,6 @@ const BUFFERED_PROPOSED_PLAN_BY_ID_TTL = Duration.minutes(120);
 const TASK_DESCRIPTION_BY_TASK_CACHE_CAPACITY = 10_000;
 const TASK_DESCRIPTION_BY_TASK_TTL = Duration.minutes(120);
 const MAX_BUFFERED_ASSISTANT_CHARS = 24_000;
-// Paragraphs that finish within this window after a delivery stay buffered
-// and land together on the next one. Keeps fast models from repainting the
-// message several times a second while still showing the first paragraph
-// as soon as it is done.
 const MIN_ASSISTANT_DELIVERY_INTERVAL_MS = 400;
 const STRICT_PROVIDER_LIFECYCLE_GUARD = process.env.T3CODE_STRICT_PROVIDER_LIFECYCLE_GUARD !== "0";
 
@@ -139,7 +131,6 @@ type RuntimeIngestionInput =
       event: TurnStartRequestedDomainEvent;
     }
   | {
-      /** A diff whose workspace the diff worker confirmed is a Git repository. */
       source: "diff";
       event: ProviderDiffEvent;
     };
@@ -200,37 +191,12 @@ function hasRenderableAssistantText(text: string | undefined): boolean {
   return (text?.trim().length ?? 0) > 0;
 }
 
-// An opening fence may sit at any indentation, since fences inside list
-// items are indented past the marker. A closing fence may be indented at most
-// three spaces more than its opener. Deeper lines are content in the block.
 const MARKDOWN_FENCE_PATTERN = /^( *)(`{3,}|~{3,})/;
-// CommonMark blank lines hold only spaces and tabs. Other whitespace, such as
-// a no-break space, is paragraph content.
 const BLANK_LINE_PATTERN = /^[ \t]*$/;
-// A bullet or ordered marker followed by whitespace, at any indentation so
-// nested items count. The trailing space is required, so a partial `-` or
-// `1.` never matches before the model finishes the marker.
 const LIST_ITEM_START_PATTERN = /^[ \t]*(?:[-*+]|\d{1,9}[.)])[ \t]/;
-// A section title: an ATX heading, or a line of only bold text, which models
-// often use as a heading.
 const SECTION_TITLE_PATTERN = /^ {0,3}(?:#{1,6}(?:[ \t]|$)|\*\*(?:[^*]|\*(?!\*))+\*\*:?$)/;
-// An unindented ATX heading ends the paragraph or list above it, even with no
-// blank line between them. A bold line would continue the paragraph instead.
 const TOP_LEVEL_HEADING_PATTERN = /^#{1,6}(?:[ \t]|$)/;
 
-/**
- * Splits buffered assistant text at the last blank line, closing code fence,
- * or list item start that is not inside an open fenced code block. `ready` is
- * safe to deliver now because the markdown before it will not change shape as
- * more text arrives. `rest` stays buffered until the next boundary or
- * completion. Only fully terminated lines count, so a trailing partial line
- * never leaks; a list item start is the one lookahead that may sit on the
- * partial line, since tight lists have no blank lines between items and would
- * otherwise land all at once.
- *
- * A section title holds the boundary until a content line follows it, so a
- * title never lands alone and waits above a block that is still streaming.
- */
 export function splitBufferedAssistantText(text: string): { ready: string; rest: string } {
   let openFence: { marker: string; indent: number } | null = null;
   let boundary = -1;
@@ -265,7 +231,6 @@ export function splitBufferedAssistantText(text: string): { ready: string; rest:
         indent <= openFence.indent + 3 &&
         line.length === indent + marker.length
       ) {
-        // CommonMark: a closing fence carries no info string.
         openFence = null;
         boundary = newline + 1;
       }
@@ -306,12 +271,6 @@ function assistantSegmentBaseKeyFromEvent(event: ProviderRuntimeEvent): string {
   return String(event.itemId ?? event.turnId ?? event.eventId);
 }
 
-/**
- * Reasoning shares the assistant segmenting, buffering and finalization
- * machinery; only the message id namespace differs. The prefix is what tells a
- * buffered segment apart when it is flushed or finalized long after the delta
- * that opened it, so the role never has to be threaded through those paths.
- */
 type MessageStreamRole = "assistant" | "reasoning";
 
 const REASONING_MESSAGE_ID_PREFIX = "reasoning:";
@@ -331,8 +290,6 @@ function assistantSegmentMessageId(
   );
 }
 
-/** A provider may stream a reasoning summary and the raw chain of thought over
- *  the same item. They are different texts, so they get different segments. */
 function reasoningSegmentBaseKeyFromEvent(
   event: ProviderRuntimeEvent,
   streamKind: "reasoning_text" | "reasoning_summary_text",
@@ -443,17 +400,8 @@ function requestKindFromCanonicalRequestType(
   }
 }
 
-/**
- * Copies the optional TaskAgentLinkage bundle from a task.* runtime payload
- * into the persisted activity payload. Identity fields ride on every row so
- * client folds survive activity retention; absent fields stay absent.
- */
 function taskLinkageActivityFields(payload: Record<string, unknown>): Record<string, unknown> {
   const fields: Record<string, unknown> = {
-    // Server-stamped classification: persisted rows are self-describing, so
-    // clients trust the stamp instead of re-deriving agent-vs-background
-    // from taskType denylists and marker heuristics (legacy rows without a
-    // stamp keep the client fallback).
     agentKind: classifyTaskAgentKind({
       taskType: typeof payload.taskType === "string" ? payload.taskType : undefined,
       agentId: typeof payload.agentId === "string" ? payload.agentId : undefined,
@@ -606,8 +554,6 @@ export function runtimeEventToActivities(
           createdAt: event.createdAt,
           tone: "info",
           kind: "runtime.warning",
-          // Use the adapter-supplied message as the row label so the work log
-          // shows what the warning was about, not a generic "Runtime warning".
           summary: truncateDetail(event.payload.message, 120),
           payload: {
             message: truncateDetail(event.payload.message),
@@ -705,10 +651,6 @@ export function runtimeEventToActivities(
 
     case "task.progress": {
       const linkage = taskLinkageActivityFields(event.payload as Record<string, unknown>);
-      // Usage and activity are independent latest-state streams. Keeping them
-      // under separate stable ids prevents a command/reasoning update from
-      // replacing the last known token count (and prevents a usage-only tick
-      // from blanking the last meaningful activity).
       const identityLinkage = { ...linkage };
       delete identityLinkage.typedUsage;
       delete identityLinkage.status;
@@ -727,9 +669,6 @@ export function runtimeEventToActivities(
         ...(hasProgressState
           ? [
               {
-                // Stable per-task id: activity is "latest state", not
-                // history, so each meaningful tick replaces the last. This
-                // bounds a large fleet to one activity row per task.
                 id: EventId.make(`task-progress:${event.threadId}:${event.payload.taskId}`),
                 createdAt: event.createdAt,
                 tone: "info" as const,
@@ -812,17 +751,11 @@ export function runtimeEventToActivities(
     }
 
     case "tool.progress": {
-      // Only agent-owned heartbeats are persisted: they feed the owning
-      // agent's activity line. Parent-conversation tool progress stays
-      // ephemeral (item lifecycle already covers it).
       if (event.payload.taskId === undefined) {
         return [];
       }
       return [
         {
-          // Same stable-id treatment as task.progress: a heartbeat is
-          // "what is this agent doing right now", so one row per task
-          // (thread-scoped for the same global-PK collision reason).
           id: EventId.make(`tool-progress:${event.threadId}:${event.payload.taskId}`),
           createdAt: event.createdAt,
           tone: "info",
@@ -862,8 +795,6 @@ export function runtimeEventToActivities(
             taskId: event.payload.taskId,
             status: event.payload.status,
             ...(taskTitle ? { title: truncateDetail(taskTitle, 120) } : {}),
-            // summary + detail mirror task.progress: clients label the row from
-            // summary and keep detail for the preview/expanded body.
             ...(event.payload.summary
               ? {
                   summary: truncateDetail(event.payload.summary),
@@ -934,13 +865,6 @@ export function runtimeEventToActivities(
       if (!isToolLifecycleItemType(event.payload.itemType)) {
         return [];
       }
-      // A streaming update's `data` carries the full tool output accumulated
-      // so far (adapters merge state forward), and a new activity is emitted
-      // per chunk, so persisting `data` verbatim writes O(N²) bytes per tool
-      // call into both the event store and the projection table. No reader
-      // needs it: ws.ts and http.ts apply `projectActivityPayload` before any
-      // payload reaches a client. Persist the projected form for non-terminal
-      // updates; `item.completed` below still persists the full payload.
       return [
         projectActivityPayload({
           id: event.eventId,
@@ -1069,24 +993,18 @@ const make = Effect.gen(function* () {
     timeToLive: BUFFERED_MESSAGE_TEXT_BY_MESSAGE_ID_TTL,
     lookup: () => Effect.succeed(""),
   });
-  // Epoch millis of the last early delivery per message, for pacing.
   const lastAssistantDeliveryAtByMessageId = yield* Cache.make<MessageId, number>({
     capacity: BUFFERED_MESSAGE_TEXT_BY_MESSAGE_ID_CACHE_CAPACITY,
     timeToLive: BUFFERED_MESSAGE_TEXT_BY_MESSAGE_ID_TTL,
     lookup: () => Effect.succeed(0),
   });
 
-  // When a thinking block opened, so "Thought for ..." measures the model's
-  // time and not the moment buffered text happened to be flushed.
   const reasoningStartedAtByMessageId = yield* Cache.make<MessageId, string>({
     capacity: BUFFERED_MESSAGE_TEXT_BY_MESSAGE_ID_CACHE_CAPACITY,
     timeToLive: BUFFERED_MESSAGE_TEXT_BY_MESSAGE_ID_TTL,
     lookup: () => Effect.succeed(""),
   });
 
-  // Codex splits a reasoning trace into indexed parts, summary and raw alike.
-  // The index is the only signal that one part ended and the next began, so the
-  // blank line that keeps them readable has to be inserted here.
   const reasoningPartIndexByMessageId = yield* Cache.make<MessageId, number>({
     capacity: BUFFERED_MESSAGE_TEXT_BY_MESSAGE_ID_CACHE_CAPACITY,
     timeToLive: BUFFERED_MESSAGE_TEXT_BY_MESSAGE_ID_TTL,
@@ -1108,8 +1026,6 @@ const make = Effect.gen(function* () {
     lookup: () => Effect.succeed({ text: "", createdAt: "" }),
   });
 
-  // Task names arrive on task.started/task.progress but not on task.completed,
-  // so remember them per task to title the completion activity.
   const taskDescriptionByTaskKey = yield* Cache.make<string, string>({
     capacity: TASK_DESCRIPTION_BY_TASK_CACHE_CAPACITY,
     timeToLive: TASK_DESCRIPTION_BY_TASK_TTL,
@@ -1119,9 +1035,6 @@ const make = Effect.gen(function* () {
   const rememberTaskDescription = (threadId: ThreadId, taskId: string, description: string) =>
     Cache.set(taskDescriptionByTaskKey, providerTaskKey(threadId, taskId), description);
 
-  // Entries are left in place after completion so replayed or duplicate
-  // terminal events stay titled; TTL, capacity, and the session-exit sweep
-  // bound the cache.
   const lookupTaskDescription = (threadId: ThreadId, taskId: string) =>
     Cache.getOption(taskDescriptionByTaskKey, providerTaskKey(threadId, taskId)).pipe(
       Effect.map((description) =>
@@ -1241,9 +1154,6 @@ const make = Effect.gen(function* () {
               activeMessageId: assistantSegmentMessageId(input.baseKey, 0, role),
             }),
             onSome: (state) => {
-              // Reasoning never resets the index on a new base key: one item can
-              // stream a summary and a raw trace, and summary -> raw -> summary
-              // would otherwise reuse the id of the first, finished block.
               const reuseIndex = state.baseKey === input.baseKey || role === "reasoning";
               const segmentIndex = reuseIndex ? state.nextSegmentIndex : 0;
               const messageId = assistantSegmentMessageId(input.baseKey, segmentIndex, role);
@@ -1286,12 +1196,6 @@ const make = Effect.gen(function* () {
       });
     });
 
-  /**
-   * Unlike assistant text, reasoning has no reliable per-block item id on every
-   * provider, so a turn's blocks can share a base key. Switching base key (a new
-   * reasoning item, or summary vs raw) closes the open block instead of
-   * appending to it.
-   */
   const getOrCreateReasoningMessageId = (input: {
     threadId: ThreadId;
     event: ProviderRuntimeEvent;
@@ -1338,7 +1242,6 @@ const make = Effect.gen(function* () {
       (settings) => resolveProjectSettings(settings, projectId).settings.responseStreamingMode,
     );
 
-  // `mode` is "turn" or "paragraph"; token mode never buffers.
   const appendBufferedAssistantText = (
     messageId: MessageId,
     delta: string,
@@ -1353,9 +1256,6 @@ const make = Effect.gen(function* () {
             onSome: (text) => `${text}${delta}`,
           });
 
-          // Paragraph mode delivers finished paragraphs and closed code blocks
-          // early so the user sees progress without token-by-token repaints.
-          // Turn mode holds everything until the turn finishes or pauses.
           const { ready, rest } =
             mode === "paragraph"
               ? splitBufferedAssistantText(nextText)
@@ -1385,7 +1285,6 @@ const make = Effect.gen(function* () {
             return "";
           }
 
-          // Safety valve: flush full buffered text as an assistant delta to cap memory.
           yield* Cache.invalidate(bufferedAssistantTextByMessageId, messageId);
           return nextText;
         }),
@@ -1569,8 +1468,6 @@ const make = Effect.gen(function* () {
         return;
       }
 
-      // A block whose deltas already reached the projection must still be
-      // completed, or it stays flagged as streaming forever.
       const alreadyProjected =
         input.hasProjectedMessage ||
         (input.flushedMessageIds?.has(activeMessageId.value) ?? false) ||
@@ -1591,8 +1488,6 @@ const make = Effect.gen(function* () {
       });
       yield* forgetAssistantMessageId(input.threadId, input.turnId, activeMessageId.value);
 
-      // The segment index is deliberately preserved: reasoning blocks in one
-      // turn can share a base key, so resetting it would reopen a closed block.
       const state = yield* getAssistantSegmentStateForTurn(input.threadId, input.turnId, role);
       if (Option.isSome(state)) {
         yield* setAssistantSegmentStateForTurn(
@@ -1818,12 +1713,6 @@ const make = Effect.gen(function* () {
         activeTurnId !== null && eventTurnId !== undefined && !sameId(activeTurnId, eventTurnId);
       const missingTurnForActiveTurn = activeTurnId !== null && eventTurnId === undefined;
 
-      // A turn.started that conflicts with the active turn is legitimate when
-      // the server itself has a turn start pending for this thread AND the
-      // provider session already tracks the event's turn as its active turn:
-      // steering a running turn makes some providers (e.g. opencode) open a
-      // new turn without ever completing the superseded one. A stale
-      // turn.started for some other turn id still gets rejected.
       const conflictingTurnStartIsPendingTurnStart =
         event.type === "turn.started" && conflictsWithActiveTurn
           ? sameId(yield* getExpectedProviderTurnIdForThread(thread.id), eventTurnId) &&
@@ -1847,13 +1736,9 @@ const make = Effect.gen(function* () {
             if (conflictsWithActiveTurn || missingTurnForActiveTurn) {
               return false;
             }
-            // Only the active turn may close the lifecycle state.
             if (activeTurnId !== null && eventTurnId !== undefined) {
               return sameId(activeTurnId, eventTurnId);
             }
-            // A named completion can recover a lost turn.started event.
-            // An abort needs an active turn so a delayed stop cannot replace
-            // a ready session or clear a newer pending start.
             return event.type === "turn.completed" && eventTurnId !== undefined;
           default:
             return true;
@@ -1890,8 +1775,6 @@ const make = Effect.gen(function* () {
                 : "ready";
             case "session.started":
             case "thread.started":
-              // Provider thread/session start notifications can arrive during an
-              // active or pending turn; preserve that lifecycle state.
               return activeTurnId !== null ? "running" : hasPendingTurnStart ? "starting" : "ready";
           }
         })();
@@ -1977,9 +1860,6 @@ const make = Effect.gen(function* () {
         event.type === "turn.proposed.delta" ? event.payload.delta : undefined;
 
       const reasoningTurnId = toTurnId(event.turnId);
-      // Every close path for a thinking block is keyed by turn. Without one the
-      // block could never be completed, and a row stuck mid-thought is worse
-      // than no row at all.
       if (reasoningDelta && reasoningDelta.delta.length > 0 && reasoningTurnId) {
         const turnId = reasoningTurnId;
         const reasoningMessageId = yield* getOrCreateReasoningMessageId({
@@ -2013,10 +1893,6 @@ const make = Effect.gen(function* () {
           yield* Cache.set(reasoningPartIndexByMessageId, reasoningMessageId, partIndex);
         }
 
-        // Reasoning is never delivered token by token, even when the project
-        // asks for it: the block is collapsed by default, so a command, an
-        // event-store write and a fan-out per token would buy nothing. Traces
-        // are longer than the answers they precede.
         const streamingMode = yield* resolveResponseStreamingMode(thread.projectId);
         const reasoningMode = streamingMode === "token" ? "paragraph" : streamingMode;
         const spillChunk = yield* appendBufferedAssistantText(
@@ -2040,8 +1916,6 @@ const make = Effect.gen(function* () {
 
       if (assistantDelta && assistantDelta.length > 0) {
         const turnId = toTurnId(event.turnId);
-        // Visible text ends the thinking block that preceded it, so the next
-        // block does not swallow this answer.
         if (turnId) {
           yield* finalizeActiveSegmentForTurn({
             event,
@@ -2065,8 +1939,6 @@ const make = Effect.gen(function* () {
 
         const streamingMode = yield* resolveResponseStreamingMode(thread.projectId);
         if (streamingMode !== "token") {
-          // Pace on the server clock. OpenCode stamps every delta of a part
-          // with the part's start time, so the event time cannot measure gaps.
           const spillChunk = yield* appendBufferedAssistantText(
             assistantMessageId,
             assistantDelta,
@@ -2156,10 +2028,6 @@ const make = Effect.gen(function* () {
         yield* appendBufferedProposedPlan(planId, proposedPlanDelta, now);
       }
 
-      // Tool work ends the thinking block that led to it. Without this a
-      // provider that reuses one reasoning stream across a turn (Claude has no
-      // per-block id) would append post-tool thinking to a block that already
-      // sits above the tool row.
       if (event.type === "item.started" && isToolLifecycleItemType(event.payload.itemType)) {
         const toolTurnId = toTurnId(event.turnId);
         if (toolTurnId) {
@@ -2184,9 +2052,6 @@ const make = Effect.gen(function* () {
             turnId,
             "reasoning",
           );
-          // The item detail is a whole-block snapshot, so it may only stand in
-          // for deltas that never arrived. Appending it to a streamed block
-          // would print the reasoning twice.
           const existingReasoningMessage = Option.isSome(activeReasoningMessageId)
             ? yield* getThreadMessageById(thread.id, activeReasoningMessageId.value)
             : undefined;
@@ -2198,14 +2063,9 @@ const make = Effect.gen(function* () {
               : undefined;
 
           if (Option.isNone(activeReasoningMessageId)) {
-            // Segment state outlives a closed block, so its presence means this
-            // turn already streamed a trace and the snapshot would duplicate it.
             const turnAlreadyStreamedReasoning = Option.isSome(
               yield* getAssistantSegmentStateForTurn(thread.id, turnId, "reasoning"),
             );
-            // A provider can report a whole block at once without streaming it.
-            // The id is derived from the item rather than the segment counter so
-            // a repeated completion rewrites that row instead of adding a copy.
             if (fallbackText !== undefined && !turnAlreadyStreamedReasoning) {
               const snapshotMessageId = assistantSegmentMessageId(
                 `snapshot:${event.itemId ?? event.eventId}`,
@@ -2372,8 +2232,6 @@ const make = Effect.gen(function* () {
               pendingRequestIds.delete(requestId);
             }
           }
-          // A terminal turn cannot accept native callback answers. Message-mode
-          // questions may outlive that turn and still accept a later user message.
           for (const requestId of pendingRequestIds) {
             yield* orchestrationEngine.dispatch({
               type: "thread.activity.append",
@@ -2478,11 +2336,6 @@ const make = Effect.gen(function* () {
           yield* rememberTaskDescription(thread.id, event.payload.taskId, description);
         }
       }
-      // Working-indicator plan progress: current step while the turn runs,
-      // cleared on settle so a finished plan never lingers as stale UI.
-      // Events carrying a turn id that conflicts with the active turn are
-      // stale (superseded turn) and must neither overwrite nor clear the
-      // active turn's progress; session.exited always clears.
       if (event.type === "session.exited") {
         threadPlanProgress.clearThreadPlanProgress(thread.id);
       } else if (!conflictsWithActiveTurn) {
@@ -2493,8 +2346,6 @@ const make = Effect.gen(function* () {
         }
       }
 
-      // Sidebar background liveness: fed from the same lifecycle stream,
-      // read by the shell query at mapping time (no persistence).
       switch (event.type) {
         case "task.started":
         case "task.progress":
@@ -2586,7 +2437,6 @@ const make = Effect.gen(function* () {
         const activities = yield* projectionThreadActivityRepository.listByThreadId({
           threadId: thread.id,
           activityKinds: ["context-window.updated", "context-compaction"],
-          // Preserve the previous thread-detail read's context-history bound.
           limit: 500,
         });
         const tokenCounts = compactedTokenCountsFromActivities(activities);
@@ -2620,11 +2470,6 @@ const make = Effect.gen(function* () {
 
   const processDomainEvent = (_event: TurnStartRequestedDomainEvent) => Effect.void;
 
-  // Records a mid-turn placeholder checkpoint for a provider diff. Runs on the
-  // lifecycle worker, after repository detection, so the running-turn check
-  // and the dispatch are ordered with the turn's terminal events: a diff that
-  // resolved after turn.completed must not rewrite the settled turn's state or
-  // move the latest-turn pointer back.
   const recordProviderDiff = Effect.fn("recordProviderDiff")(function* (event: ProviderDiffEvent) {
     const thread = yield* resolveThreadRuntimeContext(event.threadId);
     const turnId = toTurnId(event.turnId);
@@ -2634,10 +2479,6 @@ const make = Effect.gen(function* () {
     const checkpointContext = yield* projectionSnapshotQuery
       .getThreadCheckpointContext(thread.id)
       .pipe(Effect.map(Option.getOrUndefined));
-    // Skip if a checkpoint already exists for this turn. A real
-    // (non-placeholder) capture from CheckpointReactor should not
-    // be clobbered, and dispatching a duplicate placeholder for the
-    // same turnId would produce an unstable checkpointTurnCount.
     if (!checkpointContext || hasCheckpointForTurn(checkpointContext.checkpoints, turnId)) return;
     const now = event.createdAt;
     yield* orchestrationEngine.dispatch({
@@ -2688,9 +2529,6 @@ const make = Effect.gen(function* () {
     processInput(input).pipe(logIngestionFailure(input.source, input.event)),
   );
 
-  // Repository detection for a diff goes through VCS subprocesses, which can
-  // stall behind slow or hung git. It runs on its own worker so a stuck diff
-  // never delays the lifecycle worker; confirmed diffs are handed back to it.
   const detectProviderDiffRepository = Effect.fn("detectProviderDiffRepository")(function* (
     event: ProviderDiffEvent,
   ) {
@@ -2727,7 +2565,6 @@ const make = Effect.gen(function* () {
 
   return {
     start,
-    // The diff worker feeds the lifecycle worker, so drain it first.
     drain: diffWorker.drain.pipe(Effect.andThen(worker.drain)),
   } satisfies ProviderRuntimeIngestionShape;
 });

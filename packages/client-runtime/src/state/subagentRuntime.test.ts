@@ -8,11 +8,6 @@ import {
 } from "./subagentRuntime.ts";
 
 let sequence = 0;
-/**
- * Fixtures model POST-INGESTION rows: ingestion stamps agentKind on every
- * task.* payload, so the helper stamps too (same classifier). Pass an
- * explicit agentKind (or agentKind: undefined via legacy()) to override.
- */
 function activity(
   kind: string,
   payload: Record<string, unknown>,
@@ -40,7 +35,6 @@ function activity(
   } as unknown as OrchestrationThreadActivity;
 }
 
-/** A pre-stamp row (legacy thread / old server): no agentKind at all. */
 function legacyActivity(
   kind: string,
   payload: Record<string, unknown>,
@@ -159,7 +153,6 @@ describe("foldSubagentActivities", () => {
     const agent = agents[0]!;
     expect(agent.title).toBe("Late metadata");
     expect(agent.role).toBe("fixer");
-    // The late start must NOT reopen the terminal activation as a new run.
     expect(agent.status).toBe("failed");
     expect(agent.error).toBe("boom");
   });
@@ -288,7 +281,6 @@ describe("foldSubagentActivities", () => {
     for (const entry of agent.recentActivity) {
       expect(entry.summary.length).toBeLessThanOrEqual(180);
     }
-    // Consecutive identical summaries dedupe (truncation makes them equal).
     const summaries = agent.recentActivity.map((entry) => entry.summary);
     expect(new Set(summaries).size).toBe(summaries.length);
   });
@@ -418,10 +410,7 @@ describe("deriveAgentPanelModel", () => {
   it("counts idle deliberately and waiting as active", () => {
     const model = deriveAgentPanelModel({ agents: roster });
     expect(model.idleCount).toBe(1);
-    // Member 1 is running; the wf-1 coordinator is a container, not a worker.
     expect(model.runningCount).toBe(1);
-    // Every agent lands in exactly one bucket, except coordinators that stand
-    // in for their members.
     expect(model.idleCount + model.runningCount + model.waitingCount + model.settledCount).toBe(
       roster.length - 1,
     );
@@ -429,8 +418,6 @@ describe("deriveAgentPanelModel", () => {
 
   it("omits a workflow coordinator from the working-agent count", () => {
     const model = deriveAgentPanelModel({ agents: roster });
-    // One member still running plus one idle direct spawn. The coordinator
-    // reports running for the whole workflow and must not inflate the banner.
     expect(model.liveCount).toBe(1);
   });
 
@@ -455,8 +442,6 @@ describe("deriveAgentPanelModel", () => {
 
     const model = deriveAgentPanelModel({ agents: finished });
 
-    // Only the member settled. The coordinator stands in for it, so counting
-    // both would report two finished agents where one ran.
     expect(model.settledCount).toBe(1);
     expect(model.liveCount).toBe(0);
   });
@@ -521,9 +506,6 @@ describe("deriveAgentPanelModel", () => {
       }),
     ]);
     const model = deriveAgentPanelModel({ agents: pendingRoster });
-    // "pending" counts as active liveness (queued work), so the phase reads
-    // running only if a member is genuinely pending/running — this asserts
-    // the settled-count rule: no member settled, phase not done.
     expect(model.workflows[0]!.phases[0]!.state).not.toBe("done");
   });
 
@@ -571,8 +553,6 @@ describe("model and effort attribution", () => {
         model: "sonnet",
         effort: "high",
       }),
-      // Later row refines with the authoritative API model id; effort absent
-      // must not clear the known value.
       activity("task.progress", { taskId: "task-m", model: "claude-sonnet-5[1m]" }),
     ]);
     expect(agents).toHaveLength(1);
@@ -645,17 +625,13 @@ describe("background task exclusion", () => {
 
   it("the server stamp is the only classifier: no stamp means no roster row", () => {
     const agents = fold([
-      // Stamped background: agent-looking fields don't matter.
       activity("task.started", {
         taskId: "bg-1",
         agentKind: "background",
         role: "watcher",
         model: "sonnet",
       }),
-      // Stamped agent: plain row still joins the roster.
       activity("task.started", { taskId: "ag-1", agentKind: "agent", detail: "plain row" }),
-      // Legacy pre-stamp rows (old threads/servers) stay in the work log —
-      // exactly their pre-upgrade behavior.
       legacyActivity("task.started", { taskId: "old-task", detail: "tailing logs" }),
       legacyActivity("task.progress", { taskId: "old-task", summary: "still tailing" }),
     ]);
@@ -665,8 +641,6 @@ describe("background task exclusion", () => {
   it("membership is sticky: a stampless later row still reaches a known agent", () => {
     const agents = fold([
       activity("task.started", { taskId: "a1", taskType: "local_agent", title: "Agent" }),
-      // Terminal row missing the stamp (defensive: adapters synthesize some
-      // rows) — sticky membership still routes it to the agent.
       legacyActivity("task.completed", { taskId: "a1", status: "completed", summary: "done" }),
     ]);
     expect(agents).toHaveLength(1);
@@ -714,8 +688,6 @@ describe("terminal robustness", () => {
   });
 
   it("a completion after a terminal task.updated still enriches result and usage", () => {
-    // Claude commonly emits terminal task.updated before task.completed;
-    // the completion carries the summary and final usage the update lacked.
     const agents = fold([
       activity("task.started", { taskId: "te-1", taskType: "local_agent" }),
       activity(
@@ -738,7 +710,6 @@ describe("terminal robustness", () => {
     expect(agent.status).toBe("completed");
     expect(agent.result).toBe("final answer");
     expect(agent.usage?.totalTokens).toBe(4200);
-    // Timestamps stay pinned to the transition that settled the run.
     expect(agent.completedAt).toBe("2026-08-01T10:59:00.000Z");
   });
 

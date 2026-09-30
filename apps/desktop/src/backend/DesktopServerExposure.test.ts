@@ -354,11 +354,8 @@ describe("DesktopServerExposure", () => {
       Effect.gen(function* () {
         const serverExposure = yield* DesktopServerExposure.DesktopServerExposure;
         yield* serverExposure.configureFromSettings({ port: 4173 });
-        // mode stays at default "local-only", tailscaleServeEnabled stays false.
 
         const endpoints = yield* serverExposure.getAdvertisedEndpoints;
-        // Only the loopback endpoint; no tailscale spawn means the dieOnSpawnLayer
-        // would have crashed the test if the gate was missing.
         assert.deepEqual(
           endpoints.map((endpoint) => endpoint.httpBaseUrl),
           ["http://127.0.0.1:4173/"],

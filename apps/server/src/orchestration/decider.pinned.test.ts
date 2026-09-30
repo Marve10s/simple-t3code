@@ -282,8 +282,6 @@ it.layer(NodeServices.layer)("pinned thread decider", (it) => {
       expect(events[0]?.type).toBe("thread.pin-reordered");
       if (events[0]?.type === "thread.pin-reordered") {
         expect(events[0].payload.orderKey).toBe("m");
-        // A real move stamps the command time (the test clock), not the
-        // thread's previous updatedAt.
         expect(events[0].payload.updatedAt).not.toBe(NOW);
       }
     }),

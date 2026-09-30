@@ -24,7 +24,6 @@ export type DuoControlState = {
   error: string | null;
 };
 
-/** One in-flight native transaction. Hinge motion coalesces; presets replace queued motion. Nothing replays after reconnect. */
 export function createDuoControl(options: {
   send: (request: { requestId: number; command: DuoCommand }) => boolean;
   onChange: (state: DuoControlState) => void;
@@ -81,7 +80,6 @@ export function createDuoControl(options: {
   };
 }
 
-/** A pinch keeps its own accumulator across asynchronous native acknowledgements. */
 export function createDuoPinch(options: {
   angle: () => number;
   contains: (x: number, y: number) => boolean;

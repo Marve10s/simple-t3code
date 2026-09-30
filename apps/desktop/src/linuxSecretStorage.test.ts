@@ -26,7 +26,6 @@ describe("linuxSecretStorage", () => {
       expect(
         resolveLinuxPasswordStoreSwitch({ preference, env: { XDG_CURRENT_DESKTOP: "niri" } }),
       ).toBe(preference);
-      // An explicit preference also wins where auto would have stayed out of the way.
       expect(
         resolveLinuxPasswordStoreSwitch({ preference, env: { XDG_CURRENT_DESKTOP: "KDE" } }),
       ).toBe(preference);
@@ -60,14 +59,12 @@ describe("linuxSecretStorage", () => {
 
   it("forces gnome-libsecret for desktops Electron recognizes but leaves on basic text", () => {
     expect(autoSwitch({ XDG_CURRENT_DESKTOP: "LXQt" })).toBe("gnome-libsecret");
-    // Chromium stops at the first recognized value, so a later name cannot rescue the session.
     expect(autoSwitch({ XDG_CURRENT_DESKTOP: "LXQt:GNOME" })).toBe("gnome-libsecret");
     expect(autoSwitch({ XDG_CURRENT_DESKTOP: "LXQt:KDE" })).toBe("gnome-libsecret");
     expect(autoSwitch({ XDG_CURRENT_DESKTOP: "LXQt:plasma" })).toBe("gnome-libsecret");
   });
 
   it("does not treat lowercase desktop names as ones Electron recognizes", () => {
-    // Chromium matches these case-sensitively, so lowercase spellings reach basic text.
     expect(autoSwitch({ XDG_CURRENT_DESKTOP: "gnome" })).toBe("gnome-libsecret");
     expect(autoSwitch({ XDG_CURRENT_DESKTOP: "xfce" })).toBe("gnome-libsecret");
     expect(autoSwitch({ XDG_CURRENT_DESKTOP: "kde", KDE_SESSION_VERSION: "6" })).toBe(
@@ -76,9 +73,6 @@ describe("linuxSecretStorage", () => {
   });
 
   it("overrides KDE sessions identified only by legacy variables", () => {
-    // Chromium reaches KWallet4 for some of these, such as DESKTOP_SESSION=kde with a version, and
-    // basic text for the rest. Either way these are the variables a previous session leaves behind,
-    // so they are treated as unproven and forced to a real keyring rather than a guessed wallet.
     expect(autoSwitch({ XDG_CURRENT_DESKTOP: "plasma" })).toBe("gnome-libsecret");
     for (const session of [
       "kde",
@@ -107,7 +101,6 @@ describe("linuxSecretStorage", () => {
     expect(
       autoSwitch({ XDG_CURRENT_DESKTOP: "niri", DESKTOP_SESSION: "gnome", GDMSESSION: "gnome" }),
     ).toBe("gnome-libsecret");
-    // A previous KDE session left these behind; the compositor running now is not KDE.
     expect(autoSwitch({ XDG_CURRENT_DESKTOP: "niri", KDE_SESSION_VERSION: "6" })).toBe(
       "gnome-libsecret",
     );

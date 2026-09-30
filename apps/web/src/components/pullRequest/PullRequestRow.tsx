@@ -22,12 +22,6 @@ import {
   PullRequestReviewDecisionGlyph,
 } from "./pullRequestPresentation";
 
-/**
- * Each slot past the first only appears once the meta line is wide enough to hold it, so a
- * narrow row shows one label and a "+N" while a wide one spreads out up to three. The "+N"
- * rides on whichever pill is the last visible one, and is hidden as soon as the next slot shows.
- */
-// Each slot's pill appears at a wider row, and its overflow count yields to the next slot.
 const LABEL_SLOTS = [
   { overflow: "@xl/pr-row-meta:hidden" },
   { overflow: "@3xl/pr-row-meta:hidden" },
@@ -64,11 +58,6 @@ function PullRequestRowLabels({ labels }: { labels: EnvironmentPullRequestEntry[
   );
 }
 
-/**
- * The page row keeps a little more room around the shared lines than the panel, which sits in
- * a narrow column. The intrinsic size is the content box a skipped row reserves, which is the
- * two lines without the padding: a 56px row less 20px of `py-2.5`.
- */
 const PAGE_ROW_CLASS = "px-3 py-2.5 [contain-intrinsic-block-size:36.5px]";
 
 export type PullRequestRowTarget = Pick<
@@ -90,16 +79,9 @@ function PullRequestRowImpl({
   entry: EnvironmentPullRequestEntry;
   selected: boolean;
   showProjectTitle: boolean;
-  /** Only when the list spans more than one host, where the repository alone is ambiguous. */
   showProvider: boolean;
-  /** Names the server this row was read from, where the list spans more than one. */
   environmentLabel?: string;
-  /**
-   * A search found this, but in something the row does not show — a description, a comment, a
-   * commit message. Saying so is the difference between a result and an apparently random row.
-   */
   matchedElsewhere?: boolean;
-  /** Used by the list's shared visibility observer to defer optional line-count reads. */
   statsKey?: string;
   statsRef?: RefCallback<HTMLButtonElement>;
   onSelect: (entry: PullRequestRowTarget) => void;
@@ -116,9 +98,6 @@ function PullRequestRowImpl({
         PULL_REQUEST_ROW_CLASS,
         PAGE_ROW_CLASS,
         "cursor-pointer transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring",
-        // Offscreen rows are skipped for style, layout and paint: a long list costs what the
-        // viewport shows, not what the pages have loaded. The intrinsic size keeps the
-        // scrollbar honest while a row is skipped.
         "[content-visibility:auto]",
         selected ? "bg-accent" : "hover:bg-accent/60",
       )}
@@ -128,13 +107,10 @@ function PullRequestRowImpl({
         isDraft={entry.isDraft}
         mergeability={entry.mergeability}
         baseBranch={entry.baseBranch}
-        // On the title line rather than between the lines, as main aligns it.
         className="mt-0.75 self-start"
       />
       <PullRequestRowLines
         number={
-          // The number carries the link, here as much as on the detail: a right-click on it
-          // copies the pull request's own address rather than opening the editing menu.
           <span
             className={PULL_REQUEST_ROW_NUMBER_CLASS}
             onContextMenu={(event) => {
@@ -164,10 +140,6 @@ function PullRequestRowImpl({
                 }}
               />
             )}
-            {/* Only a verdict the host actually reports: an approval, a request for changes,
-                or a review the branch rules still require. No glyph on the common case of a
-                pull request nobody has reviewed, so a row only wears a person when the person
-                has said something. */}
             {entry.reviewDecision === undefined ? null : (
               <PullRequestReviewDecisionGlyph decision={entry.reviewDecision} />
             )}
@@ -242,9 +214,4 @@ function PullRequestRowImpl({
   );
 }
 
-/**
- * Memoized: the list re-renders on every keystroke of a search and every status poll, and a
- * row whose entry, selection and match state are unchanged has nothing new to say. Effective
- * because the route hands it a stable `onSelect`.
- */
 export const PullRequestRow = memo(PullRequestRowImpl);

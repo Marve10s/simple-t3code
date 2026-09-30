@@ -26,7 +26,6 @@ function ComposerProbe() {
 }
 
 beforeEach(async () => {
-  // The probe has no DOM output, but ReactDOM needs an event target.
   const document = {
     nodeType: 9,
     addEventListener() {},
@@ -57,7 +56,6 @@ describe("composer focus state", () => {
     await act(() => composer.setIsComposerFocused(true));
     expect(isResting).toBe(false);
 
-    // A tool disclosure takes focus away from the editor.
     await act(() => composer.setIsComposerFocused(false));
     expect(isResting).toBe(false);
   });

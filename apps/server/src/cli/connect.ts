@@ -67,11 +67,6 @@ const headlessFlag = Flag.Boolean("headless").pipe(
   Flag.withDefault(false),
 );
 
-/**
- * Inside an SSH session there is no local browser to complete the loopback
- * OAuth callback, so the device authorization grant is the only flow that
- * can work.
- */
 export const headlessSessionConfig = Config.all({
   sshConnection: Config.String("SSH_CONNECTION").pipe(Config.option),
   sshTty: Config.String("SSH_TTY").pipe(Config.option),
@@ -97,7 +92,6 @@ function formatDeviceAuthorizationPrompt(
   ].join("\n");
 }
 
-/** Returns the connected account identity, if the flow could determine one. */
 const authorizeCli = Effect.fn("cloud.cli.authorize")(function* (options: {
   readonly headless: boolean;
 }) {
@@ -110,8 +104,6 @@ const authorizeCli = Effect.fn("cloud.cli.authorize")(function* (options: {
     }
     yield* Console.log("\nHeadless mode enabled. A new authorization link is ready below.");
   }
-  // A stored credential whose refresh fails (revoked, expired grant) must
-  // fall through to a fresh device authorization, not dead-end the command.
   const existing = yield* tokens.getExisting.pipe(
     Effect.catchTag("CloudCliCredentialRefreshError", () =>
       Console.log(
@@ -604,10 +596,6 @@ const connectPublishCommand = Command.make("publish", {
           stringToBytes(enabled ? "true" : "false"),
         );
         if (!enabled) {
-          // If enabling scheduled a publish-only link that hasn't been
-          // provisioned yet, disabling must cancel it too — otherwise the next
-          // start still links an environment whose only purpose was publishing.
-          // A pending managed link is left alone; it exists for the tunnel.
           const linkedNow = Option.isSome(yield* secrets.get(CLOUD_LINKED_USER_ID));
           if (!linkedNow && (yield* CliState.readCliDesiredLinkMode) === "publish_only") {
             yield* CliState.setCliDesiredCloudLink(false);
@@ -623,20 +611,12 @@ const connectPublishCommand = Command.make("publish", {
           return;
         }
 
-        // Publishing needs the relay to know this environment belongs to you.
-        // Establish a tunnel-free publish-only link automatically so signing in
-        // is all it takes — the mobile client can still reach the environment
-        // out of band without T3 Connect.
         if (!(yield* tokens.hasCredential)) {
           yield* Console.log(
             "Run `t3 connect login` first so this environment can be authorized to publish.",
           );
           return;
         }
-        // A link may already be desired (e.g. `t3 connect link` before the
-        // server's first start). Never downgrade it: a desired managed link
-        // also covers publishing, so only request a publish-only link when no
-        // link is pending at all.
         if (yield* CliState.readCliDesiredCloudLink) {
           yield* Console.log(
             "A T3 Connect link is already pending. Start T3 to finish provisioning it; publishing starts once it links.",
@@ -684,13 +664,8 @@ export const connectCommand = Command.make("connect", {
         if (!linked) {
           return;
         }
-        // Show which account was linked so an unexpected identity (an
-        // authorization code for a different account) is visible before the
-        // machine is brought online.
         yield* Console.log(`✓ Authorized${connectedAs(linked.identity)}`);
 
-        // Authorization is stored. If service setup fails, preserve it and
-        // show how to run the server manually.
         const background = yield* recoverServiceOnboardingOffer(offerServiceDuringOnboarding);
         if (background) {
           const platform = yield* HostProcessPlatform;

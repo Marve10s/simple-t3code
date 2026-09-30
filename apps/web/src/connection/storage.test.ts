@@ -95,7 +95,6 @@ describe("makeCatalogBackend", () => {
         error: null as DOMException | null,
         objectStore: () => ({
           put: () => {
-            // A failed commit aborts the transaction without an "error" event.
             queueMicrotask(() => {
               transaction.error = new DOMException("Quota exceeded", "QuotaExceededError");
               transaction.dispatchEvent(new Event("abort"));

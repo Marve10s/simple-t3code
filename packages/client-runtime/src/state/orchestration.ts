@@ -15,7 +15,6 @@ export function createOrchestrationEnvironmentAtoms<R, E>(
     workflowScript: createEnvironmentRpcQueryAtomFamily(runtime, {
       label: "environment-data:orchestration:workflow-script",
       tag: ORCHESTRATION_WS_METHODS.getWorkflowScript,
-      // Scripts are immutable per run: cache generously.
       staleTimeMs: 300_000,
       idleTtlMs: 300_000,
     }),

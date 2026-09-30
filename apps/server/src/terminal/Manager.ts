@@ -1,11 +1,3 @@
-/**
- * TerminalManager - Terminal session orchestration service interface.
- *
- * Owns terminal lifecycle operations, output fanout, and session state
- * transitions for thread-scoped terminals.
- *
- * @module TerminalManager
- */
 import { withWorkspaceLease } from "../workspace/workspaceLease.ts";
 import {
   DEFAULT_TERMINAL_ID,
@@ -141,88 +133,39 @@ class TerminalProcessSignalError extends Schema.TaggedError<TerminalProcessSigna
   }
 }
 
-/**
- * TerminalManager - Service tag for terminal session orchestration.
- */
 export class TerminalManager extends Context.Service<
   TerminalManager,
   {
-    /**
-     * Open or attach to a terminal session.
-     *
-     * Reuses an existing session for the same thread/terminal id and restores
-     * persisted history on first open.
-     */
     readonly open: (
       input: TerminalOpenInput,
     ) => Effect.Effect<TerminalSessionSnapshot, TerminalError>;
 
-    /**
-     * Attach to a terminal and stream its initial snapshot followed by live events.
-     *
-     * Returns an unsubscribe function.
-     */
     readonly attachStream: (
       input: TerminalAttachInput,
       listener: (event: TerminalAttachStreamEvent) => Effect.Effect<void>,
     ) => Effect.Effect<() => void, TerminalError>;
 
-    /**
-     * Write input bytes to a terminal session.
-     */
     readonly write: (input: TerminalWriteInput) => Effect.Effect<void, TerminalError>;
 
-    /**
-     * Resize the PTY backing a terminal session.
-     */
     readonly resize: (input: TerminalResizeInput) => Effect.Effect<void, TerminalError>;
 
-    /**
-     * Clear terminal output history.
-     */
     readonly clear: (input: TerminalClearInput) => Effect.Effect<void, TerminalError>;
 
-    /**
-     * Restart a terminal session in place.
-     *
-     * Always resets history before spawning the new process.
-     */
     readonly restart: (
       input: TerminalRestartInput,
     ) => Effect.Effect<TerminalSessionSnapshot, TerminalError>;
 
-    /**
-     * Close an active terminal session.
-     *
-     * When `terminalId` is omitted, closes all sessions for the thread.
-     */
     readonly close: (input: TerminalCloseInput) => Effect.Effect<void, TerminalError>;
 
-    /**
-     * Close a thread's terminals that wait at an idle shell prompt. A terminal
-     * that runs a command stays open. When `terminalId` is set, only that
-     * terminal is considered. Used when a thread settles and when a setup
-     * script finishes.
-     */
     readonly closeIdle: (input: {
       readonly threadId: string;
       readonly terminalId?: string;
     }) => Effect.Effect<void>;
 
-    /**
-     * Subscribe to terminal runtime events with a direct callback.
-     *
-     * Returns an unsubscribe function.
-     */
     readonly subscribe: (
       listener: (event: TerminalEvent) => Effect.Effect<void>,
     ) => Effect.Effect<() => void>;
 
-    /**
-     * Subscribe to lightweight terminal metadata with an initial full snapshot.
-     *
-     * Returns an unsubscribe function.
-     */
     readonly subscribeMetadata: (
       listener: (event: TerminalMetadataStreamEvent) => Effect.Effect<void>,
     ) => Effect.Effect<() => void>;
@@ -286,7 +229,6 @@ interface TerminalSessionState {
   exitSignal: number | null;
   updatedAt: string;
   eventSequence: number;
-  /** Counts writes, so closeIdle can see input that has not echoed yet. */
   inputCount: number;
   cols: number;
   rows: number;
@@ -294,7 +236,6 @@ interface TerminalSessionState {
   unsubscribeData: (() => void) | null;
   unsubscribeExit: (() => void) | null;
   hasRunningSubprocess: boolean;
-  /** Normalized child command name when `hasRunningSubprocess`; cleared when idle. */
   childCommandLabel: string | null;
   runtimeEnv: Record<string, string> | null;
 }
@@ -669,8 +610,6 @@ function parsePosixProcessTable(stdout: string): TerminalProcessTableSnapshot {
   const childrenByParent = new Map<number, number[]>();
   const commandById = new Map<number, string>();
   for (const line of stdout.split(/\r?\n/g)) {
-    // `comm=` is the final column and may itself contain spaces, so only the
-    // first two tokens are structural.
     const match = /^\s*(\d+)\s+(\d+)\s+(.+)$/.exec(line);
     if (!match) continue;
     const pid = Number(match[1]);
@@ -708,8 +647,6 @@ function deriveSubprocessInspectResult(
   const commandName = (pid: number) =>
     normalizeChildCommandName(snapshot.commandById.get(pid) ?? "", platform);
   const shellName = commandName(terminalPid);
-  // Async prompt themes fork the shell into a helper that waits with no
-  // children of its own. That copy is not a command the user started.
   const childPid = (snapshot.childrenByParent.get(terminalPid) ?? []).find(
     (pid) =>
       shellName === null ||
@@ -740,9 +677,6 @@ function deriveSubprocessInspectResult(
 
 const POSIX_PS_ABSOLUTE_PATHS = ["/bin/ps", "/usr/bin/ps"] as const;
 
-// Resolve `ps` to an absolute path once at startup. Spawning by bare name
-// walks every PATH entry per spawn (one failed posix_spawn per directory
-// until the hit), which is measurable at a 1s poll cadence on long PATHs.
 const resolvePosixPsCommand = Effect.fn("terminal.resolvePosixPsCommand")(function* () {
   const fileSystem = yield* FileSystem.FileSystem;
   for (const candidate of POSIX_PS_ABSOLUTE_PATHS) {
@@ -779,8 +713,6 @@ const posixProcessTableSnapshot = Effect.fn("terminal.posixProcessTableSnapshot"
       ),
     );
   if (result.code !== 0 || result.timedOut || result.stdoutTruncated) {
-    // Not authoritative: an empty or partial table would mark every terminal
-    // idle and clear its registered process ids. Failing skips the tick.
     return yield* new TerminalSubprocessCheckError({
       command: "ps",
       exitCode: result.code,
@@ -847,7 +779,6 @@ export class BoundedTerminalHistory {
   private start = 0;
   private byteLength = 0;
   private lineBreaks = 0;
-  // Reading the old string's tail on each append can force chunk concatenation.
   private lastCodeUnit: number | undefined;
   private cachedValue: string | null = "";
 
@@ -862,7 +793,6 @@ export class BoundedTerminalHistory {
     this.cachedValue = null;
     if (this.maxBytes <= 0 || this.maxLines <= 0) {
       this.clear();
-      // Preserve the existing zero-line limit's trailing newline behavior.
       if (this.maxBytes > 0 && text.endsWith("\n")) this.appendChunk("\n");
       return;
     }
@@ -879,7 +809,6 @@ export class BoundedTerminalHistory {
       firstCode >= 0xdc00 &&
       firstCode <= 0xdfff
     ) {
-      // Joining a split surrogate changes its UTF-8 size from 3 to 4 bytes.
       previous.data += text[0];
       previous.byteLength += 1;
       this.byteLength += 1;
@@ -896,7 +825,6 @@ export class BoundedTerminalHistory {
         end -= 1;
       }
       const data = text.slice(offset, end);
-      // Detach small chunks from large input strings so evicted prefixes can be collected.
       this.appendChunk(
         text.length > MAX_HISTORY_CHUNK_LENGTH
           ? Buffer.from(data, "utf16le").toString("utf16le")
@@ -973,14 +901,12 @@ export class BoundedTerminalHistory {
         continue;
       }
       if (first.byteLength === first.data.length && first.lineBreaks === 0) {
-        // ASCII without newlines needs no scan to find the byte cutoff.
         this.trimChunk(bytesToDrop, bytesToDrop, 0);
         continue;
       }
       let offset = 0;
       let bytes = 0;
       let lineBreaks = 0;
-      // Scan only the discarded prefix of one small chunk, never all history.
       while (bytes < bytesToDrop) {
         const codePoint = first.data.codePointAt(offset)!;
         bytes += codePoint <= 0x7f ? 1 : codePoint <= 0x7ff ? 2 : codePoint <= 0xffff ? 3 : 4;
@@ -1032,27 +958,18 @@ function shouldStripCsiSequence(body: string, finalByte: string): boolean {
   if (finalByte === "c" && /^[>0-9;?]*$/.test(body)) {
     return true;
   }
-  // DECRQM mode queries (…$p) and DECRPM replies (…$y): replaying a stored
-  // query makes the terminal answer again, and the shell echoes the answer as
-  // junk at the prompt. The `$` guard keeps setters like DECSTR (!p) and
-  // DECSCL ("p) intact.
   if ((finalByte === "p" || finalByte === "y") && /^[0-9;?]*\$$/.test(body)) {
     return true;
   }
-  // XTVERSION query (>q). DECSCUSR (space-intermediate q) stays.
   if (finalByte === "q" && /^>[0-9;]*$/.test(body)) {
     return true;
   }
-  // Kitty keyboard protocol query/reply (?u). Restore-cursor (bare u) stays.
   if (finalByte === "u" && body.startsWith("?")) {
     return true;
   }
   return false;
 }
 
-// DECRQSS ($q) and XTGETTCAP (+q) queries plus their replies ([01]$r / [01]+r):
-// pure request/response traffic with no visual value, and replaying a stored
-// query triggers a fresh reply.
 function shouldStripDcsSequence(content: string): boolean {
   return /^[01]?[$+][qr]/.test(content);
 }
@@ -1247,17 +1164,7 @@ function shouldExcludeTerminalEnvKey(key: string): boolean {
   return TERMINAL_ENV_BLOCKLIST.has(normalizedKey);
 }
 
-// Marker variables the AppImage runtime injects into the process it launches.
-// They describe the AppImage itself, not the user's session, so terminals must
-// not inherit them.
 const APPIMAGE_RUNTIME_ENV_KEYS = ["APPIMAGE", "APPDIR", "ARGV0", "OWD"] as const;
-// Colon-separated search-path variables the AppImage runtime points at its
-// temporary mount (e.g. /tmp/.mount_T3-XXXX/usr/bin, the bundled glib schemas,
-// and an $APPDIR/usr/share XDG data entry). Only the mount segments are
-// dropped; the user's real entries are preserved. When nothing but mount
-// segments remain the variable is removed entirely so consumers fall back to
-// their platform default (e.g. gsettings finds the host schemas instead of
-// reporting "No schemas installed"). See issues #1699 and #5059.
 const APPIMAGE_PATH_LIKE_ENV_KEYS = [
   "PATH",
   "LD_LIBRARY_PATH",
@@ -1269,13 +1176,6 @@ function isPathSegmentUnderAppDir(segment: string, appDir: string): boolean {
   return segment === appDir || segment.startsWith(`${appDir}/`);
 }
 
-// On Linux AppImage builds the runtime mounts the app under a temporary dir and
-// injects APPIMAGE/APPDIR/ARGV0/OWD plus mount entries on PATH/LD_LIBRARY_PATH.
-// The integrated terminal inherits the server process environment, so without
-// this scrub those leak into the PTY and tools resolve against the AppImage
-// mount instead of the user's real environment (e.g. `php` reporting
-// PHP_BINARY as the AppImage path). See issue #1699. The scrub is gated on an
-// actual AppImage launch so non-AppImage environments are left untouched.
 function stripAppImageRuntimeEnv(env: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
   if (env.APPIMAGE === undefined && env.APPDIR === undefined) return env;
 
@@ -1319,7 +1219,6 @@ function createTerminalSpawnEnv(
         key === "CODEX_HOME" || key === "CLAUDE_CONFIG_DIR" ? expandHomePath(value) : value;
     }
   }
-  // Both PTY backends feed truecolor-capable terminal clients.
   if (spawnEnv.COLORTERM === undefined || spawnEnv.COLORTERM === "") {
     spawnEnv.COLORTERM = "truecolor";
   }
@@ -1409,7 +1308,7 @@ export const resolveProviderInstanceTerminalEnvironment = Effect.fn(
   );
 });
 
-/** @public Service construction is part of the canonical Effect module API. */
+/** @public */
 export const make = Effect.fn("TerminalManager.make")(function* () {
   const { terminalLogsDir } = yield* ServerConfig.ServerConfig;
   const ptyAdapter = yield* PtyAdapter.PtyAdapter;
@@ -1453,10 +1352,6 @@ export const makeWithOptions = Effect.fn("TerminalManager.makeWithOptions")(func
   const historyLineLimit = options.historyLineLimit ?? DEFAULT_HISTORY_LINE_LIMIT;
   const historyByteLimit = options.historyByteLimit ?? DEFAULT_HISTORY_BYTE_LIMIT;
   const platform = yield* HostProcessPlatform;
-  // Terminals must inherit the user's full environment (minus the blocklist
-  // applied in createTerminalSpawnEnv) — an allowlist here silently strips
-  // things like PSModulePath, DISPLAY, proxies, and toolchain variables.
-  // `options.env` is the test seam.
   const baseEnv = options.env ?? process.env;
   const shellResolver = options.shellResolver ?? (() => defaultShellResolver(platform, baseEnv));
   const processRunner = yield* ProcessRunner.ProcessRunner;
@@ -1478,9 +1373,6 @@ export const makeWithOptions = Effect.fn("TerminalManager.makeWithOptions")(func
       return { ...input, env };
     },
   );
-  // One process-table snapshot per poll tick, shared across every terminal.
-  // Per-terminal `pgrep`/`ps` calls multiply spawn load by terminal count and
-  // can exhaust the PID space on hosts with many sessions (#6332).
   const fallbackProcessTableSnapshot = (
     platform === "win32"
       ? windowsProcessTableSnapshot()
@@ -1489,11 +1381,6 @@ export const makeWithOptions = Effect.fn("TerminalManager.makeWithOptions")(func
   const fetchProcessTableSnapshot: Effect.Effect<
     {
       readonly snapshot: TerminalProcessTableSnapshot;
-      /**
-       * False when the sidecar snapshot failed and this table came from the
-       * spawned fallback. The data is still applied, but the tick counts as
-       * a failure so polling backs off instead of hot-looping the fallback.
-       */
       readonly snapshotSucceeded: boolean;
     },
     TerminalSubprocessCheckError
@@ -1787,7 +1674,6 @@ export const makeWithOptions = Effect.fn("TerminalManager.makeWithOptions")(func
     }
     let start = 0;
     if (offset > 0n) {
-      // A tail read can start inside a UTF-8 code point. Skip its remaining bytes.
       while (start < length && ((bytes[start] ?? 0) & 0xc0) === 0x80) start += 1;
     }
     return {
@@ -2253,7 +2139,6 @@ export const makeWithOptions = Effect.fn("TerminalManager.makeWithOptions")(func
               session.process = ptyProcess;
               session.pid = processPid;
               session.status = "running";
-              // onExit may replay an exit immediately; accept it before subscribing.
               session.unsubscribeData = spawnResult.process.onData((data) => {
                 if (!enqueueProcessEvent(session, processPid, { type: "output", data })) {
                   return;
@@ -2277,7 +2162,6 @@ export const makeWithOptions = Effect.fn("TerminalManager.makeWithOptions")(func
               sequence: eventStamp.sequence,
               snapshot: snapshot(session),
             });
-            // Publish startup before draining any events replayed during subscription.
             eventsActivated = true;
             if (session.processEventDrainRunning) runFork(drainProcessEvents(session, processPid));
           }),
@@ -2919,7 +2803,6 @@ export const makeWithOptions = Effect.fn("TerminalManager.makeWithOptions")(func
 
   const resizeLocked = Effect.fn("terminal.resize")(function* (input: TerminalResizeInput) {
     const session = yield* getSession(input.threadId, input.terminalId);
-    // ResizeObserver traffic can already be in flight when the UI closes the session.
     if (Option.isNone(session)) {
       return;
     }
@@ -3082,16 +2965,11 @@ export const makeWithOptions = Effect.fn("TerminalManager.makeWithOptions")(func
             (input.terminalId === undefined || session.terminalId === input.terminalId),
         );
         if (running.length === 0) return;
-        // A command started during the process check can miss the snapshot,
-        // but its input or echo still lands. Both counters only grow, so the
-        // sum changes when either one does.
         const activityMark = (session: TerminalSessionState) =>
           session.eventSequence + session.inputCount;
         const marks = new Map(
           running.map((session) => [session.terminalId, activityMark(session)]),
         );
-        // Inspect now instead of trusting the last poll, so a command started
-        // since then keeps its terminal.
         const { inspector } = yield* acquireSubprocessInspector;
         yield* Effect.forEach(
           running,
@@ -3108,7 +2986,6 @@ export const makeWithOptions = Effect.fn("TerminalManager.makeWithOptions")(func
         );
       }),
     ).pipe(
-      // The process check failed, so every terminal stays open.
       Effect.catch((error) =>
         Effect.logWarning("failed to close idle terminals", {
           threadId: input.threadId,

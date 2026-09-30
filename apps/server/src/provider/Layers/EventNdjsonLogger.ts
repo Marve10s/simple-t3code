@@ -1,10 +1,4 @@
 // @effect-diagnostics nodeBuiltinImport:off
-/**
- * Best-effort provider event logging with one shared writer per thread.
- *
- * Native and canonical views share batching, rotation, and retention state so
- * they cannot race while appending to the same thread-scoped file.
- */
 import * as NodeFS from "node:fs";
 import * as NodePath from "node:path";
 
@@ -205,8 +199,6 @@ function shouldPersistProviderEvent(stream: EventNdjsonStream, event: unknown): 
 
     const nested = Reflect.get(event, "event");
     const envelope = typeof nested === "object" && nested !== null ? nested : event;
-    // Decoded frames carry the same information as raw frames without another
-    // copy of every token delta. Decode failures have their own diagnostic frame.
     if (Reflect.get(envelope, "stage") === "raw") return false;
     const decodedPayload = Reflect.get(envelope, "payload");
     const nativeEvent =
@@ -255,7 +247,6 @@ function shouldPersistProviderEvent(stream: EventNdjsonStream, event: unknown): 
       const partType = Reflect.get(part, "type");
       if (partType === "text" || partType === "reasoning") return false;
       if (partType === "tool") {
-        // Running snapshots repeat growing output. Pending and terminal states stay in the log.
         const state = Reflect.get(part, "state");
         if (typeof state === "object" && state !== null) {
           return Reflect.get(state, "status") !== "running";
@@ -338,7 +329,6 @@ function summarizeProviderEvent(event: unknown): unknown {
   }
 }
 
-/** Bounds traversal before the logger encodes payloads. */
 function boundProviderEventForLogging(event: unknown): unknown {
   let remainingCharacters = MAX_RECORD_CHARACTERS;
   let remainingFields = MAX_RECORD_FIELDS;
@@ -368,9 +358,7 @@ function boundProviderEventForLogging(event: unknown): unknown {
   };
   try {
     if (fits(event, 0)) return event;
-  } catch {
-    // A failing accessor must not escape into provider processing.
-  }
+  } catch {}
   return summarizeProviderEvent(event);
 }
 
@@ -743,8 +731,6 @@ export const makeEventNdjsonLogStore = Effect.fnUntraced(function* (
       if (!shouldPersistProviderEvent(stream, event)) return;
       let payload = yield* serializeEvent(boundProviderEventForLogging(event));
       if (payload === undefined) return;
-      // Escaping can expand strings beyond their input size. Keep that bounded
-      // serialization out of the file too, while retaining routing/error fields.
       if (Buffer.byteLength(payload) > MAX_RECORD_CHARACTERS) {
         payload = yield* serializeEvent(summarizeProviderEvent(event));
         if (payload === undefined) return;

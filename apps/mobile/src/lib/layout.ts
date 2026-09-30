@@ -5,13 +5,6 @@ function clamp(value: number, min: number, max: number): number {
   return Math.min(Math.max(value, min), max);
 }
 
-/**
- * Use available space, not device or orientation labels, to choose the shell.
- *
- * The height floor deliberately keeps every current iPhone in the compact shell
- * when it rotates to landscape, while still allowing iPad and foldable-sized
- * windows to adopt the persistent sidebar as they resize.
- */
 export const SPLIT_LAYOUT_MIN_WIDTH = 720;
 export const SPLIT_LAYOUT_MIN_HEIGHT = 600;
 
@@ -20,7 +13,6 @@ const SPLIT_SIDEBAR_DEFAULT_MAX_WIDTH = 380;
 
 export const AUXILIARY_PANE_MIN_CONTENT_WIDTH = 960;
 export const CHAT_CONTENT_MAX_WIDTH = 960;
-// min-h-8 uses the 14px rem configured in metro.config.js.
 export const THREAD_WORK_ROW_MIN_HEIGHT = 28;
 
 export function deriveThreadWorkLogSizing(input: {
@@ -29,14 +21,11 @@ export function deriveThreadWorkLogSizing(input: {
 }) {
   const lineHeight = scaledTypographyLineHeight(MOBILE_TYPOGRAPHY.footnote, input.baseFontSize);
   return {
-    // Different text metrics can share the same minimum row height.
     textSizeKey: `${input.baseFontSize}:${input.fontScale}`,
     estimatedRowHeight: Math.max(
       THREAD_WORK_ROW_MIN_HEIGHT,
       Math.ceil(lineHeight * input.fontScale),
     ),
-    // Native text can exceed its authored line height with accessibility scaling.
-    // Leave those rows measured instead of promising LegendList an exact size.
     fixedRowHeight:
       input.fontScale <= 1 && lineHeight <= THREAD_WORK_ROW_MIN_HEIGHT
         ? THREAD_WORK_ROW_MIN_HEIGHT
@@ -213,10 +202,6 @@ export function deriveFileInspectorPaneLayout(input: {
   };
 }
 
-/**
- * Keep an auxiliary pane within native-feeling bounds without squeezing its
- * neighboring content below a usable reading/editor width.
- */
 export function constrainAuxiliaryPaneWidth(input: {
   readonly preferredWidth: number;
   readonly availableWidth: number;

@@ -7,7 +7,6 @@ import { ProviderValidationError } from "./Errors.ts";
 
 const quoteReference = Schema.encodeSync(Schema.fromJsonString(Schema.String));
 
-/** Keep provider answer protocols unchanged; paths refer to files on the provider's server. */
 export const appendUserInputAttachmentPaths = Effect.fn("appendUserInputAttachmentPaths")(
   function* (input: {
     answers: ProviderUserInputAnswers;

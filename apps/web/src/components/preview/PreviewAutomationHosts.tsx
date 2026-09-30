@@ -214,10 +214,7 @@ const waitForRenderedViewport = async (
       ) {
         return renderedViewport;
       }
-    } catch {
-      // Registration and navigation can transiently replace the guest while
-      // React applies the server snapshot. Retry until the operation deadline.
-    }
+    } catch {}
     await new Promise<void>((resolve) => window.setTimeout(resolve, 50));
   }
   throw new PreviewAutomationViewportTimeoutError({
@@ -278,11 +275,6 @@ export function PreviewAutomationHosts() {
   if (!isElectron || !previewBridge?.automation) return null;
   return (
     <>
-      {/*
-       * Host lifetime follows the desktop runtime's environment connections,
-       * not the routed thread. This keeps background threads automatable and
-       * lets the subscription runtime own reconnects for every saved target.
-       */}
       {environments.map((environment) => (
         <PreviewAutomationHost
           key={environment.environmentId}
@@ -356,7 +348,6 @@ function PreviewAutomationHost(props: { readonly environmentId: EnvironmentId })
 
   const handleRequest = useCallback(
     async (request: PreviewAutomationRequest): Promise<unknown> => {
-      // Session sync and tab creation consume the same budget as overlay registration.
       const hostDeadlineMs = Date.now() + resolveHostWaitBudgetMs(request.timeoutMs);
       const threadRef: ScopedThreadRef = {
         environmentId,
@@ -457,8 +448,6 @@ function PreviewAutomationHost(props: { readonly environmentId: EnvironmentId })
                 input: {
                   threadId: request.threadId,
                   ...(resolvedInputUrl ? { url: resolvedInputUrl } : {}),
-                  // An agent that didn't state a size gets the user's
-                  // configured default, same as a hand-opened tab.
                   viewport: browserDefaultOpenViewport(defaults),
                   profileId: browserDefaultOpenProfileId(defaults),
                 },
@@ -548,10 +537,6 @@ function PreviewAutomationHost(props: { readonly environmentId: EnvironmentId })
               await requireReadyTab();
             }
             if (shouldPresentPreview) {
-              // React commits the thread-bound surface asynchronously. Settle
-              // briefly so active-thread opens report visible=true, without
-              // turning a background thread's offscreen mini player into an
-              // operation failure.
               await waitForPreviewPresentation(activeRuntimeTabId);
             }
             if (reusedExistingTab && resolvedInputUrl && previewBridge) {

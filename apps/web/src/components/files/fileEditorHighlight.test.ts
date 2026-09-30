@@ -19,7 +19,6 @@ interface Tokenizer {
   cleanUp(): void;
 }
 
-// This dependency-internal tokenizer is the one used by Editor.#rerender.
 const tokenizerUrl = new URL("./editor/tokenizer.js", import.meta.resolve("@pierre/diffs"));
 const { EditorTokenizer } = (await import(/* @vite-ignore */ tokenizerUrl.href)) as {
   EditorTokenizer: new (options: {
@@ -117,7 +116,6 @@ class WorkerTransport {
 }
 
 function applyChange(change: DocumentChange) {
-  // Keep the installed editor's non-DOM order, including the existing contents patch.
   renderer.updateRenderCache(tokenizer.tokenize(change, range), tokenizer.themeType);
   file.contents = document.getText();
   if (change.lineDelta !== 0) renderer.applyDocumentChange(document);
@@ -162,7 +160,6 @@ beforeEach(async () => {
   });
   vi.stubGlobal("window", { matchMedia: () => ({ matches: true }) });
   pool = new WorkerPoolManager(
-    // Adapt browser transport only; Pierre's real worker produces each response.
     { workerFactory: () => new WorkerTransport() as unknown as globalThis.Worker, poolSize: 1 },
     options,
   );
@@ -190,7 +187,6 @@ async function cleanUpFixture() {
   renderer?.cleanUp();
   pool?.terminate();
   await Promise.all(terminationPromises);
-  // Pool termination can queue a final broadcast after its workers have exited.
   for (const frame of animationFrames) clearImmediate(frame);
   animationFrames.clear();
   vi.unstubAllGlobals();
@@ -211,7 +207,6 @@ describe("editable file highlighting", () => {
     const window = globalThis.window;
     try {
       await cleanUpFixture();
-      // Deliver the real Immediate queue after cleanup has removed the browser globals.
       await new Promise<void>((resolve) => setImmediate(resolve));
     } finally {
       vi.stubGlobal("requestAnimationFrame", animationFrame);

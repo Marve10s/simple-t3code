@@ -29,8 +29,6 @@ import {
 import { getThreadListV2OrderedSection } from "../threads/threadListV2";
 import { resolveThreadTitleRename } from "../threads/thread-title-rename";
 
-/** Version skew: never send settle/unsettle to a server that predates them
-    (capability defaults false on decode for older servers). */
 function environmentSupportsSettlement(environmentId: EnvironmentThreadShell["environmentId"]) {
   return (
     appAtomRegistry.get(environmentServerConfigsAtom).get(environmentId)?.environment.capabilities
@@ -107,7 +105,6 @@ function actionFailureTitle(action: ThreadListAction): string {
   return "Could not delete thread";
 }
 
-/** Resolves to true iff the action was dispatched and succeeded. */
 function useThreadActionExecutor(
   onCompleted?: (action: ThreadListAction, thread: EnvironmentThreadShell) => void,
 ) {
@@ -138,8 +135,6 @@ function useThreadActionExecutor(
           );
           return false;
         }
-        // Archive keeps its original, narrower guard: never interrupt a
-        // thread mid-turn.
         if (
           action === "archive" &&
           thread.session?.status === "running" &&
@@ -155,9 +150,7 @@ function useThreadActionExecutor(
           key,
           async () =>
             action === "unsettle"
-              ? // reason "user" pins the thread active: auto-settle stays
-                // suppressed until real activity clears the pin server-side.
-                await unsettleMutation({
+              ? await unsettleMutation({
                   environmentId: thread.environmentId,
                   input: { threadId: thread.id, reason: "user" },
                 })
@@ -179,8 +172,6 @@ function useThreadActionExecutor(
           Alert.alert(actionFailureTitle(action), actionFailureMessage(action, result.cause));
           return false;
         }
-        // Settled threads stay in the live shell stream; only the archive
-        // lifecycle still feeds the archived-snapshot surface.
         if (action === "archive" || action === "unarchive" || action === "delete") {
           refreshArchivedThreadsForEnvironment(thread.environmentId);
         }
@@ -246,7 +237,6 @@ export function useThreadListActions(): {
   readonly unsettleThread: (thread: EnvironmentThreadShell) => Promise<boolean>;
   readonly pinThread: (thread: EnvironmentThreadShell) => Promise<boolean>;
   readonly unpinThread: (thread: EnvironmentThreadShell) => Promise<boolean>;
-  /** Sets per-thread automatic settlement on or off. */
   readonly setThreadAutoSettle: (
     thread: EnvironmentThreadShell,
     enabled: boolean,
@@ -394,8 +384,6 @@ export function useThreadListActions(): {
         return false;
       }
       selectionHaptic();
-      // Same placement as web: a fresh pin takes the top of the arranged
-      // run. Servers that predate reordering get the bare pin (keyless).
       let orderKey: string | undefined;
       if (environmentSupportsPinReorder(thread.environmentId)) {
         const shells = appAtomRegistry.get(environmentThreadShells.threadShellsAtom);
@@ -566,7 +554,6 @@ export function useThreadListActions(): {
     [updateThreadMetadata],
   );
 
-  // Plan against the complete section so filtering does not change a move.
   const reorderPinnedMutation = useAtomCommand(threadEnvironment.reorderPin, {
     reportFailure: false,
   });
@@ -709,7 +696,6 @@ export function useThreadListActions(): {
                 ? error.message
                 : "The thread could not be moved.",
             );
-            // Keep confirmed keys when a later environment rejects its write.
             return false;
           }
         }

@@ -9,23 +9,12 @@ import * as PreviewManager from "./Manager.ts";
 const DRAIN_LIMIT = 100;
 
 interface EventCollector {
-  /** Drain everything published since the last call (or since subscribe). */
   readonly drain: Effect.Effect<ReadonlyArray<PreviewEvent>>;
 }
 
-/**
- * Each `it.effect` shares the live PreviewManager layer across the whole
- * `it.layer` block, so tests that assert per-thread counts must use a unique
- * thread id to avoid bleeding state from earlier tests.
- */
 let nextThreadId = 0;
 const freshThreadId = () => ThreadId.make(`thread-${++nextThreadId}`);
 
-/**
- * Subscribe to the manager's event stream BEFORE the test publishes. We
- * use `subscribeEvents` (synchronous PubSub.subscribe under the hood) so
- * no event can land between subscribe and the consumer drain.
- */
 const collectEvents = Effect.gen(function* () {
   const manager = yield* PreviewManager.PreviewManager;
   const subscription = yield* manager.subscribeEvents;
@@ -66,10 +55,6 @@ it.layer(PreviewManager.layer)("PreviewManager", (it) => {
       const opened = yield* manager.open({ threadId, profileId: "work" });
       expect(opened.profileId).toBe("work");
 
-      // `navigate` and `reportStatus` rebuild the snapshot field by field
-      // rather than spreading it, so a new field is dropped unless carried
-      // explicitly — which would silently move the tab to another profile's
-      // partition on its first navigation.
       const navigated = yield* manager.navigate({
         threadId,
         tabId: opened.tabId,

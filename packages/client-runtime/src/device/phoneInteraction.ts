@@ -7,7 +7,6 @@ export type PhoneNavigation =
   | { readonly type: "orbit"; readonly x: number; readonly y: number }
   | { readonly type: "zoom"; readonly delta: number };
 
-/** Browser wheel units vary by device. Navigation uses viewport fractions and logarithmic zoom. */
 export function phoneWheelNavigation(input: {
   readonly deltaX: number;
   readonly deltaY: number;
@@ -30,7 +29,6 @@ export function phoneWheelNavigation(input: {
   };
 }
 
-/** A single pointer owns either a device gesture or an orbit until released or cancelled. */
 export function createPhoneInteraction(options: {
   readonly screenPoint: (point: Point, captured: boolean) => Point | null;
   readonly touch: (phase: "begin" | "move" | "end", point: Point) => void;
@@ -42,7 +40,6 @@ export function createPhoneInteraction(options: {
     null;
   return {
     navigate(gesture: PhoneNavigation) {
-      // Moving the camera during a captured device touch would change its projected coordinates.
       if (active) return false;
       if (gesture.type === "zoom") options.zoomBy(gesture.delta);
       else options.orbit(gesture.x, gesture.y);

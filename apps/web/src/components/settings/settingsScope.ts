@@ -6,12 +6,6 @@ import type {
 } from "../../sidebarProjectGrouping";
 import type { EnvironmentPresentation } from "../../state/environments";
 
-/**
- * Two axes. `machine` narrows the environment axis (absent = all
- * environments); `project` and `checkout` narrow the project axis (absent =
- * environment defaults). Device-local preferences are not a scope: they
- * render regardless of the selection because they never touch a server.
- */
 export interface SettingsScopeSearch {
   project?: string | undefined;
   machine?: string | undefined;
@@ -46,7 +40,6 @@ export type ResolvedSettingsScope = ScopeTargets &
       }
   );
 
-/** Stale IDs remain visible to the resolver so a removed target reads as unavailable, not as "all". */
 export function validateSettingsScopeSearch(raw: Record<string, unknown>): SettingsScopeSearch {
   const stringValue = (value: unknown) =>
     typeof value === "string" && value.trim().length > 0 ? value : undefined;
@@ -60,7 +53,6 @@ export function validateSettingsScopeSearch(raw: Record<string, unknown>): Setti
   };
 }
 
-/** Resolves only existing targets. An unavailable selection never broadens a subsequent write. */
 export function resolveSettingsScope(
   search: SettingsScopeSearch,
   groups: readonly SidebarProjectSnapshot[],

@@ -6,7 +6,6 @@ export interface MarkdownImageDisplaySize {
   readonly height: number;
 }
 
-/** Keeps small images intrinsic while fitting larger images inside the chat viewport. */
 export function resolveMarkdownImageDisplaySize(input: {
   readonly sourceWidth: number;
   readonly sourceHeight: number;

@@ -158,7 +158,6 @@ describe("CloudManagedEndpointRuntime", () => {
         "2026-06-17T02:00:00Z INF Starting metrics server",
       ),
     ).toBe("debug");
-    // FTL (fatal) and PNC (panic) are more severe than ERR and must surface.
     expect(
       ManagedEndpointRuntime.classifyRelayClientOutput(
         "2026-06-17T02:00:00Z FTL Cannot determine default origin certificate path",
@@ -502,12 +501,10 @@ describe("CloudManagedEndpointRuntime", () => {
       });
       expect(spawned).toEqual([600]);
 
-      // The first crash restarts immediately.
       yield* Deferred.succeed(exits[0]!, ChildProcessSpawner.ExitCode(1));
       yield* Deferred.await(spawnSignals[1]!);
       expect(spawned).toEqual([600, 601]);
 
-      // The second rapid crash waits out the base delay before restarting.
       yield* Deferred.succeed(exits[1]!, ChildProcessSpawner.ExitCode(1));
       yield* TestClock.adjust(Duration.millis(999));
       expect(spawned).toEqual([600, 601]);
@@ -515,7 +512,6 @@ describe("CloudManagedEndpointRuntime", () => {
       yield* Deferred.await(spawnSignals[2]!);
       expect(spawned).toEqual([600, 601, 602]);
 
-      // The third rapid crash doubles the delay.
       yield* Deferred.succeed(exits[2]!, ChildProcessSpawner.ExitCode(1));
       yield* TestClock.adjust(Duration.millis(1999));
       expect(spawned).toEqual([600, 601, 602]);
@@ -535,19 +531,15 @@ describe("CloudManagedEndpointRuntime", () => {
         connectorToken: "token",
       });
 
-      // One rapid crash arms the backoff.
       yield* Deferred.succeed(exits[0]!, ChildProcessSpawner.ExitCode(1));
       yield* Deferred.await(spawnSignals[1]!);
 
-      // The replacement stays up past the stable-uptime window, so its exit
-      // restarts immediately and the backoff starts over.
       yield* TestClock.adjust(Duration.millis(30_000));
       yield* Deferred.succeed(exits[1]!, ChildProcessSpawner.ExitCode(1));
       yield* Deferred.await(spawnSignals[2]!);
       yield* Deferred.succeed(exits[2]!, ChildProcessSpawner.ExitCode(1));
       yield* Deferred.await(spawnSignals[3]!);
 
-      // The next rapid crash waits the base delay again, not a doubled one.
       yield* Deferred.succeed(exits[3]!, ChildProcessSpawner.ExitCode(1));
       yield* TestClock.adjust(Duration.millis(999));
       expect(spawned).toEqual([700, 701, 702, 703]);
@@ -566,8 +558,6 @@ describe("CloudManagedEndpointRuntime", () => {
         connectorToken: "same-token",
         tunnelId: "same-tunnel",
       };
-      // The startup consumer re-applies whatever the relay hands back. When the
-      // relay confirms the current tunnel, that must not look like a config change.
       yield* runtime.recoveryRequests.pipe(
         Stream.runForEach((requested) => runtime.applyConfig(requested).pipe(Effect.asVoid)),
         Effect.forkChild,
@@ -578,7 +568,6 @@ describe("CloudManagedEndpointRuntime", () => {
       yield* Deferred.await(spawnSignals[1]!);
       expect(spawned).toEqual([900, 901]);
 
-      // Second rapid crash still waits out the base delay.
       yield* Deferred.succeed(exits[1]!, ChildProcessSpawner.ExitCode(1));
       yield* TestClock.adjust(Duration.millis(999));
       expect(spawned).toEqual([900, 901]);
@@ -600,7 +589,6 @@ describe("CloudManagedEndpointRuntime", () => {
       yield* Deferred.succeed(exits[0]!, ChildProcessSpawner.ExitCode(1));
       yield* Deferred.await(spawnSignals[1]!);
 
-      // Leave the supervisor sleeping on the base delay, then change config.
       yield* Deferred.succeed(exits[1]!, ChildProcessSpawner.ExitCode(1));
       const status = yield* runtime.applyConfig({
         providerKind: "cloudflare_tunnel",
@@ -609,7 +597,6 @@ describe("CloudManagedEndpointRuntime", () => {
       expect(status).toMatchObject({ status: "running", pid: 802 });
       expect(spawned).toEqual([800, 801, 802]);
 
-      // The preempted supervisor wakes later and must not spawn a duplicate.
       yield* TestClock.adjust(Duration.millis(60_000));
       expect(spawned).toEqual([800, 801, 802]);
     }).pipe(Effect.provide(TestClock.layer())),

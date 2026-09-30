@@ -2,7 +2,6 @@ import type { ContextMenuItem } from "@t3tools/contracts";
 
 const SVG_NS = "http://www.w3.org/2000/svg";
 
-// Inline Lucide-style icon paths (stroke-based, viewBox 0 0 24 24, strokeWidth 2).
 const ICON_PATHS: Record<string, ReadonlyArray<{ tag: string; attrs: Record<string, string> }>> = {
   archive: [
     { tag: "rect", attrs: { width: "20", height: "5", x: "2", y: "3", rx: "1" } },
@@ -197,29 +196,17 @@ function isNodeWithinMenuStack(target: EventTarget | null, menuStack: readonly H
   return false;
 }
 
-// Only one fallback menu exists at a time in the renderer; the active one is
-// tracked so a state change (for example a terminal selection clearing) can
-// dismiss it with the same result as an outside click or Escape.
 let activeContextMenuDismiss: (() => void) | null = null;
 
 export function isContextMenuOpen(): boolean {
   return activeContextMenuDismiss !== null;
 }
 
-/**
- * Closes the currently open fallback context menu, resolving its show() with
- * null (the same result as dismissing by outside click or Escape). No-op when
- * no fallback menu is open.
- */
 export function dismissContextMenu(): void {
   activeContextMenuDismiss?.();
   activeContextMenuDismiss = null;
 }
 
-/**
- * Imperative DOM-based context menu for non-Electron environments.
- * Supports nested submenus and resolves with the clicked leaf item id.
- */
 export function showContextMenuFallback<T extends string>(
   items: readonly ContextMenuItem<T>[],
   position?: { x: number; y: number },
@@ -354,8 +341,6 @@ export function showContextMenuFallback<T extends string>(
         }
 
         if (typeof item.checked === "boolean") {
-          // Option rows use the icon slot for the check so labels line up
-          // with icon rows. The unselected option keeps the slot empty.
           button.setAttribute("role", "menuitemradio");
           button.setAttribute("aria-checked", item.checked ? "true" : "false");
           const check = item.checked ? createIconElement("check", "neutral") : null;
@@ -492,9 +477,6 @@ export function showContextMenuFallback<T extends string>(
     document.addEventListener("pointerdown", onPointerDown, true);
     document.addEventListener("contextmenu", onContextMenu, true);
     openMenu(items, position?.x ?? 0, position?.y ?? 0, 0);
-    // Only one fallback menu can be open at a time: a new show must dismiss
-    // any prior one, or its DOM and listeners leak and close() can only ever
-    // reach the newest menu.
     if (activeContextMenuDismiss) {
       activeContextMenuDismiss();
     }

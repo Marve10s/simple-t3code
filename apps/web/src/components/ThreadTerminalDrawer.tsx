@@ -167,7 +167,6 @@ function readThemeColor(styles: CSSStyleDeclaration, variable: string, fallback:
   return normalizeComputedColor(styles.getPropertyValue(variable), fallback);
 }
 
-/** The surface treats an omitted family or size as "use the built-in default". */
 function terminalFontOptions(family: string, size: number): { family?: string; size: number } {
   const trimmed = family.trim();
   return trimmed.length > 0 ? { family: trimmed, size } : { size };
@@ -249,7 +248,6 @@ export function terminalSelectionLineRange(position: {
 
 export type TerminalContextMenuAction = "add-to-chat" | "copy" | "paste";
 
-/** Post-selection popup: available selection actions, always enabled. */
 export function terminalSelectionMenuItems(options?: {
   canAddToChat?: boolean;
 }): ContextMenuItem<"add-to-chat" | "copy">[] {
@@ -261,12 +259,6 @@ export function terminalSelectionMenuItems(options?: {
   ];
 }
 
-/**
- * Right-click menu for the terminal canvas: the selection actions (disabled
- * until a selection exists) plus Paste. Paste is always offered: the browser
- * (and Electron's default editing menu) can only paste into an editable
- * element, so a canvas terminal never gets a usable entry from them.
- */
 export function terminalContextMenuItems(options: {
   hasSelection: boolean;
   canAddToChat?: boolean;
@@ -281,13 +273,6 @@ export function terminalContextMenuItems(options: {
   ];
 }
 
-/**
- * An empty selection change may only cancel a selection-action flow that is
- * still current: a pending popup timer, or an open popup whose request id has
- * not been superseded. A popup already superseded by a right-click keeps its
- * menu promise unsettled for a moment; treating it as active would cancel the
- * newer context-menu flow instead.
- */
 export function shouldClearTerminalSelectionAction(options: {
   actionPending: boolean;
   openMenuRequestId: number | null;
@@ -372,9 +357,6 @@ export function TerminalViewport({
   });
   const hasHandledExitRef = useRef(false);
   const selectionActionRequestIdRef = useRef(0);
-  // Holds the request id of the selection popup currently on screen, so a
-  // popup that was superseded (but whose menu promise has not settled yet)
-  // cannot be mistaken for the active flow.
   const openSelectionMenuRequestIdRef = useRef<number | null>(null);
   const keybindingsRef = useRef(keybindings);
   const runtimeEnvKey = useMemo(() => runtimeEnvSignature(runtimeEnv), [runtimeEnv]);
@@ -501,9 +483,6 @@ export function TerminalViewport({
         onSelectionChange: () => handleSelectionChange(),
         beforeKey: (event) => handleBeforeKey(event),
         onLinkActivate: (text, event) => handleLinkActivate(text, event),
-        // The surface listens from construction, so a right-click can land
-        // while `create` is still awaiting WASM — before the handler below it
-        // exists. The ref is only assigned once that setup has run.
         onContextMenu: (event) => {
           if (terminalRef.current) void showTerminalContextMenu(event);
         },
@@ -514,14 +493,9 @@ export function TerminalViewport({
         return null;
       }
       terminal.setVisible(visibleRef.current);
-      // The theme observer is not installed yet, so re-read the theme in case
-      // the app toggled light/dark while the WASM surface was loading.
       terminal.setTheme(terminalThemeFromApp(mount));
       setupTerminal = terminal;
       terminalRef.current = terminal;
-      // Client settings hydrate asynchronously; a font preference that landed
-      // while the surface was loading found terminalRef null, so its setFont
-      // was dropped. Re-apply whatever is current once the terminal exists.
       const currentFont = terminalFontRef.current;
       if (currentFont.family !== setupFont.family || currentFont.size !== setupFont.size) {
         void terminal.setFont(terminalFontOptions(currentFont.family, currentFont.size));
@@ -537,13 +511,8 @@ export function TerminalViewport({
       }
       outputCursorRef.current = initialOutput.cursor;
       if (latestSession.error !== null) writeSystemMessage(terminal, latestSession.error);
-      // Attaching to a session that already exited must still run exit handling
-      // once, so mount synchronization starts from the empty "closed" state.
-      // (A session that is "closed" at mount is indistinguishable from one that
-      // never started, so only "exited" triggers the message — as with xterm.)
       synchronizedStatusRef.current = "closed";
       synchronizeTerminalStatus(terminal, latestSession.status);
-      // Startup may finish after the user has returned to the composer.
       if (visibleRef.current && mount.contains(document.activeElement)) {
         terminal.focus();
       }
@@ -551,7 +520,6 @@ export function TerminalViewport({
       const dismissSelectionAction = (supersede = false) => {
         const ownsMenu =
           openSelectionMenuRequestIdRef.current === selectionActionRequestIdRef.current;
-        // Passive cancellation must not invalidate a newer right-click flow.
         if (supersede || ownsMenu) selectionActionRequestIdRef.current += 1;
         if (ownsMenu) void localApi?.contextMenu.close();
       };
@@ -606,8 +574,6 @@ export function TerminalViewport({
         terminalRef.current?.focus();
       };
 
-      // A selection-action flow that was superseded while its async work ran
-      // must go silent: no error message, no focus steal.
       const reportIfCurrent = (requestId: number, error: unknown, fallback: string) => {
         if (requestId !== selectionActionRequestIdRef.current) return;
         const activeTerminal = terminalRef.current;
@@ -635,9 +601,6 @@ export function TerminalViewport({
         const activeTerminal = terminalRef.current;
         if (!activeTerminal) return;
         try {
-          // The surface owns the read so it can claim the paste race before it
-          // starts: a paste shortcut fired while the menu read is in flight
-          // supersedes this paste instead of landing alongside it.
           await activeTerminal.pasteFromClipboard(
             () => readTextFromClipboard("terminal input"),
             () => requestId === selectionActionRequestIdRef.current,
@@ -651,11 +614,7 @@ export function TerminalViewport({
 
       const showTerminalContextMenu = async (event: MouseEvent) => {
         if (!localApi || !terminalRef.current) return;
-        // Own the gesture before anything async: leaving the default alive lets
-        // the browser (or Electron's editing menu) answer with a Paste entry
-        // that is permanently disabled over the terminal canvas.
         event.preventDefault();
-        // A right-click supersedes a selection popup that is pending or open.
         clearSelectionAction();
         const selectionAction = readSelectionAction();
         const requestId = selectionActionRequestIdRef.current;
@@ -955,8 +914,6 @@ export function TerminalViewport({
 
   useEffect(() => {
     if (!autoFocus || !visible) return;
-    // Claim focus when requested, then hand it to the terminal once ready only
-    // if the user has not focused something else in the meantime.
     (terminalRef.current ?? containerRef.current)?.focus();
   }, [autoFocus, focusRequestId, visible]);
 
@@ -964,8 +921,6 @@ export function TerminalViewport({
     const terminal = terminalRef.current;
     if (!terminal || !visibleRef.current) return;
     const wasAtBottom = terminal.isAtBottom();
-    // The surface reports grid changes through onResize, which is the single
-    // channel for PTY resize RPCs; fitting here only refreshes the layout.
     const frame = window.requestAnimationFrame(() => {
       if (!visibleRef.current) return;
       terminal.fit();
@@ -1012,9 +967,7 @@ interface ThreadTerminalDrawerProps {
   onHeightChange: (height: number) => void;
   onAddTerminalContext: (selection: TerminalContextSelection) => void;
   keybindings: ResolvedKeybindingsConfig;
-  /** Prefer server-provided tab titles when present (e.g. active subprocess name). */
   terminalLabelsById?: ReadonlyMap<string, string>;
-  /** Prefer per-session launch locations when the server already knows a terminal. */
   terminalLaunchLocationsById?: ReadonlyMap<string, TerminalLaunchLocation>;
 }
 

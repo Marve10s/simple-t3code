@@ -7,7 +7,6 @@ import { PullRequestStackLayers } from "./PullRequestStackLayers";
 import { PullRequestStackHeader } from "./PullRequestStackHeader";
 import { PullRequestGlyph } from "./pullRequestIcons";
 
-/** Mounted only while the menu is open, so list rows do not each fetch a stack. */
 function StackBody({
   environmentId,
   reference,

@@ -60,7 +60,6 @@ export interface ThreadDetailView {
   readonly isDeleted: boolean;
 }
 
-/** Shared with the pull requests page, which debounces its search the same way. */
 export function useDebouncedValue<A>(value: A, delayMs: number): A {
   const [debounced, setDebounced] = useState(value);
 
@@ -282,8 +281,6 @@ interface ProjectContentSearchTarget {
 }
 
 export function useProjectContentSearch(target: ProjectContentSearchTarget) {
-  // Whitespace is significant in content queries; trimming is only used to
-  // decide whether the input is blank.
   const query = target.query;
   const hasQuery = query.trim().length > 0;
   const debouncedQuery = useDebouncedValue(query, PROJECT_CONTENT_SEARCH_DEBOUNCE_MS);

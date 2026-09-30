@@ -15,7 +15,6 @@ export function SourceControlIcon(props: {
 
   switch (props.kind) {
     case "forgejo":
-      // Official two-color mark from https://forgejo.org/favicon.svg.
       return (
         <Svg width={size} height={size} viewBox="0 0 212 212">
           <G transform="translate(6 6)" fill="none">

@@ -24,11 +24,6 @@ type Flyout =
   | { kind: "effort"; top: number }
   | null;
 
-/**
- * After Synara's original picker: providers in a column, each opening a
- * flyout with search and its models; effort and fast mode sit under the
- * providers.
- */
 export function PickerClassic(props: PickerDesignProps) {
   const navigate = useNavigate();
   const [flyout, setFlyout] = useState<Flyout>(() =>

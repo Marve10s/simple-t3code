@@ -18,13 +18,11 @@ async function extractFrame(uri: string, signal: AbortSignal) {
   let cancel = () => {};
   let timeout: ReturnType<typeof setTimeout> | undefined;
   try {
-    // Never play or change audio settings: thumbnails must leave the shared audio session alone.
     player.bufferOptions = { preferredForwardBufferDuration: 1 };
     const canceled = new Promise<null>((resolve) => {
       cancel = () => resolve(null);
     });
     signal.addEventListener("abort", cancel, { once: true });
-    // An unreachable environment must not hold up thumbnails for other environments.
     timeout = setTimeout(cancel, 15_000);
     const frame = (async () => {
       await player.replaceAsync({ uri, contentType: "progressive" });
@@ -44,7 +42,6 @@ async function extractFrame(uri: string, signal: AbortSignal) {
   }
 }
 
-/** Serializes frame extraction and releases each temporary player and local-file lease. */
 export function loadVideoThumbnail(
   key: string,
   resolveSource: (

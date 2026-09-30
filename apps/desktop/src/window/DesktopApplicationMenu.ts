@@ -105,7 +105,7 @@ const handleCheckForUpdatesMenuClick = Effect.gen(function* () {
   yield* checkForUpdatesFromMenu;
 }).pipe(Effect.withSpan("desktop.menu.handleCheckForUpdatesClick"));
 
-/** @public Service construction is part of the canonical Effect module API. */
+/** @public */
 export const make = Effect.gen(function* () {
   const electronApp = yield* ElectronApp.ElectronApp;
   const electronMenu = yield* ElectronMenu.ElectronMenu;
@@ -137,11 +137,6 @@ export const make = Effect.gen(function* () {
     const settingsClick = () => {
       runMenuEffect("open-settings", dispatchMenuAction("open-settings"));
     };
-    // Chromium already pastes as plain text for this chord, so the accelerator
-    // needs nothing from the menu: the composer and the terminal each arm
-    // themselves from the same keydown. Routing it through the renderer anyway
-    // lands a second, injected paste and doubles the text. Only a menu click,
-    // which produces no keystroke for them to see, needs that round trip.
     const pasteAsTextClick = (
       _item: Electron.MenuItem,
       _window: Electron.BaseWindow | undefined,
@@ -234,12 +229,6 @@ export const make = Effect.gen(function* () {
           { role: "forceReload" },
           { role: "toggleDevTools" },
           { type: "separator" },
-          /*
-            Not the zoom roles: those act on the focused webContents, so with
-            an embedded preview WebContentsView focused they zoom the guest
-            page and the app UI appears stuck. These always zoom the main
-            window (see DesktopWindow.zoomMain).
-          */
           { label: "Actual Size", accelerator: "CmdOrCtrl+0", click: zoomClick("reset") },
           { label: "Zoom In", accelerator: "CmdOrCtrl+=", click: zoomClick("in") },
           {

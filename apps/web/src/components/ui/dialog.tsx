@@ -70,7 +70,6 @@ function DialogPopup({
 }) {
   return (
     <DialogPortal>
-      {/* Media opens from inside other overlays (a composer chip, a popover), so it sits above them. */}
       <DialogBackdrop className={variant === "media" ? "z-[60]" : undefined} variant={variant} />
       <DialogViewport
         className={cn(

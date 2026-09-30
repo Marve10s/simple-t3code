@@ -19,10 +19,6 @@ export function settingsScopeEnvironmentLabel(
 export const ALL_ENVIRONMENTS_VALUE = "all";
 export const ALL_PROJECTS_VALUE = "all";
 
-/**
- * The environment axis: `all` or an environment id. A legacy checkout link
- * without `machine` still names one environment, which the resolver supplies.
- */
 export function environmentAxisValue(
   search: SettingsScopeSearch,
   resolvedEnvironmentId?: string | null,
@@ -30,12 +26,10 @@ export function environmentAxisValue(
   return search.machine ?? resolvedEnvironmentId ?? ALL_ENVIRONMENTS_VALUE;
 }
 
-/** The project axis: `all` or a project key. */
 export function projectAxisValue(search: SettingsScopeSearch): string {
   return search.project ?? ALL_PROJECTS_VALUE;
 }
 
-/** Choosing an environment keeps the project; a pre-existing checkout narrowing is dropped. */
 export function selectEnvironmentAxis(
   search: SettingsScopeSearch,
   value: string,
@@ -46,7 +40,6 @@ export function selectEnvironmentAxis(
   return next;
 }
 
-/** Choosing a project keeps the environment axis. */
 export function selectProjectAxis(search: SettingsScopeSearch, value: string): SettingsScopeSearch {
   const next: SettingsScopeSearch = {};
   if (value !== ALL_PROJECTS_VALUE) next.project = value;
@@ -54,7 +47,6 @@ export function selectProjectAxis(search: SettingsScopeSearch, value: string): S
   return next;
 }
 
-/** Provider configuration always belongs to one environment, including project scopes. */
 export function selectSingleEnvironmentScope(
   search: SettingsScopeSearch,
   scope: ResolvedSettingsScope,

@@ -61,7 +61,6 @@ function normalizeSelectionOptions(
       };
 }
 
-/** Whether a known Antigravity selection needs setup or a different model. */
 export function isModelSelectionUnavailable(
   config: T3ServerConfig | null | undefined,
   selection: ModelSelection | null | undefined,
@@ -85,11 +84,6 @@ export function isModelSelectionUnavailable(
   );
 }
 
-/**
- * Keep Antigravity selections when setup or catalog changes make them
- * unavailable. Other providers fall through to the server default when they
- * are disabled, missing, or signed out. Without config, keep stored selections.
- */
 export function resolveSelectableModelSelection(
   config: T3ServerConfig | null | undefined,
   selection: ModelSelection | null,
@@ -113,11 +107,6 @@ export function resolveSelectableModelSelection(
     : null;
 }
 
-/**
- * Reject legacy models for implicit defaults, except Antigravity selections,
- * which must not silently change after a catalog update. Explicit picks in
- * the settings sheet are unaffected.
- */
 export function resolveDefaultableModelSelection(
   config: T3ServerConfig | null | undefined,
   selection: ModelSelection | null,

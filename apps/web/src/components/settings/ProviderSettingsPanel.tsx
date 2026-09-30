@@ -174,15 +174,9 @@ function providerEnvironmentDetail(environment: EnvironmentPresentation): string
   return environment.displayUrl ?? "Remote device";
 }
 
-// Shared by the editor grid and the placeholder states so switching devices
-// never changes the card's footprint.
 const providerCardHeightClassName =
   "@min-[48rem]/providers:h-[min(44rem,calc(100dvh-11rem))] @min-[48rem]/providers:min-h-[32rem]";
 
-/**
- * Same chrome as the provider editor (section heading, floating device tabs,
- * tall card) for states that cannot render provider settings yet.
- */
 function ProviderSettingsPlaceholder({
   deviceTabs,
   icon,
@@ -233,16 +227,12 @@ function EnvironmentUnavailablePlaceholder({
     : access.kind === "error"
       ? "Could not connect to this device"
       : "Provider settings are unavailable";
-  // Keep the description to a short status; the raw failure can be a
-  // multi-paragraph CLI dump, so it goes below, clamped and expandable.
   const description = isLoading
     ? access.reason === "permissions"
       ? "Checking what this session is allowed to change."
       : `Waiting for ${environment.label}'s configuration.`
     : connectionStatusTitle(environment.connection);
   const error = isLoading ? null : environment.connection.error;
-  // No spinner: this state can persist indefinitely for a wedged device, and a
-  // continuously repainting animation would run the whole time.
   return (
     <ProviderSettingsPlaceholder
       deviceTabs={deviceTabs}
@@ -290,9 +280,6 @@ function ProviderSettingsPanelContent(target: ProviderSettingsTarget) {
       buildProviderEnvironmentOptions(environments, primaryEnvironmentId, target.environmentIds),
     [environments, primaryEnvironmentId, target.environmentIds],
   );
-  // Raw user intent; the effective selection is re-derived every render so a
-  // device that drops out of the catalog falls back without erasing the pick —
-  // if it reappears (e.g. after a reconnect) the selection is restored.
   const [selectedEnvironmentId, setSelectedEnvironmentId] = useState<EnvironmentId | null>(
     target.environmentId ?? primaryEnvironmentId,
   );
@@ -456,8 +443,6 @@ function SelectedEnvironmentProviderSettings({
 }) {
   const isPrimary = environment.entry.target._tag === "PrimaryConnectionTarget";
   if (isPrimary) {
-    // The desktop app owns its primary server outright; a browser session
-    // checks the scopes its cookie session was granted.
     if (isElectron) {
       return (
         <AccessGatedProviderSettings
@@ -584,17 +569,9 @@ export function EnvironmentProviderSettings({
   readonly environmentLabel: string;
   readonly deviceTabs?: ReactNode;
   readonly targetInstanceId?: ProviderInstanceId | undefined;
-  /**
-   * Grey out and freeze every write control when this session's credential
-   * lacks `orchestration:operate` on the environment. Selecting providers
-   * still works so the real configuration stays readable; switches, forms,
-   * and the health interval are inert so no write is offered and then rejected.
-   */
   readonly readOnly?: boolean;
 }) {
   const settings = useEnvironmentSettings(environmentId);
-  // Provider instances hold per-machine credentials and binaries, so this
-  // page always edits exactly the environment it displays.
   const updateSettings = useUpdateEnvironmentSettings(environmentId);
   const updateClientSettings = useUpdateClientSettings();
   const serverProviders =
@@ -677,8 +654,6 @@ export function EnvironmentProviderSettings({
       candidate: Pick<ProviderSettingsUpdateCandidate, "driver" | "instanceId">,
       targetVersion?: string,
     ) => {
-      // Ref-based re-entry guard, mirroring refreshProviders: a state updater
-      // may run after this function returns, so it cannot gate the dispatch.
       if (updatingInstanceIdsRef.current.has(candidate.instanceId)) {
         return;
       }
@@ -759,15 +734,8 @@ export function EnvironmentProviderSettings({
     const driver = providerSettings.provider;
     const defaultInstanceId = defaultInstanceIdForDriver(driver);
     const explicitInstance = settings.providerInstances?.[defaultInstanceId];
-    // A remote device may run a server version whose settings predate this
-    // driver, so the legacy mirror can be absent. Without either an explicit
-    // instance or a legacy blob there is nothing to render for the slot.
     const legacyConfig = legacyProviders[providerSettings.provider];
     const defaultLegacyConfig = defaultLegacyProviders[providerSettings.provider];
-    // The envelope is the single enabled flag: keep the legacy in-config
-    // flag out of the synthesized blob, or an explicit `enabled: false`
-    // would keep winning over the envelope and the Switch could never
-    // turn a default-off provider on.
     const synthesizedInstance = (): ProviderInstanceConfig | undefined => {
       if (legacyConfig === undefined) {
         return undefined;
@@ -781,8 +749,6 @@ export function EnvironmentProviderSettings({
     };
     const effectiveInstance: ProviderInstanceConfig | undefined =
       explicitInstance ?? synthesizedInstance();
-    // Only the default slot depends on the legacy blob; custom instances for
-    // the driver must still render even when the slot has nothing to show.
     if (effectiveInstance !== undefined) {
       const isDirty =
         explicitInstance !== undefined || !Equal.equals(legacyConfig, defaultLegacyConfig);

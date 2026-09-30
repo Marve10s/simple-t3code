@@ -51,8 +51,6 @@ export function renderSkillInlineMarkdownChildren(
     if (!isValidElement<{ children?: ReactNode; node?: { tagName?: string } }>(child)) {
       return child;
     }
-    // Custom react-markdown components replace the intrinsic type, so also
-    // check the hast node they carry.
     const markdownTagName = typeof child.type === "string" ? child.type : child.props.node?.tagName;
     if (markdownTagName === "code" || markdownTagName === "a") {
       return child;
@@ -77,7 +75,6 @@ function SkillChip(props: { skill: InlineSkill; rawText: string }) {
   );
 }
 
-/** The skill glyph; the surrounding chip sizes its svg. */
 export function SkillChipIcon() {
   return (
     <span

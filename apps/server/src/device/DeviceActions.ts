@@ -1,17 +1,3 @@
-/**
- * Device settings and one-shot actions, run by the server against the host's
- * toolchain instead of through serve-sim's shell-exec channel.
- *
- * serve-sim's preview drives its "Simulator" panel by sending shell commands
- * over a token-gated socket. Proxying that would hand any environment
- * session arbitrary command execution on the host, so T3 runs the same
- * underlying commands itself, typed per action: `xcrun simctl ui` and
- * `simctl privacy` for iOS, the `serve-sim-ax-settings` helper that serve-sim
- * bundles for the accessibility toggles, and `adb shell` for Android.
- *
- * Each platform advertises which actions it supports; the panel hides the
- * rest rather than showing controls that cannot work.
- */
 import {
   type DeviceActionInput,
   type DeviceActionType,
@@ -65,7 +51,6 @@ const ANDROID_ACTIONS: ReadonlySet<DeviceActionType> = new Set([
   "terminateApp",
 ]);
 
-/** Toggle settings each platform can actually flip. */
 const IOS_TOGGLES = new Set([
   "reduceMotion",
   "increaseContrast",
@@ -96,8 +81,6 @@ const ok = (operation: string) => (result: { code: number; stderr: string; stdou
         }),
       );
 
-// iOS text-size categories in ascending order; the four shared steps index
-// into it. `default` is what a fresh simulator reports ("large").
 const IOS_TEXT_SIZES: Record<DeviceTextSize, string> = {
   small: "small",
   default: "large",
@@ -138,7 +121,6 @@ const IOS_TOGGLE_OPTIONS: Record<string, string> = {
   voiceOver: "voiceover",
 };
 
-// serve-sim permission names -> the TCC service or simctl privacy service.
 const IOS_TCC_SERVICES: Record<string, string> = {
   camera: "camera",
   microphone: "microphone",
@@ -165,8 +147,6 @@ const ANDROID_PERMISSIONS: Record<string, ReadonlyArray<string>> = {
   motion: ["android.permission.ACTIVITY_RECOGNITION"],
 };
 
-// Gravity vector (x:y:z) that makes the emulator report each orientation,
-// and the window-manager rotation index for the same.
 const ANDROID_GRAVITY: Record<DeviceOrientation, string> = {
   portrait: "0:9.81:0",
   landscape_left: "9.81:0:0",
@@ -264,8 +244,6 @@ const runIos = Effect.fn("DeviceActions.runIos")(function* (
       return;
     case "setPermission": {
       if (input.permission === "notifications") {
-        // simctl has no notification permission verb; serve-sim's CLI edits
-        // the BulletinBoard plist for it.
         yield* serveSimPermissions(ready, udid, input);
         return;
       }
@@ -383,10 +361,6 @@ const runAndroid = Effect.fn("DeviceActions.runAndroid")(function* (
         reason: "unsupported",
       });
     case "setOrientation": {
-      // `user-rotation lock` only rotates window content on recent images;
-      // the display the encoder captures stays put. Tilting the emulator's
-      // accelerometer rotates it for real, so that is used whenever the
-      // target is an emulator. Physical devices get the lock.
       if (serial.startsWith("emulator-")) {
         yield* shell(["settings", "put", "system", "accelerometer_rotation", "1"], "orientation");
         yield* shell(["cmd", "window", "user-rotation", "free"], "orientation");
@@ -413,8 +387,6 @@ const runAndroid = Effect.fn("DeviceActions.runAndroid")(function* (
       );
       return;
     case "clearLocation":
-      // The emulator has no "clear"; leaving the fix in place is the closest
-      // behavior, so this is a no-op that still refreshes the reading.
       return;
     case "setPermission": {
       const permissions = ANDROID_PERMISSIONS[input.permission];
@@ -427,7 +399,6 @@ const runAndroid = Effect.fn("DeviceActions.runAndroid")(function* (
       }
       const verb = input.decision === "grant" ? "grant" : "revoke";
       for (const permission of permissions) {
-        // Not every app declares every permission in a group; ignore those.
         yield* shell(["pm", verb, input.appId, permission], "permission").pipe(Effect.ignore);
       }
       return;
@@ -459,7 +430,6 @@ const runAndroid = Effect.fn("DeviceActions.runAndroid")(function* (
   }
 });
 
-/** Read the current settings and foreground app. Errors degrade to unknowns. */
 export const readDeviceDetail = Effect.fn("DeviceActions.readDetail")(function* (
   ready: DeviceHostReady,
   platform: DevicePlatform,
@@ -541,8 +511,6 @@ const readAndroid = Effect.fn("DeviceActions.readAndroid")(function* (run: Runne
       shell(["settings", "get", "system", "font_scale"]),
       shell(["settings", "get", "global", "animator_duration_scale"]),
       shell(["settings", "get", "global", "wifi_on"]),
-      // `dumpsys window windows` stopped printing the focus on API 36; the
-      // unfiltered dump still does.
       shell(["dumpsys", "window"]),
     ],
     { concurrency: 5 },

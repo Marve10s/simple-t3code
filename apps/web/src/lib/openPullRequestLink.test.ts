@@ -315,11 +315,7 @@ describe("parseChangeRequestUrl", () => {
       "https://github.com/t3tools/t3code/pull/abc",
       "https://gitlab.com/t3tools/t3code/-/snippets/12",
       "https://gitlab.com/t3tools/t3code/-/issues/12",
-      // A path shape that means nothing off its own host.
       "https://blog.example.test/2026/updates/pull/3",
-      // A lookalike is deliberately not fought here: `github.com.evil.test` reads as a GitHub
-      // Enterprise install and there is no way to tell it from one. It is `findProjectForChange
-      // Request` that refuses it, because no project in the workspace is checked out from it.
       "javascript:alert(1)//github.com/t3tools/t3code/pull/1",
       "not a url",
     ]) {
@@ -461,8 +457,6 @@ describe("findProjectForChangeRequest", () => {
     ({ id: "p1", repositoryIdentity: identity }) as never;
 
   it("matches a nested GitLab group by the whole path below the host", () => {
-    // The server identifies a repository by `displayName`, which keeps every group segment; the
-    // two-segment owner/name form would look for `t3tools/t3code` and find nothing.
     const projects = [
       project({
         canonicalKey: "gitlab.com/t3tools/platform/t3code",
@@ -500,12 +494,6 @@ describe("findProjectForChangeRequest", () => {
   });
 
   it("matches an Azure repository cloned over SSH, whose remote shares no part with its URL", () => {
-    // Azure alone addresses one repository under two names: `ssh.dev.azure.com` and `v3/...` over
-    // SSH against `dev.azure.com` and `.../_git/...` everywhere a person sees it. The identity is
-    // recorded in the spelling a link arrives in, so both halves of this comparison line up.
-    //
-    // Derived from the SSH remote the way the server derives it rather than written out, so the
-    // day that normalization stops reaching the web spelling this fails here too.
     const canonicalKey = normalizeGitRemoteUrl("git@ssh.dev.azure.com:v3/T3Tools/Platform/T3Code");
     const projects = [
       project({

@@ -1,11 +1,3 @@
-/**
- * ProjectionThreadMessageRepository - Projection repository interface for messages.
- *
- * Owns persistence operations for projected thread messages rendered in the
- * orchestration read model.
- *
- * @module ProjectionThreadMessageRepository
- */
 import {
   ChatAttachment,
   MessageId,
@@ -66,63 +58,36 @@ export const DeleteProjectionThreadMessagesInput = Schema.Struct({
 });
 export type DeleteProjectionThreadMessagesInput = typeof DeleteProjectionThreadMessagesInput.Type;
 
-/**
- * ProjectionThreadMessageRepositoryShape - Service API for projected thread messages.
- */
 export interface ProjectionThreadMessageRepositoryShape {
-  /**
-   * Insert or replace a projected thread message row.
-   *
-   * Upserts by `messageId`.
-   */
   readonly upsert: (
     message: ProjectionThreadMessage,
   ) => Effect.Effect<void, ProjectionRepositoryError>;
 
-  /** Insert a streaming message or append text to its existing row. */
   readonly appendStreaming: (
     message: AppendStreamingProjectionThreadMessage,
   ) => Effect.Effect<void, ProjectionRepositoryError>;
 
-  /**
-   * Read a projected thread message by id.
-   */
   readonly getByMessageId: (
     input: GetProjectionThreadMessageInput,
   ) => Effect.Effect<Option.Option<ProjectionThreadMessage>, ProjectionRepositoryError>;
 
-  /**
-   * Check for an assistant message in a turn without hydrating message text.
-   */
   readonly hasAssistantMessageForTurn: (
     input: HasProjectionThreadAssistantMessageInput,
   ) => Effect.Effect<boolean, ProjectionRepositoryError>;
 
-  /**
-   * List projected thread messages for a thread.
-   *
-   * Returned in ascending creation order.
-   */
   readonly listByThreadId: (
     input: ListProjectionThreadMessagesInput,
   ) => Effect.Effect<ReadonlyArray<ProjectionThreadMessage>, ProjectionRepositoryError>;
 
-  /** Read the latest user-message timestamp without loading message bodies. */
   readonly getLatestUserMessageAt: (
     input: ListProjectionThreadMessagesInput,
   ) => Effect.Effect<ProjectionThreadMessage["createdAt"] | null, ProjectionRepositoryError>;
 
-  /**
-   * Delete projected thread messages by thread.
-   */
   readonly deleteByThreadId: (
     input: DeleteProjectionThreadMessagesInput,
   ) => Effect.Effect<void, ProjectionRepositoryError>;
 }
 
-/**
- * ProjectionThreadMessageRepository - Service tag for message projection persistence.
- */
 export class ProjectionThreadMessageRepository extends Context.Service<
   ProjectionThreadMessageRepository,
   ProjectionThreadMessageRepositoryShape

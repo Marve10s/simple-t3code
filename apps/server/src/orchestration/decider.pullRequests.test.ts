@@ -282,7 +282,6 @@ it.layer(NodeServices.layer)("pull request link decider", (it) => {
         const other = makeLink({ number: 7, snapshot: { ...snapshot, state: "merged" } });
         const current = makeLink({ source, linkedAt: "2026-01-02T00:00:00.000Z" });
         let model = makeReadModel([other, current]);
-        // This is the pre-array command shape sent by older clients.
         const command = yield* decodeCommand({
           type: "thread.meta.update",
           commandId: "legacy-unlink",
@@ -296,7 +295,6 @@ it.layer(NodeServices.layer)("pull request link decider", (it) => {
           const event = { ...planned, sequence: model.snapshotSequence + 1 };
           const encoded = yield* Schema.encodeEffect(OrchestrationEvent)(event);
           const decoded = yield* Schema.decodeEffect(OrchestrationEvent)(encoded);
-          // Older detail-event unions must never receive the new PR discriminants.
           expect(isThreadDetailEvent(decoded)).toBe(false);
           model = yield* projectEvent(model, decoded);
         }
@@ -305,7 +303,6 @@ it.layer(NodeServices.layer)("pull request link decider", (it) => {
         expect(thread.pullRequests).toEqual(
           source === "stack" ? [other, { ...current, source: "stack-dismissed" }] : [other],
         );
-        // The old single-link field continues to track the remaining visible request.
         expect(thread.linkedPullRequest?.number).toBe(7);
       }),
     );
@@ -389,7 +386,6 @@ it.layer(NodeServices.layer)("pull request link decider", (it) => {
         readModel: makeReadModel([dismissed]),
       });
       const event = expectSingleEvent(decided, "thread.pull-request-linked");
-      // Host state survives the flip; only the source changes.
       expect(event.payload.link).toEqual({ ...dismissed, source: "manual" });
     }),
   );

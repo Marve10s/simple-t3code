@@ -13,7 +13,6 @@ export function isOnboardingRelayEnvironment(
   return environment.entry.target._tag === "RelayConnectionTarget";
 }
 
-/** Keep a directly paired machine pinned while its initial connection completes. */
 export function resolveOnboardingTargetEnvironment<TEnvironment extends OnboardingEnvironment>({
   mode,
   environments,

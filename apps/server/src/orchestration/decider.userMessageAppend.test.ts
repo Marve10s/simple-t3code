@@ -125,7 +125,6 @@ it.layer(NodeServices.layer)("thread.message.user.append", (it) => {
       expect(events.map((event) => event.type)).toEqual(["thread.turn-start-requested"]);
       expect(events[0]?.payload).toMatchObject({ messageId });
 
-      // Without the append the turn start still carries the message itself.
       const direct = yield* decideOrchestrationCommand({ command: turnStartCommand, readModel });
       const directEvents = Array.isArray(direct) ? direct : [direct];
       expect(directEvents.map((event) => event.type)).toEqual([

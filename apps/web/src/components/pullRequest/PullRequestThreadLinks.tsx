@@ -29,7 +29,6 @@ interface PullRequestThreadLinksProps {
   onPickerOpenChange?: (open: boolean) => void;
 }
 
-/** Thread relations belong to the detail environment, including when another environment is active. */
 export function PullRequestThreadLinks(props: PullRequestThreadLinksProps) {
   const configs = useServerConfigs();
   if (
@@ -65,8 +64,6 @@ function EnabledPullRequestThreadLinks({
         })
       : null,
   );
-  // Refreshes can briefly clear the query value. Keep the last response so polling
-  // does not hide the linked-thread count between responses.
   const [lastRelations, setLastRelations] = useState(relations.data);
   if (relations.data !== null && relations.data !== lastRelations) {
     setLastRelations(relations.data);

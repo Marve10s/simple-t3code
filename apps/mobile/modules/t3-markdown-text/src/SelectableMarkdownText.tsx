@@ -81,10 +81,6 @@ export function SelectableMarkdownText({
     <MarkdownContextClipboardContext.Provider value={contextClipboardFragment ?? ""}>
       <MarkdownImageRendererContext.Provider value={renderImage ?? null}>
         <MarkdownFileContextMenuContext.Provider value={fileContextMenuHandlers}>
-          {/* A percentage width here creates a cyclic intrinsic measurement inside
-          shrink-to-fit containers such as user-message bubbles. Yoga then gives
-          the native text node an unbounded second pass and the parent only clips
-          the resulting single-line width instead of reflowing it. */}
           <View style={{ flexShrink: 1, minWidth: 0, marginTop, marginBottom }}>
             {chunks.map((chunk, index) => {
               const content =

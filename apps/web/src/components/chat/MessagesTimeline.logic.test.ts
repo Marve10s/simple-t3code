@@ -1193,8 +1193,6 @@ describe("deriveMessagesTimelineRows", () => {
       },
     ]);
 
-    // The main pass already places the working header after the send while a
-    // bootstrap counts as working; the card slots under that one header.
     const withUserMessage = deriveMessagesTimelineRows({
       timelineEntries: [userEntry],
       isWorking: true,
@@ -1209,9 +1207,6 @@ describe("deriveMessagesTimelineRows", () => {
       "worktree-setup",
     ]);
 
-    // A failed setup never handed off, so the card stays under the send. The
-    // rest of the timeline is untouched: a running send still gets its
-    // working and thinking rows, and queued follow-ups still trail.
     const withMessages = deriveMessagesTimelineRows({
       timelineEntries: [userEntry, assistantEntry],
       isWorking: true,
@@ -1245,8 +1240,6 @@ describe("deriveMessagesTimelineRows", () => {
       "queued-message",
     ]);
 
-    // Once the agent stage is done and the turn is live, a still-running
-    // script leaves the timeline; the working header surfaces it instead.
     const stage = (id: "agent" | "setup-script", status: "done" | "running") =>
       ({
         id,
@@ -1278,8 +1271,6 @@ describe("deriveMessagesTimelineRows", () => {
     });
     expect(asyncRows.map((row) => row.kind)).toEqual(["message", "working", "thinking"]);
 
-    // Dispatched but not yet visible as a turn: the full card stays put so
-    // nothing collapses during the handoff.
     const handoffRows = deriveMessagesTimelineRows({
       timelineEntries: [userEntry],
       isWorking: true,
@@ -1291,7 +1282,6 @@ describe("deriveMessagesTimelineRows", () => {
     expect(handoffRows.map((row) => row.kind)).toEqual(["message", "working", "worktree-setup"]);
     expect(handoffRows[2]).toMatchObject({ kind: "worktree-setup", embedded: false });
 
-    // A script that outlives the reply never trails the assistant's message.
     const outlivedRows = deriveMessagesTimelineRows({
       timelineEntries: [
         userEntry,
@@ -1306,7 +1296,6 @@ describe("deriveMessagesTimelineRows", () => {
     });
     expect(outlivedRows.map((row) => row.kind)).toEqual(["message", "message"]);
 
-    // A failed script after the handoff keeps its row under the send.
     const failedRows = deriveMessagesTimelineRows({
       timelineEntries: [userEntry],
       latestTurn: liveTurn,
@@ -1436,7 +1425,6 @@ describe("deriveMessagesTimelineRows", () => {
     for (const [toolLifecycleStatus, tone, sourceActivityKind] of [
       ["inProgress", "tool", "tool.updated"],
       ["completed", "tool", "tool.completed"],
-      // Claude background Bash completions arrive without a command or item type.
       ["completed", "info", "task.completed"],
     ] as const) {
       const laterTool = {
@@ -1476,12 +1464,9 @@ describe("deriveMessagesTimelineRows", () => {
 
     expect(derive(direct, new Set())).toEqual(unfolded);
     expect(derive(direct, new Set(["agent-b"]))).toEqual(unfolded);
-    // A workflow coordinator between phases keeps its batch out of the fold.
     expect(derive(workflow, new Set(["wf-1"]))).toEqual(unfolded);
     expect(derive(workflow, new Set())).toEqual(unfolded);
-    // No live set is known.
     expect(derive(direct, undefined)).toEqual(unfolded);
-    // Expanding the turn reveals the other work without duplicating the batch.
     expect(derive(direct, new Set(), new Set(["turn-1" as TurnId]))).toEqual([
       "turn-fold:turn-1",
       "assistant-first-entry",
@@ -1739,7 +1724,6 @@ describe("deriveMessagesTimelineRows", () => {
     );
     expect(foldRow?.turnId).toBe("turn-1");
     expect(foldRow?.expanded).toBe(false);
-    // User message boundary (00:00:00) → terminal message updatedAt (00:00:22).
     expect(foldRow?.label).toBe("Worked for 22s");
     expect(collapsedRows.map((row) => row.id)).toEqual([
       "user-entry",
@@ -2291,10 +2275,6 @@ describe("deriveMessagesTimelineRows", () => {
   });
 
   it("derives a sane duration for a steer-superseded turn with one instant commentary message", () => {
-    // A steer ends the previous turn early: its only message completes the
-    // instant it is created, and trailing work entries land after it. The
-    // fold duration must span from the user message that started the turn to
-    // the last entry, not message createdAt → message updatedAt (~0ms).
     const rows = deriveMessagesTimelineRows({
       timelineEntries: [
         {
@@ -2394,7 +2374,6 @@ describe("deriveMessagesTimelineRows", () => {
       (row): row is Extract<(typeof rows)[number], { kind: "turn-fold" }> =>
         row.kind === "turn-fold",
     );
-    // User message (00:00:00) → trailing work entry (00:00:12).
     expect(foldRow?.turnId).toBe("turn-1");
     expect(foldRow?.label).toBe("Worked for 12s");
   });
@@ -2438,8 +2417,6 @@ describe("deriveMessagesTimelineRows", () => {
   });
 
   it("keeps the previous turn folded while a newly sent message awaits its turn", () => {
-    // Right after send, isWorking is true but latestTurn still points at the
-    // previous, settled turn — it must stay folded through that window.
     const rows = deriveMessagesTimelineRows({
       timelineEntries: [
         {

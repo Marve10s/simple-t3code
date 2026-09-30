@@ -4,7 +4,6 @@ import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 import type { DeviceAssetSource } from "./model.ts";
 import { createDisplayProjection, updateDisplayUv, type PhoneDisplayLayout } from "./phoneScene.ts";
 
-/** GLB resources belong to one viewer; the live framebuffer texture belongs to its stream presentation. */
 export function disposeDeviceModel(root: Object3D) {
   const geometries = new Set<Mesh["geometry"]>();
   const materials = new Set<Material>();
@@ -30,7 +29,6 @@ export function disposeDeviceModel(root: Object3D) {
   for (const image of images) image.close();
 }
 
-/** Assets are converted offline: portrait, front +Z, centered display, height 2.2 and planar display UVs. */
 export function createImportedPhoneScene(
   asset: Group,
   texture: Texture,
@@ -92,7 +90,6 @@ export function createImportedPhoneScene(
     },
     screenPoint: projection,
     dispose() {
-      // The model slot owns imported resources. This scene owns only its replacement screen material.
       display.material = originalMaterial;
       screenMaterial.map = null;
       screenMaterial.dispose();

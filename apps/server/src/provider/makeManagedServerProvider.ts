@@ -84,8 +84,6 @@ export const makeManagedServerProvider = Effect.fn("makeManagedServerProvider")(
       if (state.enrichmentGeneration !== generation) {
         return [null, state] as const;
       }
-      // Enrichment derives from the snapshot it was handed; a runtime usage
-      // update that landed since must not be reverted by it.
       const merged = withUsageLimits(nextSnapshot, state.snapshot.usageLimits);
       if (Equal.equals(state.snapshot, merged)) {
         return [null, state] as const;
@@ -178,11 +176,6 @@ export const makeManagedServerProvider = Effect.fn("makeManagedServerProvider")(
   const applySnapshot = (nextSettings: Settings, options?: { readonly forceRefresh?: boolean }) =>
     refreshSemaphore.withPermits(1)(applySnapshotBase(nextSettings, options));
 
-  /**
-   * Runtime usage updates arrive between probes. They patch only
-   * `usageLimits` on whatever snapshot is published and leave the enrichment
-   * generation alone, so an in-flight enrichment still lands.
-   */
   const applyUsageLimits: ServerProviderShape["applyUsageLimits"] = (update) =>
     Effect.gen(function* () {
       const snapshotToPublish = yield* Ref.modify(snapshotStateRef, (state) => {
@@ -191,8 +184,6 @@ export const makeManagedServerProvider = Effect.fn("makeManagedServerProvider")(
           update,
           checkedAt: update.checkedAt,
         });
-        // `applyUsageLimitsUpdate` hands back the same object when nothing
-        // moved, which is the common case for Codex's per-tick notification.
         if (usageLimits === state.snapshot.usageLimits) {
           return [null, state] as const;
         }

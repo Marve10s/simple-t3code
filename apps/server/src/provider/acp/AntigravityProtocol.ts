@@ -38,7 +38,6 @@ const decodeSingleAnswer = Schema.decodeUnknownOption(
 );
 const decodeToolCallContent = Schema.decodeUnknownOption(EffectAcpSchema.ToolCallContent);
 
-/** Native questions share the permission method, but their choices are not approvals. */
 export function isAntigravityUserInputRequest(
   request: EffectAcpSchema.RequestPermissionRequest,
 ): boolean {
@@ -58,7 +57,6 @@ export function selectAntigravityPermissionOptionId(
   return option?.optionId.trim() ? option.optionId : undefined;
 }
 
-/** Copy truncated text so V8 cannot retain the original large string. */
 const SECURITY_WARNING_META_KEY = "agy.security.warning";
 const WARNING_TEXT_LIMIT = 512;
 const decodeSecurityWarning = Schema.decodeUnknownOption(
@@ -68,10 +66,6 @@ const decodeSecurityWarning = Schema.decodeUnknownOption(
   }),
 );
 
-/**
- * The agent marks "Allow Always" on shell and web tools with a prompt injection
- * warning in `_meta`. Surface it as option text so both clients can show it.
- */
 function antigravitySecurityWarning(option: EffectAcpSchema.PermissionOption): string | undefined {
   const meta = option._meta;
   if (!Predicate.isObject(meta)) return undefined;
@@ -83,7 +77,6 @@ function antigravitySecurityWarning(option: EffectAcpSchema.PermissionOption): s
     : text;
 }
 
-/** Only advertise decisions that the native request can honor. */
 export function antigravityApprovalOptions(
   request: EffectAcpSchema.RequestPermissionRequest,
 ): ReadonlyArray<ProviderApprovalOption> {
@@ -153,7 +146,6 @@ export function extractAntigravityUserInputQuestion(
   };
 }
 
-/** Return undefined for an invalid answer so the adapter keeps the question open. */
 export function makeAntigravityUserInputResponse(
   request: EffectAcpSchema.RequestPermissionRequest,
   answers: ProviderUserInputAnswers,
@@ -229,12 +221,10 @@ function sanitizeToolValue(value: unknown, budget: ToolPayloadBudget, depth: num
   return Object.fromEntries(entries);
 }
 
-/** Bound both retained raw events and display data before they enter the event stream. */
 export function sanitizeAntigravityToolPayload(payload: unknown): unknown {
   return sanitizeToolValue(payload, { nodes: 512, text: 64_000 }, 0);
 }
 
-/** The runtime uses this before it retains tool state or dispatches raw callbacks. */
 export function normalizeAntigravitySessionUpdate(
   notification: EffectAcpSchema.SessionNotification,
 ): EffectAcpSchema.SessionNotification {
@@ -343,12 +333,10 @@ export function normalizeAntigravityToolCall(toolCall: AcpToolCallState): AcpToo
   };
 }
 
-/** Only commands still running after end_turn become background tasks. */
 export function isAntigravityOpenCommand(toolCall: AcpToolCallState): boolean {
   return toolCall.kind === "execute" && toolCall.status === "inProgress";
 }
 
-/** ACP 1.1.1 exposes subagent invocations as ordinary tools, without child IDs or models. */
 export function classifyAntigravitySubagentToolCall(
   toolCall: AcpToolCallState,
   rawPayload: unknown,
@@ -363,7 +351,6 @@ export function classifyAntigravitySubagentToolCall(
   return Predicate.isObject(meta) && meta.is_mcp_tool_call === true ? "mcp" : "subagent";
 }
 
-/** History sends a completed start before the separate result and its final status. */
 export function isAntigravitySubagentReplayStart(rawPayload: unknown): boolean {
   const update = Predicate.isObject(rawPayload) ? rawPayload.update : undefined;
   return (

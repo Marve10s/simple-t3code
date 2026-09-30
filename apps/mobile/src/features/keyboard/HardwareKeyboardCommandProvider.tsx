@@ -37,7 +37,6 @@ const COPY_FEEDBACK_DISMISS_MS = 3_000;
 
 const CommandPaletteContext = createContext<ReactNode>(null);
 
-/** Render inside the workspace so palette actions share its navigation and pane state. */
 export function HardwareKeyboardCommandOverlay() {
   return use(CommandPaletteContext);
 }

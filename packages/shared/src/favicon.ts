@@ -1,10 +1,5 @@
 import { isPublicFaviconHost } from "./hostClassification.ts";
 
-/**
- * Mirrors Codex's generic Browser Use fallback: ask the page origin for its
- * conventional favicon and let the image element fall back to a browser glyph.
- * Chrome-backed tools can pass their tab's explicit favicon URL separately.
- */
 function faviconUrlForPage(rawUrl: string | null | undefined, _size = 32): string | null {
   if (!rawUrl || rawUrl.length > 4096) return null;
   try {
@@ -39,7 +34,6 @@ function themedFaviconUrlForPage(
   }
 }
 
-/** Accepts image URLs supplied by a trusted provider event. */
 function explicitFaviconUrl(rawUrl: string | null | undefined): string | null {
   if (!rawUrl || rawUrl.length > 4096) return null;
   try {
@@ -52,12 +46,6 @@ function explicitFaviconUrl(rawUrl: string | null | undefined): string | null {
   }
 }
 
-/**
- * Chooses a website icon for the app's resolved theme. Provider-supplied
- * variants mirror Codex's Chrome-selected favicon path. A small site-owned
- * fallback table covers websites whose conventional favicon is illegible in
- * one appearance without recoloring full-color icons.
- */
 export function toolActivityFaviconUrl(
   icon: {
     readonly pageUrl: string;
@@ -82,7 +70,6 @@ export function toolActivityFaviconUrl(
   );
 }
 
-/** Return a public favicon URL without disclosing private or reserved hosts. */
 export function faviconUrlForOrigin(rawUrl: string | null | undefined, size = 32): string | null {
   if (!rawUrl) return null;
   try {

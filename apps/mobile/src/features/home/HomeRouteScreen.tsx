@@ -23,8 +23,6 @@ import { usePendingTaskListActions } from "./usePendingTaskListActions";
 import { useThreadListActions } from "./useThreadListActions";
 import { getConnectionAwareBrandHeaderOptions } from "./WorkspaceConnectionTitle";
 
-/* ─── Route screen ───────────────────────────────────────────────────── */
-
 export function HomeRouteScreen() {
   const { width: windowWidth } = useWindowDimensions();
   const { layout, panes } = useAdaptiveWorkspaceLayout();
@@ -102,8 +100,6 @@ export function HomeRouteScreen() {
     }
   }, [projectFilterOptions, selectedProjectKey]);
 
-  // In split layouts the persistent sidebar IS the thread list — Home becomes
-  // an empty detail pane so selecting a thread never transitions layouts.
   if (layout.usesSplitView) {
     return (
       <>
@@ -149,9 +145,6 @@ export function HomeRouteScreen() {
       onStartNewTask={() => navigation.navigate("NewTaskSheet", { screen: "NewTask" })}
     >
       <>
-        {/* Restore the header after leaving split view; screen options are
-            shallow-merged. The brand slot also doubles as the connection
-            status surface while an environment reconnects. */}
         <NativeStackScreenOptions
           optionsVersion={windowWidth}
           options={{

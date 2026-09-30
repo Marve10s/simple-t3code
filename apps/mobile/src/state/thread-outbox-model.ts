@@ -28,14 +28,11 @@ import type { DraftComposerAttachment } from "../lib/composerImages";
 import { scopedThreadKey } from "../lib/scopedEntities";
 import { resolveProviderInteractionMode } from "./legacy-plan-mode";
 
-// Keep current writes until a compatible native baseline includes the v4 reader.
 const THREAD_OUTBOX_SCHEMA_VERSION = 3;
 const THREAD_OUTBOX_MAX_RETRY_DELAY_MS = 16_000;
 
 const QueuedThreadCreationSchema = Schema.Struct({
   projectId: ProjectId,
-  // Snapshot of the project's display metadata so a pending task stays
-  // presentable in the thread list even when the project shell is not loaded.
   projectTitle: Schema.optional(Schema.String),
   projectCwd: Schema.optional(Schema.String),
   workspaceMode: Schema.Literals(["local", "worktree"]),
@@ -56,8 +53,6 @@ export const QueuedThreadMessageSchema = Schema.Struct({
   modelSelection: Schema.optional(ModelSelection),
   runtimeMode: Schema.optional(RuntimeMode),
   interactionMode: Schema.optional(ProviderInteractionMode),
-  // Present when the queued item creates a brand-new thread (pending task)
-  // instead of appending a turn to an existing one.
   creation: Schema.optional(QueuedThreadCreationSchema),
   createdAt: IsoDateTime,
 });
@@ -174,14 +169,9 @@ export function resolveThreadOutboxDeliveryAction(input: {
   readonly threadBusy: boolean;
 }): ThreadOutboxDeliveryAction {
   if (input.isCreation) {
-    // A pending task creates its thread on delivery. If the thread already
-    // exists the creation command went through and only cleanup remains.
     if (input.threadExists) {
       return "remove";
     }
-    // Wait for the shell to be live before sending: until the thread list has
-    // synchronized, a previously delivered creation whose cleanup failed would
-    // look missing and get re-issued, duplicating the thread.
     return input.environmentConnected && input.shellStatus === "live" ? "send" : "wait";
   }
   if (!input.threadExists) {
@@ -197,15 +187,9 @@ export type ThreadOutboxDispatchStep =
   | { readonly step: "restore"; readonly reason: string }
   | { readonly step: "send" };
 
-/**
- * Wait for provider and file capabilities before sending. Cleanup does not
- * need config: a creation whose thread exists, or a message whose thread is
- * gone, can still be removed while config loads.
- */
 export function resolveThreadOutboxDispatchStep(input: {
   readonly deliveryAction: ThreadOutboxDeliveryAction;
   readonly fileAttachments: ReadonlyArray<{ readonly name: string; readonly sizeBytes: number }>;
-  /** Null while the environment's server config has not synced yet. */
   readonly serverConfig: { readonly maxFileUploadBytes: number | undefined } | null;
 }): ThreadOutboxDispatchStep {
   if (input.deliveryAction !== "send") {
@@ -230,10 +214,6 @@ export function resolveThreadOutboxDispatchStep(input: {
     : { step: "send" };
 }
 
-/**
- * A queued creation can only be dispatched once its payload would pass server
- * validation; incomplete payloads stay pending until the user edits them.
- */
 export function isQueuedThreadCreationSendable(message: QueuedThreadMessage): boolean {
   if (!message.creation) {
     return false;
@@ -254,16 +234,6 @@ function errorMessage(error: unknown): string | null {
   return typeof error === "string" ? error : null;
 }
 
-/**
- * Only a failure the server actually decided (`OrchestrationDispatchCommandError`,
- * or an authorization rejection) means the payload itself is bad. The other
- * typed failures a queued send can hit are transport-shaped: a socket that
- * dropped mid-request (`RpcClientError` wrapping a Socket read/write/close
- * reason), or an environment that is not connected or not registered. Those
- * are matched by tag, not by message text, because a `SocketReadError` message
- * is just "An error occurred during Read". A wrong answer here restores the
- * pending task into a draft and it disappears from the list.
- */
 export function shouldRetryThreadOutboxDelivery(error: unknown): boolean {
   if (typeof error === "object" && error !== null && "_tag" in error) {
     switch (error._tag) {

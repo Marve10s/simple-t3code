@@ -56,8 +56,6 @@ function useLocalPlayback(source: LocalVideoPreviewSource): PlaybackState {
   const { attachment } = source;
   const [uri, setUri] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  // Only a different file needs a new lease; a metadata update on the same
-  // draft must not dispose the file Android is still playing.
   const attachmentRef = useRef(attachment);
   attachmentRef.current = attachment;
   const { id: attachmentId, fileUri } = attachment;

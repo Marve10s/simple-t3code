@@ -6,14 +6,12 @@ import type { FilePreviewSource } from "../components/FilePreviewModal";
 import type { MediaVideoPreviewSource } from "./videoPreviewSource";
 import type { MediaActionsSource } from "./mediaActions";
 
-/** Resolves only explicit media references. Ordinary links keep their existing navigation. */
 export function resolveMarkdownMediaPreview(
   href: string,
   input: {
     readonly environmentId: EnvironmentId;
     readonly threadId: ThreadId;
     readonly workspaceRoot: string | null | undefined;
-    /** Image syntax can target an endpoint without a recognizable extension. */
     readonly imageEmbed?: boolean;
   },
 ):

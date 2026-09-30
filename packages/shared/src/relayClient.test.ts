@@ -18,8 +18,6 @@ import {
   makeCloudflaredRelayClient,
 } from "./relayClient.ts";
 
-// The suite runs the linux code path against the real filesystem, checking
-// POSIX exec bits that NTFS never reports; the win32 branch skips that check.
 const windowsHost = HostProcessPlatform.defaultValue() === "win32";
 
 const hostRuntimeLayer = (env: Record<string, string> = {}) =>
@@ -61,7 +59,6 @@ const makeSpawnerLayer = (commands: Array<string>) =>
     ChildProcessSpawner.make((command) =>
       Effect.sync(() => {
         commands.push(ChildProcess.isStandardCommand(command) ? command.command : "piped-command");
-        // The pinned Windows executable rejects --version but accepts the version subcommand.
         return makeHandle(
           ChildProcess.isStandardCommand(command) && command.args.includes("--version") ? 1 : 0,
         );

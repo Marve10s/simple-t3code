@@ -28,11 +28,6 @@ const HOMEBREW_INFO_TIMEOUT_MS = 10_000;
 const HOMEBREW_INFO_MAX_BYTES = 256 * 1_024;
 const PROVIDER_UPDATE_ACTION_TOAST_MESSAGE = "Install the update now or review provider settings.";
 
-/**
- * Ownership is re-derived from the executable this often. Installs do not
- * move on their own, so this mostly bounds how stale a Homebrew "latest" can
- * get; the npm registry check keeps its own cache.
- */
 const MAINTENANCE_CAPABILITIES_CACHE_TTL = Duration.hours(1);
 
 const compactEnv = (input: Record<string, Option.Option<string>>): NodeJS.ProcessEnv =>
@@ -58,12 +53,6 @@ export interface ProviderMaintenanceCapabilities {
   readonly provider: ProviderDriverKind;
   readonly packageName: string | null;
   readonly update: ProviderMaintenanceCommandAction | null;
-  /**
-   * Latest version reported by the installer that owns the executable.
-   * `undefined` means the installer has no channel of its own and the npm
-   * registry entry for `packageName` is authoritative; `null` means the
-   * installer was asked and did not know.
-   */
   readonly latestVersion?: string | null;
 }
 
@@ -72,22 +61,14 @@ export interface ProviderMaintenanceCommandAction {
   readonly executable: string;
   readonly args: ReadonlyArray<string>;
   readonly lockKey: string;
-  /**
-   * Extra environment for the spawned updater, on top of the server's own.
-   * A native updater finds its install through the same variables the
-   * provider runs with (e.g. `CODEX_HOME`), so an instance with a custom home
-   * must update that home and not the default one.
-   */
   readonly env?: NodeJS.ProcessEnv;
 }
 
-/** Where the provider executable was found; every path is absolute. */
 export interface ProviderMaintenanceResolutionContext {
   readonly binaryPath: string;
   readonly resolvedCommandPath: string;
   readonly realCommandPath: string;
   readonly env: NodeJS.ProcessEnv;
-  /** Host platform; decides how the copyable command quotes the executable. */
   readonly platform: NodeJS.Platform;
 }
 
@@ -108,7 +89,6 @@ export interface PackageManagedProviderMaintenanceDefinition {
   readonly nativeUpdate: {
     readonly args: ReadonlyArray<string>;
     readonly isCommandPath: (commandPath: string) => boolean;
-    /** Environment the native updater needs to target this instance's install. */
     readonly env?: NodeJS.ProcessEnv;
   } | null;
 }
@@ -132,10 +112,6 @@ function nonEmptyString(value: unknown): string | null {
   return typeof value === "string" && value.trim().length > 0 ? value.trim() : null;
 }
 
-/**
- * The copyable command must paste into a shell as-is, so an executable path
- * with spaces or quotes is quoted for the host's default shell.
- */
 function quoteShellWord(word: string, platform: NodeJS.Platform): string {
   const safeWord = platform === "win32" ? /^[\w./:\\@=-]+$/ : /^[\w./:@=-]+$/;
   if (safeWord.test(word)) return word;
@@ -146,7 +122,6 @@ function quoteShellWord(word: string, platform: NodeJS.Platform): string {
 
 function quoteUpdateExecutable(executable: string, platform: NodeJS.Platform): string {
   const quoted = quoteShellWord(executable, platform);
-  // Windows terminals default to PowerShell, where a quoted executable needs &.
   return platform === "win32" && quoted !== executable ? `& ${quoted}` : quoted;
 }
 
@@ -156,7 +131,6 @@ export function makeProviderMaintenanceCapabilities(input: {
   readonly updateExecutable: string | null;
   readonly updateArgs: ReadonlyArray<string>;
   readonly updateLockKey: string | null;
-  /** Shown to the user instead of `<executable> <args>`; use for a bare tool name like `brew`. */
   readonly updateCommand?: string;
   readonly platform?: NodeJS.Platform;
   readonly env?: NodeJS.ProcessEnv;
@@ -186,7 +160,6 @@ export function makeProviderMaintenanceCapabilities(input: {
   };
 }
 
-/** Pin only package-manager actions we own, preserving prefix, scripts, env and lock. */
 export function makeTargetedProviderUpdateAction(
   capabilities: ProviderMaintenanceCapabilities,
   version: string,
@@ -249,13 +222,6 @@ function isPnpmGlobalCommandPath(commandPath: string): boolean {
   );
 }
 
-/**
- * The npm global prefix that owns a package, derived from the real path of
- * its entry point: `<prefix>/lib/node_modules/<pkg>/…`. Windows global
- * installs have no `lib` segment and are proven by the shim instead (see
- * `resolveNpmGlobalPrefix`). A project-local `node_modules` is not a global
- * install and yields null.
- */
 export function npmGlobalPrefixFromCommandPath(
   realCommandPath: string,
   packageName: string,
@@ -267,8 +233,6 @@ export function npmGlobalPrefixFromCommandPath(
   if (packageIndex < 0 || normalized.slice(0, packageIndex).includes("/node_modules/")) {
     return null;
   }
-  // Mise's npm backend uses a global-looking layout inside a tool version.
-  // Globals under its Node installation still belong to npm.
   const miseTool = /\/mise\/installs\/([^/]+)\/[^/]+$/.exec(normalized.slice(0, packageIndex))?.[1];
   if (miseTool && miseTool !== "node") {
     return null;
@@ -276,22 +240,14 @@ export function npmGlobalPrefixFromCommandPath(
   return packageIndex === 0 ? "/" : slashPath.slice(0, packageIndex);
 }
 
-// `<prefix>/Cellar/<name>/<version>/…` or `<prefix>/Caskroom/<name>/<version>/…`.
-// Homebrew always nests a version directory under the keg.
 const HOMEBREW_KEG_PATTERN = /^(.*)\/(cellar|caskroom)\/([^/]+)\/[^/]+\//i;
 
 export interface HomebrewOwnership {
   readonly kind: "formula" | "cask";
   readonly name: string;
-  /** The Homebrew prefix the keg sits under; must match `brew --prefix`. */
   readonly prefix: string;
 }
 
-/**
- * Homebrew looks like the owner when the real path runs through a versioned
- * keg or cask. It is only proven once the prefix matches the `brew` that will
- * run the upgrade (see `resolvePackageManagedProviderMaintenance`).
- */
 export function homebrewOwnershipFromCommandPath(
   realCommandPath: string,
 ): HomebrewOwnership | null {
@@ -319,7 +275,6 @@ const HomebrewInfoResponse = Schema.Struct({
 
 const decodeHomebrewInfo = Schema.decodeUnknownOption(Schema.fromJsonString(HomebrewInfoResponse));
 
-/** Cask versions may carry a build suffix after a comma (`1.2.3,456`). */
 export function parseHomebrewLatestVersion(
   infoJson: string,
   ownership: HomebrewOwnership,
@@ -335,7 +290,6 @@ export function parseHomebrewLatestVersion(
   return nonEmptyString(raw);
 }
 
-/** Run `brew <args>` and return stdout, or null on failure, timeout, or oversized output. */
 const runHomebrew = Effect.fn("runHomebrew")(function* (
   brewPath: string,
   args: ReadonlyArray<string>,
@@ -345,7 +299,6 @@ const runHomebrew = Effect.fn("runHomebrew")(function* (
   const collect = Effect.gen(function* () {
     const child = yield* spawner.spawn(ChildProcess.make(brewPath, args, { env, extendEnv: true }));
     yield* Effect.addFinalizer(() => child.kill().pipe(Effect.ignore));
-    // stderr is drained so a chatty brew cannot block on a full pipe.
     const [stdout, exitCode] = yield* Effect.all(
       [
         collectUint8StreamText({ stream: child.stdout, maxBytes: HOMEBREW_INFO_MAX_BYTES }),
@@ -369,12 +322,6 @@ const runHomebrew = Effect.fn("runHomebrew")(function* (
   );
 });
 
-/**
- * Derive update capabilities from where the executable actually lives. Every
- * branch that yields a one-click command has evidence that the named tool
- * owns that path; anything unproven stays manual-only so T3 Code never runs
- * a package manager against an install it did not create.
- */
 export const resolvePackageManagedProviderMaintenance = Effect.fn(
   "resolvePackageManagedProviderMaintenance",
 )(function* (
@@ -431,16 +378,8 @@ export const resolvePackageManagedProviderMaintenance = Effect.fn(
     });
   }
 
-  // npm proof names the package, so it outranks a keg the path merely passes
-  // through: a Homebrew-installed Node keeps its globals under
-  // `Cellar/node/<ver>/lib/node_modules/`, and that is npm's install, not brew's.
   const npmPrefix = yield* resolveNpmGlobalPrefix(context, packageName);
   if (npmPrefix) {
-    // npm 12 blocks install scripts by default (empty allow-scripts allowlist)
-    // and still exits 0, so a package whose postinstall finishes the install
-    // (claude copies its native binary over a placeholder stub) is left broken
-    // while the update reports success. Allow this one package's scripts.
-    // Older npm warns about the unknown config and continues.
     return makeProviderMaintenanceCapabilities({
       provider: definition.provider,
       packageName,
@@ -459,7 +398,6 @@ export const resolvePackageManagedProviderMaintenance = Effect.fn(
 
   const homebrew = homebrewOwnershipFromCommandPath(context.realCommandPath);
   if (homebrew) {
-    // Mise shims resolve to the version manager, not the provider.
     if (homebrew.kind === "formula" && homebrew.name.toLowerCase() === "mise") {
       return manual;
     }
@@ -469,8 +407,6 @@ export const resolvePackageManagedProviderMaintenance = Effect.fn(
     if (!brewPath) {
       return manual;
     }
-    // A keg-shaped path is only Homebrew's if it sits under the prefix of the
-    // `brew` that would upgrade it; `brew --prefix` is a cheap shell script.
     const fileSystem = yield* FileSystem.FileSystem;
     const brewPrefix = nonEmptyString(yield* runHomebrew(brewPath, ["--prefix"], context.env));
     const realBrewPrefix = brewPrefix
@@ -484,8 +420,6 @@ export const resolvePackageManagedProviderMaintenance = Effect.fn(
     }
     const args =
       homebrew.kind === "cask" ? ["upgrade", "--cask", homebrew.name] : ["upgrade", homebrew.name];
-    // Homebrew lags npm by hours on every release, so compare against what
-    // `brew upgrade` can actually deliver.
     const info = yield* runHomebrew(brewPath, ["info", "--json=v2", homebrew.name], context.env);
     return makeProviderMaintenanceCapabilities({
       provider: definition.provider,
@@ -501,11 +435,6 @@ export const resolvePackageManagedProviderMaintenance = Effect.fn(
   return manual;
 });
 
-/**
- * POSIX npm links `<prefix>/bin/<cmd>` into the package, so the real path is
- * proof. Windows npm writes `.cmd` shims beside `node_modules`, so the proof
- * is the package manifest next to the shim.
- */
 const resolveNpmGlobalPrefix = Effect.fn("resolveNpmGlobalPrefix")(function* (
   context: ProviderMaintenanceResolutionContext,
   packageName: string,
@@ -526,9 +455,6 @@ const resolveNpmGlobalPrefix = Effect.fn("resolveNpmGlobalPrefix")(function* (
     ...packageName.split("/"),
     "package.json",
   );
-  // npm writes both `<cmd>.cmd` and an extensionless sh script into the
-  // Windows prefix; either one sits directly beside `node_modules`. A POSIX
-  // project checkout has the same shape, which is why this is Windows-only.
   const hasManifest = yield* fileSystem
     .exists(manifestPath)
     .pipe(Effect.orElseSucceed(() => false));
@@ -552,11 +478,6 @@ function makeManualProviderMaintenanceCapabilities(
   });
 }
 
-/**
- * Locate the configured provider executable, follow symlinks, and hand the
- * result to the resolver. A binary that cannot be found yields the resolver's
- * no-context answer.
- */
 export const resolveProviderMaintenanceCapabilitiesEffect = Effect.fn(
   "resolveProviderMaintenanceCapabilitiesEffect",
 )(function* (
@@ -572,9 +493,6 @@ export const resolveProviderMaintenanceCapabilitiesEffect = Effect.fn(
   }
 
   const env = options?.env ?? (yield* readCommandLookupEnv);
-  // resolveCommandPath checks explicit paths for existence too, so a missing
-  // binary always lands in the no-context branch and never gets an update
-  // command it cannot run.
   const resolvedCommandPath = yield* resolveCommandPath(binaryPath, { env }).pipe(
     Effect.catchTags({ CommandResolutionError: () => Effect.succeed(null) }),
   );
@@ -598,11 +516,6 @@ export const resolveProviderMaintenanceCapabilitiesEffect = Effect.fn(
   });
 });
 
-/**
- * Turn a one-shot resolution into the shape drivers expose: a cached read for
- * advisories and a `fresh` read that update execution uses so it never trusts
- * ownership derived before the user clicked.
- */
 export const makeCachedProviderMaintenanceResolution = Effect.fn(
   "makeCachedProviderMaintenanceResolution",
 )(function* (resolve: Effect.Effect<ProviderMaintenanceCapabilities>) {

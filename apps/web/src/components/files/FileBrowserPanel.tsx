@@ -32,9 +32,7 @@ interface FileBrowserPanelProps {
   environmentId: EnvironmentId;
   cwd: string;
   projectName: string;
-  /** Entry currently open in the surface; revealed and selected in the tree. A directory is expanded. */
   selectedPath: string | null;
-  /** Bumped when the same path should be revealed again (e.g. re-opened from search). */
   selectedPathRevealId: number;
   onOpenFile: (relativePath: string) => void;
   onRefreshSelectedFile?: () => void;
@@ -147,9 +145,6 @@ export default function FileBrowserPanel({
   const treeSelectionPathRef = useRef<string | null>(null);
   const handledRevealRef = useRef<{ path: string; revealId: number } | null>(null);
 
-  // The tree renders rows in shadow DOM and its anchor rect is unreliable, so
-  // capture the right-click position ourselves; contextmenu is a composed
-  // event, so a capture-phase listener sees it with viewport coordinates.
   const contextMenuPointerRef = useRef<{ x: number; y: number; at: number } | null>(null);
   useEffect(() => {
     const capturePointer = (event: MouseEvent) => {
@@ -159,7 +154,6 @@ export default function FileBrowserPanel({
     return () => document.removeEventListener("contextmenu", capturePointer, true);
   }, []);
 
-  /** Combines the file actions (open/reveal/open with) with the panel's own mention actions. */
   const showEntryContextMenu = async (
     item: TreeContextMenuItem,
     context: TreeContextMenuOpenContext,
@@ -189,8 +183,6 @@ export default function FileBrowserPanel({
         position,
       );
       if (clicked === null) return;
-      // "Open with" submenu selections report the child id ("editor:<id>"),
-      // which is not present in the top-level item list.
       const isFileMenuAction =
         fileMenuItems.some((entry) => entry.id === clicked) || clicked.startsWith("editor:");
       if (isFileMenuAction) {
@@ -255,8 +247,6 @@ export default function FileBrowserPanel({
         },
       },
     },
-    // Rows only need to be draggable so entries can be dropped into the chat
-    // composer; rearranging files inside the tree stays off.
     dragAndDrop: { canDrop: () => false },
     density: "compact",
     fileTreeSearchMode: "hide-non-matches",
@@ -264,14 +254,8 @@ export default function FileBrowserPanel({
     initialExpansion: "closed",
     icons: T3_PIERRE_ICONS,
     onSelectionChange: (selectedPaths) => {
-      // The drag controller's selection cache must track every change,
-      // including reveal-driven ones, or drags act on a stale selection.
       dragMention.handleSelectionChange(selectedPaths);
-      // Selection changes driven by the reveal sync below are echoes of an
-      // already-open file, not a request to open it again.
       if (syncingSelectionRef.current) return;
-      // Starting a drag selects the dragged row; that selection is a side
-      // effect of the gesture, not a request to open the file.
       if (dragMention.isDragInProgress()) {
         return;
       }
@@ -392,31 +376,22 @@ export default function FileBrowserPanel({
       return;
     }
     const selectedKind = entryKinds.get(selectedPath);
-    // An unloaded entry has no row to reveal yet; folders do, and chat links can
-    // point at them.
     if (selectedKind === undefined) {
       handledRevealRef.current = null;
       return;
     }
     const revealRequest = { path: selectedPath, revealId: selectedPathRevealId };
     const handledReveal = handledRevealRef.current;
-    // Entry refreshes rebuild treePaths while the same preview stays open.
-    // Replaying a handled reveal would close an active tree search and steal focus.
     if (
       handledReveal?.path === revealRequest.path &&
       handledReveal.revealId === revealRequest.revealId
     ) {
       return;
     }
-    // Directory rows are registered with a trailing slash (see treePath).
     const selectedTreePath = selectedKind === "directory" ? `${selectedPath}/` : selectedPath;
     const selectedItem = model.getItem(selectedTreePath);
     if (!selectedItem) return;
 
-    // A selection that originated inside the tree (clicking a row, possibly
-    // in an active tree search) is already visible; re-revealing it would
-    // close the search and clobber the user's context. Only sync external
-    // opens (file picker, content search, chat links).
     const selectedInTree = model
       .getSelectedPaths()
       .some((path) => path.replace(/\/$/, "") === selectedPath);
@@ -435,8 +410,6 @@ export default function FileBrowserPanel({
       model.getItem(path)?.deselect();
     }
 
-    // Directory rows are registered with a trailing slash (see treePath), so
-    // ancestor lookups must use the same form to expand them.
     const segments = selectedPath.split("/");
     let ancestorPath = "";
     for (const segment of segments.slice(0, -1)) {
@@ -456,12 +429,6 @@ export default function FileBrowserPanel({
     });
   }, [entryKinds, model, selectedPath, selectedPathRevealId]);
 
-  // Tag tree drags with the composer mention payload. The row is read from
-  // the composed event path (the tree's shadow root is open), so this does
-  // not depend on running after the tree's own dragstart handler; the drag
-  // data store is writable for every dragstart listener in the dispatch.
-  // The capture phase runs before the tree's own dragstart handler selects
-  // the dragged row, so the drag flag is up before that selection emits.
   const panelRef = useRef<HTMLDivElement | null>(null);
   useEffect(() => {
     treeModelRef.current = model;

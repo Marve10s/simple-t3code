@@ -503,8 +503,6 @@ export const reconcileProviderSessions = Effect.gen(function* () {
     (yield* providerService.listSessions()).map((session) => session.threadId),
   );
   const { threads } = yield* query.getCommandReadModel();
-  // Provider startup can report ready before the continuation is submitted.
-  // Find those markers in one read rather than querying every idle thread.
   const preparedThreadIds = new Set(
     (yield* directory.listBindings().pipe(
       Effect.catch((cause) =>
@@ -576,8 +574,6 @@ export const reconcileProviderSessions = Effect.gen(function* () {
       Option.isSome(binding) &&
       readRuntimePayload(binding.value.runtimePayload).activeTurnId === null &&
       readRuntimePayload(binding.value.runtimePayload).continueAfterServerUpdatePrepared === true;
-    // Runtime events advance the projection's turn, but not the directory's
-    // last admitted turn. Use the projection to identify interrupted work.
     const interruptedByRestart =
       continueAfterRestartFor(thread.projectId) &&
       session.status === "running" &&
@@ -657,7 +653,6 @@ export const reconcileProviderSessions = Effect.gen(function* () {
           status: "starting",
           runtimePayload: {
             ...readRuntimePayload(binding.value.runtimePayload),
-            // Keep recovery durable if this process also exits before sending.
             [SERVER_UPDATE_CONTINUATION_KEY]: session.activeTurnId ?? continuationTurnId,
             continueAfterServerUpdatePrepared: true,
             activeTurnId: null,
@@ -746,21 +741,10 @@ export const reconcileProviderSessions = Effect.gen(function* () {
 
 const decodeWorktreeSetupSnapshot = Schema.decodeUnknownOption(WorktreeSetupSnapshot);
 
-/**
- * A worktree bootstrap records its setup snapshot on the thread while it runs
- * and settles it when it finishes. The bootstrap itself lives only in memory,
- * so a process exit mid-setup leaves a `running` record with nobody to finish
- * it. Before the turn started that also strands the persisted user message, so
- * the setup is marked failed and the user is told to send again. After the
- * handoff only an async setup script was still running; its stage is marked
- * failed and the setup settles as done, like any other script failure.
- */
 export const reconcileWorktreeSetups = Effect.gen(function* () {
   const crypto = yield* Crypto.Crypto;
   const orchestrationEngine = yield* OrchestrationEngine.OrchestrationEngineService;
   const query = yield* ProjectionSnapshotQuery.ProjectionSnapshotQuery;
-  // The command read model carries no activity bodies; read the setup
-  // records directly, live threads only.
   const recordedSetups = yield* query.listActivitiesByKind(WORKTREE_SETUP_ACTIVITY_KIND);
   const interruptedAt = DateTime.formatIso(yield* DateTime.now);
 
@@ -894,7 +878,7 @@ export const autoPullProjects = Effect.fn("autoPullProjects")(function* (
   );
 });
 
-/** @public Service construction is part of the canonical Effect module API. */
+/** @public */
 export const make = (options?: StartupOptions) =>
   Effect.gen(function* () {
     const serverConfig = yield* ServerConfig.ServerConfig;
@@ -1043,8 +1027,6 @@ export const make = (options?: StartupOptions) =>
         options?.awaitAuxiliaryParked ?? Effect.void,
       );
 
-      // This is the prepared boundary. Every dependency has been acquired and
-      // every runtime root has confirmed that it is parked before this request.
       const updateOutcome = yield* launcher.prepareTrial;
       yield* runStartupPhase(
         "welcome.publish",

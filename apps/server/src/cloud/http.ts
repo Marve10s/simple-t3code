@@ -105,7 +105,6 @@ const CLOUD_MINT_NONCE_PREFIX = "cloud-mint-nonce-";
 const CLOUD_MINT_JTI_PREFIX = "cloud-mint-jti-";
 const CLOUD_HEALTH_NONCE_PREFIX = "cloud-health-nonce-";
 const CLOUD_HEALTH_JTI_PREFIX = "cloud-health-jti-";
-/** Secret store name prefixes of cloud replay markers. The server prunes expired ones. */
 export const CLOUD_REPLAY_MARKER_PREFIXES = [
   CLOUD_MINT_NONCE_PREFIX,
   CLOUD_MINT_JTI_PREFIX,
@@ -114,7 +113,6 @@ export const CLOUD_REPLAY_MARKER_PREFIXES = [
 ] as const;
 const CLOUD_PROOF_MAX_LIFETIME_SECONDS = 5 * 60;
 const CLOUD_PROOF_CLOCK_SKEW_SECONDS = 60;
-// The desktop app stops its backends within seconds of writing the marker.
 const DESKTOP_UPDATE_RESTART_MARKER_TTL = Duration.minutes(1);
 const MANAGED_ENDPOINT_PROVISION_REQUEST_TIMEOUT = Duration.minutes(2);
 const LOOPBACK_HOSTNAMES = new Set(["127.0.0.1", "::1", "localhost"]);
@@ -364,10 +362,6 @@ function isAllowedEndpointOrigin(input: {
   return input.origin.localHttpPort === endpointRequestPort(url);
 }
 
-// A managed (Cloudflare tunnel) endpoint is provisioned by the relay and must
-// point at a loopback origin. A manual endpoint is reached out of band (e.g.
-// Tailscale) or not advertised at all for publish-only links, so it is not
-// tied to the managed-tunnel scope.
 export function isSupportedLinkProviderKind(request: RelayLinkProofRequest): boolean {
   return (
     request.endpoint.providerKind === "cloudflare_tunnel" ||
@@ -597,10 +591,6 @@ export const startManagedCloudTunnelIfOriginConfirmed = Effect.fn(
       if (Option.isNone(runtimeBytes)) return false;
       const config = Option.getOrNull(decodeRuntimeConfig(bytesToString(runtimeBytes.value)));
       if (config === null || config.providerKind !== "cloudflare_tunnel") return false;
-      // With the marker required, only a config the relay already confirmed on
-      // this port may start. Without it, startup is falling back after the
-      // relay stayed unreachable: an unconfirmed origin may send traffic to a
-      // stale port, but that beats no remote access at all.
       if (requireConfirmedOrigin) {
         if (Option.isNone(markerBytes)) return false;
         const marker = Option.getOrNull(decodeConfirmedOrigin(bytesToString(markerBytes.value)));
@@ -640,8 +630,6 @@ const applyCloudRelayConfig = Effect.fn("environment.cloud.applyRelayConfig")(fu
       cloudUserId: payload.cloudUserId,
     });
     yield* validateCloudMintPublicKey(payload.cloudMintPublicKey);
-    // Reject unsupported runtimes before touching the connector so a bad
-    // payload cannot stop a healthy tunnel on its way to a 503.
     if (
       payload.endpointRuntime !== null &&
       payload.endpointRuntime.providerKind !== "cloudflare_tunnel"
@@ -864,8 +852,6 @@ const reconcileDesiredCloudLinkWith = Effect.fn("environment.cloud.reconcileDesi
         confirmedOrigin: parsedOrigin.origin,
       },
     );
-    // Callers decide on managed tunnel recovery from the mode this link
-    // actually used, not from a value read before the relay round trip.
     return mode;
   },
   Effect.catchIf(
@@ -1140,8 +1126,6 @@ export const recoverManagedCloudTunnel = Effect.fn("environment.cloud.recoverMan
   },
 );
 
-// The launcher owns this durable state, so read it directly both when a trial
-// decides whether it owns pre-activation cleanup and while a server tears down.
 export const pendingServiceUpdateExists = Effect.gen(function* () {
   const config = yield* ServerConfig.ServerConfig;
   const fs = yield* FileSystem.FileSystem;
@@ -1153,11 +1137,6 @@ export const pendingServiceUpdateExists = Effect.gen(function* () {
   return Option.isSome(stateText) && serviceStateHasPendingUpdate(stateText.value);
 });
 
-// A pending update alone is not proof a replacement server is coming: an
-// explicit launcher stop (`t3 service uninstall`, `systemctl stop`,
-// `launchctl bootout`) during
-// the pending window also tears this server down. The launcher marks that case
-// just before it signals the child, so pending + no marker is the handoff.
 const pendingUpdateHandoffExists = Effect.gen(function* () {
   if (!(yield* pendingServiceUpdateExists)) {
     return false;
@@ -1172,11 +1151,6 @@ const pendingUpdateHandoffExists = Effect.gen(function* () {
   return !stopping;
 });
 
-// The desktop app writes its marker right before it stops this server to
-// install an update, whether a remote client or the local app started it.
-// Reading consumes it, so shutdown checks it first. Only a fresh marker counts,
-// so a marker the server never read (a hard kill) cannot keep the tunnel on a
-// later quit.
 const desktopUpdateRestartPending = Effect.gen(function* () {
   const config = yield* ServerConfig.ServerConfig;
   const fs = yield* FileSystem.FileSystem;
@@ -1195,36 +1169,17 @@ const desktopUpdateRestartPending = Effect.gen(function* () {
   });
 });
 
-// Cloudflare bills per provisioned tunnel, so an environment that goes offline
-// must not leave its tunnel behind. Releasing deletes only the tunnel — the
-// relay keeps the link and its hostname reservation, and the next startup's
-// link reconcile provisions a replacement tunnel under the same URL.
 export const releaseManagedTunnelOnShutdown = Effect.fn(
   "environment.cloud.releaseManagedTunnelOnShutdown",
 )(function* () {
   const dependencies = yield* cloudHttpDependencies;
-  // Only a managed link stores a runtime config; publish-only links have no
-  // tunnel to release.
   const runtimeConfig = yield* dependencies.secrets.get(CLOUD_ENDPOINT_RUNTIME_CONFIG);
   if (Option.isNone(runtimeConfig)) {
     return false;
   }
-  // Only CLI-desired managed links release eagerly because this request uses
-  // CLI authorization. Web/mobile links register startup recovery with their
-  // environment credential, and the relay reaper removes them after they are
-  // down for the configured grace period. Unlink still deletes either kind.
   if (!(yield* readCliDesiredCloudLink) || (yield* readCliDesiredLinkMode) !== "managed") {
     return false;
   }
-  // A shutdown that hands off to a pending update is not the environment
-  // going offline: the service launcher or the desktop app immediately brings
-  // a server back (the new version, or the old one after a rollback). Deleting
-  // the tunnel here forces that server to provision a replacement UUID, and the
-  // public hostname's route to the new tunnel takes 1-2 minutes to propagate —
-  // the dominant cost of an update restart. Keep the tunnel instead: the next
-  // boot respawns the connector from the stored config and is reachable as
-  // soon as it connects, and the reconcile confirms the still-live tunnel
-  // without replacing it.
   if ((yield* desktopUpdateRestartPending) || (yield* pendingUpdateHandoffExists)) {
     yield* Effect.logInfo("Keeping the managed tunnel across the update restart");
     return false;
@@ -1233,14 +1188,11 @@ export const releaseManagedTunnelOnShutdown = Effect.fn(
   if (Option.isNone(token)) {
     return false;
   }
-  // The link belongs to the relay it was installed against, so target the
-  // persisted URL: T3CODE_RELAY_URL may have changed since the link was made.
   const relayUrl = yield* dependencies.secrets.get(RELAY_URL_SECRET);
   if (Option.isNone(relayUrl)) {
     return false;
   }
   const environmentId = yield* dependencies.environment.getEnvironmentId;
-  // Stop the local connector before the relay deletes the tunnel it serves.
   yield* dependencies.endpointRuntime.applyConfig(null);
   const response = yield* HttpClientRequest.delete(
     `${bytesToString(relayUrl.value)}/v1/client/environment-links/${encodeURIComponent(environmentId)}/tunnel`,
@@ -1251,18 +1203,9 @@ export const releaseManagedTunnelOnShutdown = Effect.fn(
     Effect.flatMap(HttpClientResponse.schemaBodyJson(RelayOkResponse)),
     withRelayClientTracing,
   );
-  // ok:false means the relay skipped deletion because a concurrent provision
-  // owns the recorded tunnel now — leave the stored config alone.
   if (!response.ok) {
     return false;
   }
-  // The connector token died with the tunnel. Drop the stored config so the
-  // next start waits for the link reconcile instead of respawning the relay
-  // client with a dead token. Kept when the release request fails: the tunnel
-  // still exists, so the stored token keeps working across the restart.
-  // Only dropped while it is still the config this shutdown released — a fast
-  // restart may already have reconciled and stored a fresh config for its
-  // replacement tunnel, and that one must survive this finalizer.
   const storedConfig = yield* dependencies.secrets.get(CLOUD_ENDPOINT_RUNTIME_CONFIG);
   if (
     Option.isSome(storedConfig) &&
@@ -1293,8 +1236,6 @@ const readCloudLinkState = Effect.fn("environment.cloud.readLinkState")(function
     cloudUserId: Option.isSome(cloudUserId) ? bytesToString(cloudUserId.value) : null,
     relayUrl: Option.isSome(relayUrl) ? bytesToString(relayUrl.value) : null,
     relayIssuer: Option.isSome(relayIssuer) ? bytesToString(relayIssuer.value) : null,
-    // The managed tunnel runtime config is only stored for managed links; a
-    // publish-only link leaves it absent.
     managedTunnelActive: Option.isSome(endpointRuntimeConfig),
     publishAgentActivity: Option.isSome(publishAgentActivity)
       ? bytesToString(publishAgentActivity.value) === "true"

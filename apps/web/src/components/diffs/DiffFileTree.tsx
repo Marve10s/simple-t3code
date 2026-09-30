@@ -23,26 +23,15 @@ export type { DiffFileTreeEntry } from "./diffFileTree.logic";
 
 interface DiffFileTreeProps {
   readonly entries: ReadonlyArray<DiffFileTreeEntry>;
-  /** Called with the file's path when the reader picks a file row. */
   readonly onSelectFile: (path: string) => void;
-  /**
-   * The file the diff is currently showing, kept selected in the tree. Bump `revealRequestId` to
-   * scroll the tree to the same path again.
-   */
   readonly selectedPath?: string | null;
   readonly revealRequestId?: number;
   readonly ariaLabel: string;
-  /** Right-aligned content in the header row, after the file count. */
   readonly headerAccessory?: ReactNode;
-  /** Rendered under the tree, for a host that still has files to fetch. */
   readonly footer?: ReactNode;
   readonly className?: string;
 }
 
-/**
- * A directory tree of the files in a diff. Every directory starts open: a diff is a short list
- * compared to a workspace, and the reader came for the files, not the folders.
- */
 export function DiffFileTree({
   entries,
   onSelectFile,
@@ -72,8 +61,6 @@ export function DiffFileTree({
   );
   const filePathsRef = useRef<ReadonlySet<string>>(new Set(paths));
   const onSelectFileRef = useRef(onSelectFile);
-  // Selection driven by `selectedPath` below is an echo of a file already on screen, not a
-  // request to scroll to it again.
   const syncingSelectionRef = useRef(false);
   const handledRevealRef = useRef<{ path: string; revealRequestId: number } | null>(null);
   const mountedPathsRef = useRef<ReadonlyArray<string> | null>(null);
@@ -110,12 +97,9 @@ export function DiffFileTree({
     if (mountedPaths === null) {
       model.resetPaths(paths);
     } else if (mountedPaths.every((path, index) => paths[index] === path)) {
-      // PR slices only append files, so keep the existing tree and its open folders.
       const updates = buildDiffFileTreeUpdates(mountedPaths, paths);
       if (updates.length > 0) model.batch(updates);
     } else {
-      // A refreshed diff can change the rank of existing siblings. Mutations do not reorder
-      // those rows, so rebuild while carrying the reader's folder expansion forward.
       const collapsedDirectories = directoryPaths.filter((path) => {
         const directory = model.getItem(path);
         return directory !== null && "isExpanded" in directory && !directory.isExpanded();
@@ -134,11 +118,8 @@ export function DiffFileTree({
       handledRevealRef.current = null;
       return;
     }
-    // A path list that changes under an already-revealed file (a refresh, a later slice) must
-    // not pull the tree back to it over whatever the reader has picked since.
     const item = model.getItem(selectedPath);
     if (item === null || item.isDirectory()) {
-      // A file that left the diff has to be revealed again when it comes back.
       handledRevealRef.current = null;
       return;
     }
@@ -160,7 +141,6 @@ export function DiffFileTree({
     queueMicrotask(() => {
       syncingSelectionRef.current = false;
     });
-    // `paths` is a dependency so a file that arrives after it was asked for is still revealed.
   }, [model, paths, revealRequestId, selectedPath]);
 
   return (
@@ -215,8 +195,6 @@ export function DiffFileTree({
           ) {
             return;
           }
-          // Pierre does not emit a selection change for its sole selected row.
-          // Read selection before the row handles the click so new selections reveal only once.
           const selected = model.getSelectedPaths();
           const path = selected.length === 1 ? selected[0] : undefined;
           if (!path || !filePathsRef.current.has(path)) return;

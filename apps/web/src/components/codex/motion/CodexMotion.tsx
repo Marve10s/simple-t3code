@@ -1,9 +1,3 @@
-/**
- * Motion-powered transitions for the "motion" animation style. Only
- * codexAnimations.ts imports this module, lazily, so Motion stays out of the
- * main bundle. Everything here animates transform and opacity, which the
- * compositor applies without layout or paint, and honors reduced motion.
- */
 import { useLocation } from "@tanstack/react-router";
 import { animate, spring } from "motion";
 import { AnimatePresence, LayoutGroup, MotionConfig, motion } from "motion/react";
@@ -13,7 +7,6 @@ import { CodexNewTabButton, CodexTabContents, useCodexTabStrip } from "../CodexT
 import { setCodexHeroTransitionTiming } from "../codexMotionTiming";
 import { useCodexView } from "../codexView";
 
-// "550ms linear(...)": Motion's spring rendered as a CSS duration and easing.
 const heroSpring = /^(\d+(?:\.\d+)?)ms (linear\(.+\))$/.exec(String(spring(0.5, 0.14)));
 if (heroSpring?.[1] && heroSpring[2]) {
   setCodexHeroTransitionTiming({ durationMs: Number(heroSpring[1]), easing: heroSpring[2] });
@@ -26,7 +19,6 @@ function prefersReducedMotion() {
   return window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 }
 
-/** Tabs slide into place, pop in and out, and the active surface glides between them. */
 export function MotionTabStrip() {
   const strip = useCodexTabStrip();
   return (
@@ -68,7 +60,6 @@ export function MotionTabStrip() {
   );
 }
 
-/** The rail's selected background glides between items instead of jumping. */
 export function MotionRailIndicator() {
   return (
     <MotionConfig reducedMotion="user" transition={SPRING}>
@@ -90,27 +81,16 @@ const SIDEBAR_SPRING = { type: "spring", visualDuration: 0.34, bounce: 0 } as co
 
 function slideFrom(element: HTMLElement, offsetX: number) {
   if (Math.abs(offsetX) < 1) return;
-  // Hold the old position in this same task, before the browser paints the
-  // new layout; Motion starts on the next frame.
   element.style.transform = `translateX(${offsetX}px)`;
   void animate(
     element,
     { transform: [`translateX(${offsetX}px)`, "translateX(0px)"] },
     SIDEBAR_SPRING,
   ).then(() => {
-    // A leftover transform would turn this element into the containing block
-    // for fixed-position descendants.
     element.style.removeProperty("transform");
   });
 }
 
-/**
- * Opening and closing the sidebar: the sidebar card and the chat card move
- * together. Upstream swaps their layout in one frame (its own transition is
- * turned off in Motion mode, see simple-codex.css); this runs right after
- * that swap and animates both from where they were, by transform only, so
- * no frame has to lay out the chat again.
- */
 function useSidebarMotion() {
   useEffect(() => {
     const desktop = window.matchMedia("(min-width: 768px)");
@@ -128,7 +108,6 @@ function useSidebarMotion() {
             getComputedStyle(document.documentElement).getPropertyValue("--codex-rail-width"),
           ) || 0;
         const expanded = sidebar.dataset.state === "expanded";
-        // Collapsed, upstream parks the card at -width; expanded, it sits beside the rail.
         slideFrom(container, expanded ? -width - railWidth : width + railWidth);
         slideFrom(main, expanded ? -width : width);
       }
@@ -143,7 +122,6 @@ function useSidebarMotion() {
   }, []);
 }
 
-/** Route and view entrances: the new-chat hero rises in, sidebars cross-fade on view switch. */
 export function MotionEffects() {
   useSidebarMotion();
   const pathname = useLocation({ select: (location) => location.pathname });

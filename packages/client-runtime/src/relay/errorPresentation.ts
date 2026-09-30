@@ -4,8 +4,6 @@ import type { RelayProtectedError } from "@t3tools/contracts/relay";
 export const DPOP_CLOCK_HINT =
   "Hint: Check that automatic date and time is enabled on both devices, then try again.";
 
-/** Older servers omit the DPoP category, but newer servers can also omit it for
- * a credential failure that happens after proof verification. */
 export const DPOP_UNKNOWN_HINT =
   "Hint: Try again. If it still fails, clock skew may be the cause; check that automatic date and time is enabled on both devices.";
 
@@ -38,8 +36,6 @@ export function relayProtectedErrorMessage(error: RelayProtectedError): string {
     case "RelayEnvironmentLinkProofInvalidError":
       return `Relay rejected the environment link proof (${error.reason}).`;
     case "RelayEnvironmentConnectNotAuthorizedError":
-      // "Not authorized" covers non-auth causes too; surface the reason so a
-      // missing link does not read as a credential problem.
       if (error.reason === "environment_link_not_found") {
         return "Relay has no active link for this environment. The environment server may not have re-established its link yet.";
       }

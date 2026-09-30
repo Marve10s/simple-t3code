@@ -225,7 +225,6 @@ export function isClaudeUltrathinkPrompt(text: string | null | undefined): boole
   return typeof text === "string" && /\bultrathink\b/i.test(text);
 }
 
-/** Compare Codex model families without changing provider-owned dispatch identifiers. */
 export function codexModelFamily(slug: string): string {
   return slug.startsWith("openai.gpt-") ? slug.slice("openai.".length) : slug;
 }
@@ -246,7 +245,6 @@ export function normalizeModelSlug(
   return typeof aliased === "string" ? aliased : trimmed;
 }
 
-/** Custom model identifiers are provider-owned, so only trim them; never expand aliases. */
 export function normalizeCustomModelSlug(model: string | null | undefined): string | null {
   if (typeof model !== "string") {
     return null;
@@ -255,7 +253,6 @@ export function normalizeCustomModelSlug(model: string | null | undefined): stri
   return model.trim() || null;
 }
 
-/** A custom model setting with its optional fields resolved. */
 export interface CustomModelDefinition {
   readonly slug: string;
   readonly name: string;
@@ -264,13 +261,6 @@ export interface CustomModelDefinition {
 
 const decodeCustomModelCapabilities = Schema.decodeUnknownOption(ModelCapabilities);
 
-/**
- * Read a `customModels` setting into resolved definitions. Accepts the typed
- * union as well as the opaque `providerInstances[id].config` blob clients see,
- * so it tolerates bare slugs, malformed rows, and unparseable capabilities
- * (dropped rather than failing the whole list). Slugs are trimmed and
- * deduplicated, first occurrence wins; `name` falls back to the slug.
- */
 export function readCustomModelEntries(value: unknown): CustomModelDefinition[] {
   if (!Array.isArray(value)) return [];
   const entries: CustomModelDefinition[] = [];
@@ -303,10 +293,6 @@ export function readCustomModelEntries(value: unknown): CustomModelDefinition[] 
   return entries;
 }
 
-/**
- * Write a definition back to the compact stored shape: a bare slug when it
- * carries nothing custom, otherwise an entry with only the set fields.
- */
 export function toCustomModelSetting(entry: CustomModelDefinition): CustomModelSetting {
   const descriptors = entry.capabilities?.optionDescriptors ?? [];
   const name = entry.name !== entry.slug ? entry.name : undefined;
@@ -360,7 +346,6 @@ export function resolveSelectableModel(
   return resolved ? resolved.slug : null;
 }
 
-/** Trim a string, returning null for empty/missing values. */
 function trimOrNull<T extends string>(value: T | null | undefined): T | null {
   if (typeof value !== "string") return null;
   const trimmed = value.trim() as T;
@@ -386,14 +371,6 @@ export function createModelSelection(
   return selections.length > 0 ? { ...base, options: selections } : base;
 }
 
-/**
- * Returns the effort value if it is a prompt-injected value according to
- * any select descriptor in the given capabilities, or null otherwise.
- *
- * Unlike a single `find`, this checks every descriptor so that the
- * correct descriptor's `promptInjectedValues` list is consulted even when
- * multiple select descriptors exist.
- */
 export function resolvePromptInjectedEffort(
   caps: ModelCapabilities,
   rawEffort: string | null | undefined,
@@ -417,10 +394,6 @@ export function applyClaudePromptEffortPrefix(
   if (!trimmed) {
     return trimmed;
   }
-  // Prefixing a slash command turns it into plain prose, so Claude never
-  // runs it. Command names come from arbitrary file names ("/deploy.prod",
-  // "/plugin:skill"), so accept any first token without a second slash;
-  // absolute paths like "/home/theo/app.ts" keep the prefix.
   if (effort !== "ultrathink" || /^\/[^\s/]+(?:\s|$)/u.test(trimmed)) {
     return trimmed;
   }

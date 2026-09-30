@@ -27,15 +27,6 @@ import {
 
 const encoder = new TextEncoder();
 
-/**
- * Asserts nothing reachable from `error` contains `secret`. Recurses through
- * nested objects, arrays, and `cause` chains rather than checking only
- * top-level strings: a leak one level down (say, a wrapped cause carrying raw
- * stderr) is just as visible in a log, and a shallow check would pass it.
- *
- * Walks values instead of serializing so it holds for fields added later, and
- * tracks visited objects so a cyclic cause chain terminates.
- */
 function assertCarriesNoSecret(error: object, secret: string): void {
   const seen = new WeakSet<object>();
 
@@ -53,8 +44,6 @@ function assertCarriesNoSecret(error: object, secret: string): void {
       value.forEach((entry, index) => walk(entry, `${path}[${String(index)}]`));
       return;
     }
-    // `message` and `cause` are getters on Error subclasses, so they are not
-    // own enumerable properties and Object.entries alone would skip them.
     walk((value as { message?: unknown }).message, `${path}.message`);
     walk((value as { cause?: unknown }).cause, `${path}.cause`);
     for (const [key, nested] of Object.entries(value)) {
@@ -99,8 +88,6 @@ function neverFinishingMockHandle() {
   });
 }
 
-// The executable name depends on the host platform (`tailscale.exe` on
-// Windows), so pin it: these tests assert the posix spelling.
 function spawnerLayer(spawner: ChildProcessSpawner.ChildProcessSpawner["Service"]) {
   return Layer.merge(
     Layer.succeed(ChildProcessSpawner.ChildProcessSpawner, spawner),
@@ -219,10 +206,6 @@ describe("tailscale", () => {
   });
 
   it.effect("turns spawn defects into typed spawn failures", () => {
-    // A non-directory entry on PATH makes node's spawn throw ENOTDIR
-    // synchronously. The platform spawner calls `NodeChildProcess.spawn` from
-    // inside an `Effect.callback` registration, so that throw arrives as a
-    // defect rather than a typed error - the shape reproduced here.
     const defect = Object.assign(new Error("spawn tailscale ENOTDIR"), { code: "ENOTDIR" });
     const layer = spawnerLayer(
       ChildProcessSpawner.make(() =>
@@ -246,8 +229,6 @@ describe("tailscale", () => {
       assert.equal(serveError.subcommand, "serve");
       assert.strictEqual(serveError.cause, defect);
 
-      // What callers actually rely on: the desktop endpoint providers recover
-      // with `Effect.orElseSucceed`, which only sees the typed error channel.
       const degraded = yield* readTailscaleStatus.pipe(
         Effect.orElseSucceed(() => null),
         Effect.provide(layer),
@@ -291,8 +272,6 @@ describe("tailscale", () => {
       const error = yield* readTailscaleStatus.pipe(Effect.flip, Effect.provide(layer));
 
       assert.instanceOf(error, TailscaleCommandExitError);
-      // Unmatched stderr degrades to "unknown" rather than passing text
-      // through — that fallback is what keeps novel output from leaking.
       assert.equal(error.stderrDiagnostic, "unknown");
       assertCarriesNoSecret(error, "tskey-auth-secret-token-value");
       assertCarriesNoSecret(error, "fluffy-badger");
@@ -352,8 +331,6 @@ describe("tailscale", () => {
       assert.notProperty(error, "command");
       assert.notProperty(error, "stderr");
       assert.notInclude(error.message, "tskey-auth-secret-token-value");
-      // The diagnostic classifies the failure without quoting stderr, so the
-      // key cannot reach a log through it either.
       assert.equal(error.stderrDiagnostic, "permission-denied");
       assertCarriesNoSecret(error, "tskey-auth-secret-token-value");
     });

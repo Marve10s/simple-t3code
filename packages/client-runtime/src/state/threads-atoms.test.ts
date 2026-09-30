@@ -351,8 +351,6 @@ describe("createEnvironmentThreadStateAtoms", () => {
               ),
         );
         yield* Deferred.await(first.closed);
-        // The real finalizer has run; advancing the atom runtime's test clock
-        // also verifies that a defect does not enter the domain retry loop.
         yield* TestClock.adjust("1 second");
         const failed = h.registry.get(h.stateAtom);
         expect(failed.status).toBe(httpNone ? "empty" : "cached");
@@ -361,8 +359,6 @@ describe("createEnvironmentThreadStateAtoms", () => {
         expect(h.counts().opened).toBe(1);
         expect(h.counts().active).toBe(0);
 
-        // Session publication can precede connected, and a fatal child cannot
-        // restart just because its supervisor reconnects.
         for (const connection of [
           AVAILABLE_CONNECTION_STATE,
           { ...CONNECTED_STATE, phase: "connecting" as const },
@@ -813,7 +809,6 @@ describe("createEnvironmentThreadStateAtoms", () => {
       unmount();
       yield* Deferred.await(first.closed);
 
-      // Force the weak-family miss without depending on host GC timing.
       const deref = WeakRef.prototype.deref;
       vi.spyOn(WeakRef.prototype, "deref").mockImplementation(function (this: WeakRef<object>) {
         const value = deref.call(this);

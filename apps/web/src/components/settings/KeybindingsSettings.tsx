@@ -72,7 +72,6 @@ import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
 import { useAtomCommand } from "../../state/use-atom-command";
 
 function KeybindingPill({ value }: { value: string }) {
-  // Keys dedupe repeated parts; a literal "+" in a shortcut splits into empty strings.
   const seenParts = new Map<string, number>();
   const parts = value.split("+").map((part) => {
     const seen = seenParts.get(part) ?? 0;
@@ -235,7 +234,6 @@ function defaultWhenGroup(operator: BooleanOperator = "and"): KeybindingWhenNode
   };
 }
 
-/** Warning glyph whose explanation lives in a tooltip; the one owner of that affordance here. */
 function WarningTooltipIcon({
   label,
   focusable = true,
@@ -738,7 +736,6 @@ function rowKeybindingTarget(row: KeybindingRow): ServerRemoveKeybindingInput {
   };
 }
 
-/** Draft state and actions for editing one existing binding; layouts decide how to render it. */
 function useKeybindingRowEditor({
   row,
   allRows,
@@ -809,7 +806,6 @@ type KeybindingRowProps = KeybindingRowActions & {
   anchorId?: string | undefined;
 };
 
-/** Shortcut pill that turns into a capture input when clicked, plus Save once the draft changes. */
 function KeybindingKeyControl({
   row,
   editor,
@@ -868,7 +864,6 @@ function KeybindingKeyControl({
   );
 }
 
-/** Quiet inline trigger showing the when clause; opens the expression builder. */
 function WhenClauseControl({
   label,
   expression,
@@ -1002,7 +997,6 @@ function KeybindingRowWhen({
   );
 }
 
-/** Row actions that stay hidden until the row is hovered or holds focus. */
 function KeybindingHoverRowMenu(props: {
   row: KeybindingRow;
   isSaving: boolean;
@@ -1016,7 +1010,6 @@ function KeybindingHoverRowMenu(props: {
   );
 }
 
-/** One binding as a settings row: pills flush right, actions fading in beside them on hover. */
 function KeybindingSettingsRow(props: KeybindingRowProps) {
   const { row, isSaving, anchorId, allRows, variables, onSave, onReset, onRemove } = props;
   const editor = useKeybindingRowEditor({ row, allRows, onSave });
@@ -1048,7 +1041,6 @@ function KeybindingSettingsRow(props: KeybindingRowProps) {
   );
 }
 
-/** Draft state for a binding that does not exist yet. */
 function useNewKeybindingDraft({
   allRows,
   onSave,
@@ -1223,7 +1215,6 @@ function NewKeybindingCancelIcon({
   );
 }
 
-/** Add-binding form shaped like the binding rows below it. */
 function NewKeybindingSettingsRow(props: NewKeybindingProps) {
   const { commandOptions, allRows, variables, isSaving, onSave, onCancel } = props;
   const draft = useNewKeybindingDraft({ allRows, onSave });
@@ -1265,7 +1256,6 @@ interface KeybindingsListProps extends KeybindingRowActions {
   onCancelAdd: () => void;
 }
 
-/** The add-binding row, one settings row per binding, and the empty state. */
 function KeybindingsList(props: KeybindingsListProps) {
   const { rows, commandOptions, savingCommand, isAddingBinding, onCancelAdd, ...rowActions } =
     props;
@@ -1277,7 +1267,6 @@ function KeybindingsList(props: KeybindingsListProps) {
     onSave: rowActions.onSave,
     onCancel: onCancelAdd,
   };
-  // Settings search jumps to a command, so only its first row anchors.
   const anchorIds = useMemo(() => {
     const ids = new Map<string, string>();
     const seen = new Set<KeybindingCommand>();
@@ -1309,7 +1298,6 @@ function KeybindingsList(props: KeybindingsListProps) {
   );
 }
 
-/** Shown in the browser build only; the desktop app receives every shortcut. */
 function BrowserKeybindingNotice() {
   return (
     <div className="flex items-center gap-2 px-3 py-2.5 text-xs leading-normal text-muted-foreground sm:px-4">
@@ -1323,9 +1311,6 @@ function BrowserKeybindingNotice() {
 }
 
 export function KeybindingsSettingsPanel() {
-  // The representative environment supplies the displayed bindings; edits
-  // fan out to every connected environment in the selection, so one
-  // shortcut change reaches each machine the user runs T3 Code on.
   const { environment: primaryEnvironment, connectedEnvironments } = useSettingsScope();
   const serverKeybindings = primaryEnvironment?.serverConfig?.keybindings;
   const keybindings = useMemo(
@@ -1350,12 +1335,9 @@ export function KeybindingsSettingsPanel() {
   const [savingCommand, setSavingCommand] = useState<KeybindingCommand | null>(null);
   const [isAddingBinding, setIsAddingBinding] = useState(false);
   const rows = useMemo(() => buildKeybindingRows(keybindings, query), [keybindings, query]);
-  // The search-target context is provided by this panel's own page container,
-  // so the jump target is read from the route hash here.
   const searchTargetId = useLocation({ select: (location) => location.hash.replace(/^#/, "") });
   const [handledSearchTargetId, setHandledSearchTargetId] = useState(searchTargetId);
 
-  // A settings-search jump must not be hidden by the page's own filter.
   if (searchTargetId !== handledSearchTargetId) {
     setHandledSearchTargetId(searchTargetId);
     if (searchTargetId.startsWith("keybinding-")) setQuery("");

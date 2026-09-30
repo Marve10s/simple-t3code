@@ -145,9 +145,6 @@ const makeOrchestrationEngine = Effect.gen(function* () {
           commandId: envelope.command.commandId,
         });
         if (Option.isSome(existingReceipt)) {
-          // A receipt only proves this exact command was handled. Replaying it
-          // for a command aimed at another aggregate would report success for
-          // work that never happened.
           if (
             existingReceipt.value.aggregateKind !== aggregateRef.aggregateKind ||
             existingReceipt.value.aggregateId !== aggregateRef.aggregateId
@@ -185,8 +182,6 @@ const makeOrchestrationEngine = Effect.gen(function* () {
           });
         }
 
-        // The decider compares the lookup inputs. Only recreation needs an
-        // event check, since it can reset a thread to the same field values.
         if (
           envelope.command.type === "thread.pull-request.sync" &&
           (yield* eventStore.hasEventAfter({
@@ -212,8 +207,6 @@ const makeOrchestrationEngine = Effect.gen(function* () {
           });
         }
 
-        // New and moved projects do not carry a resolved identity in the event-derived
-        // command model. Legacy PR edits need it to identify the link they replace.
         if (
           envelope.command.type === "thread.meta.update" &&
           envelope.command.linkedPullRequest !== undefined
@@ -235,8 +228,6 @@ const makeOrchestrationEngine = Effect.gen(function* () {
           }
         }
 
-        // Command snapshots omit activities at startup and cap them while running.
-        // Read this request's durable state before deciding how to send the answer.
         const userInputActivity =
           envelope.command.type === "thread.user-input.respond" ||
           envelope.command.type === "thread.user-input.dismiss"
@@ -261,8 +252,6 @@ const makeOrchestrationEngine = Effect.gen(function* () {
           ),
         );
         const plannedEvents = Array.isArray(eventBase) ? eventBase : [eventBase];
-        // Stamp the dispatching client's origin onto every event the command
-        // produced. The decider stays pure; attribution is an engine concern.
         const eventBases =
           envelope.origin === undefined
             ? plannedEvents
@@ -453,16 +442,9 @@ const makeOrchestrationEngine = Effect.gen(function* () {
     getThreadReplayStats,
     dispatch,
     subscribeDomainEvents: PubSub.subscribe(eventPubSub).pipe(Effect.map(Stream.fromSubscription)),
-    // Each access creates a fresh PubSub subscription so that multiple
-    // consumers (wsServer, ProviderRuntimeIngestion, CheckpointReactor, etc.)
-    // each independently receive all domain events.
     get streamDomainEvents(): OrchestrationEngineShape["streamDomainEvents"] {
       return Stream.fromPubSub(eventPubSub);
     },
-    // The command read model's snapshotSequence tracks the latest committed
-    // event sequence (updated on the worker fiber). A plain property read is a
-    // consistent, committed value — reassignment of `commandReadModel` is
-    // atomic on the single-threaded event loop.
     latestSequence: Effect.sync(() => commandReadModel.snapshotSequence),
   } satisfies OrchestrationEngineShape;
 });

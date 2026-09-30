@@ -64,7 +64,6 @@ export const ForgejoKeysSchema = Schema.Struct({
 
 const parseForgejoKeys = decodeJsonResult(ForgejoKeysSchema);
 
-/** Matches fj's directories::ProjectDirs, including its pre-0.6 organization name. */
 function forgejoKeysPaths(input: {
   readonly platform: string;
   readonly home: string;
@@ -166,7 +165,6 @@ export function parseForgejoRemote(value: string) {
       return null;
     }
   }
-  // SCP remotes may omit the username; URL treats these as a custom scheme.
   const ssh = /^(?:[^@/]+@)?([^:/]+):([^/].*)$/.exec(value);
   return ssh?.[1] && ssh[2]
     ? {
@@ -300,9 +298,7 @@ export const make = Effect.gen(function* () {
     const remote = remoteUrl ? parseForgejoRemote(remoteUrl) : null;
     return Object.keys(keys.hosts).flatMap((host) => {
       const url = parseForgejoRemote(`https://${host}`);
-      // fj 0.6 drops URL mounts during whoami and OAuth renewal; tea supports them.
       if (!url || url.path) return [];
-      // fj omits the scheme in storage. Only an explicit matching HTTP remote opts into HTTP.
       const scheme =
         remote && !remote.ssh && remote.host === url.host && /^http:\/\//i.test(remoteUrl ?? "")
           ? "http"
@@ -321,7 +317,6 @@ export const make = Effect.gen(function* () {
     if (input.command === "fj") {
       const keys = yield* readKeys(input.cwd).pipe(Effect.result);
       if (Result.isFailure(keys)) {
-        // Stale credentials from an uninstalled fj must not disable an available tea login.
         const available = yield* execute({ command: "fj", cwd: input.cwd, args: ["version"] }).pipe(
           Effect.result,
         );
@@ -436,7 +431,6 @@ export const make = Effect.gen(function* () {
     const cached = authenticated.get(login.url);
     if (token && cached?.token === token && now - cached.time < 30_000) return token;
     yield* execute({ command: "fj", cwd, args: ["--host", login.url, "whoami"] });
-    // fj owns OAuth renewal. Re-read the file after it has refreshed an expired token.
     const refreshed = (yield* readKeys(cwd)).hosts[login.name]?.token;
     if (!refreshed)
       return yield* new ForgejoCliError({
@@ -652,7 +646,6 @@ export const make = Effect.gen(function* () {
           );
     let path = input.path.replace(/^\/+/, "");
     if (input.repository && input.repository !== repository.repository) {
-      // Repository identities retain the server mount path; API routes do not.
       const prefix = `repos/${input.repository.split("/").map(encodeURIComponent).join("/")}`;
       if (path === prefix || path.startsWith(`${prefix}/`) || path.startsWith(`${prefix}?`)) {
         path = `repos/${repository.repository.split("/").map(encodeURIComponent).join("/")}${path.slice(prefix.length)}`;
@@ -691,7 +684,6 @@ export const make = Effect.gen(function* () {
       ],
       ...(stdin === undefined ? {} : { stdin }),
     });
-    // tea reports HTTP failures with exit code zero; use its response status.
     const status = Number(/^HTTP\/\S+ (\d{3})/m.exec(result.stderr)?.[1]);
     if (!status || status >= 400)
       return yield* new ForgejoCliError({

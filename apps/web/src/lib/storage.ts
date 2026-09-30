@@ -42,7 +42,6 @@ export function resolveStorage(storage: Partial<StateStorage> | null | undefined
   return isStateStorage(storage) ? storage : createMemoryStorage();
 }
 
-/** Keep the latest value and serialize it when the debounce fires or `flush` runs. */
 export function createDeferredStorage<TValue>(
   baseStorage: Partial<StateStorage> | null | undefined,
   serialize: (value: TValue) => string,
@@ -63,7 +62,6 @@ export function createDeferredStorage<TValue>(
     },
     removeItem: (name) => {
       debouncedSetItem.cancel();
-      // cancel() leaves the captured value in Pacer's lastArgs.
       debouncedSetItem.reset();
       resolvedStorage.removeItem(name);
     },

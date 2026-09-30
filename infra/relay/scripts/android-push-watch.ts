@@ -88,7 +88,6 @@ const main = Effect.gen(function* () {
   );
   const socketConstructor = Layer.succeed(
     Socket.WebSocketConstructor,
-    // Socket.makeWebSocket only ever passes its `protocols` option here.
     (url, protocols) =>
       new NodeSocket.NodeWS.WebSocket(url, protocols as string | string[] | undefined, {
         headers: { authorization: `Bearer ${connection.bearerToken}` },
@@ -170,7 +169,6 @@ const main = Effect.gen(function* () {
           }
           const state = item.kind === "thread-upserted" ? next.get(item.thread.id) : undefined;
           const previous = state ? states.get(state.threadId) : undefined;
-          // A fresh subscription restores ongoing work without announcing old completions.
           const now = yield* Clock.currentTimeMillis;
           const alert =
             state && state.phase !== previous?.phase && item.kind !== "snapshot"
@@ -220,8 +218,6 @@ NodeRuntime.runMain(
           : new WatchStoppedError({ cause }),
       );
     }),
-    // Socket failures may contain credential-bearing request headers. Keep the
-    // cause on the error, but print only the fixed message at the CLI boundary.
     Effect.tapError((error) => Effect.logError(error.message)),
   ),
   { disableErrorReporting: true },

@@ -28,7 +28,6 @@ import {
 
 const DEFAULT_TIMEOUT_MS = 30_000;
 
-/** Server-local credential scope; never put its value in RPC payloads or cache keys. */
 export const PinnedGitHubCredential = Context.Reference<{
   readonly host: string;
   readonly token: Redacted.Redacted<string>;
@@ -285,7 +284,6 @@ export class GitHubCli extends Context.Service<
       readonly cwd: string;
       readonly args: ReadonlyArray<string>;
       readonly timeoutMs?: number;
-      /** Piped to the child's stdin, for payloads that must never appear in argv. */
       readonly stdin?: string;
       readonly env?: NodeJS.ProcessEnv;
       readonly maxOutputBytes?: number;
@@ -357,12 +355,6 @@ function normalizeRepositoryCloneUrls(
   };
 }
 
-/**
- * `gh repo create` prints the canonical URL of the new repository on stdout
- * (e.g. `https://github.com/owner/repo`). Reading it back here avoids a
- * follow-up `gh repo view`, which can race GitHub's GraphQL eventual
- * consistency window and falsely report the just-created repo as missing.
- */
 function deriveRepositoryCloneUrlsFromCreateOutput(
   stdout: string,
   repository: string,
@@ -383,9 +375,7 @@ function deriveRepositoryCloneUrlsFromCreateOutput(
           sshUrl: `git@${parsed.host}:${nameWithOwner}.git`,
         };
       }
-    } catch {
-      // Fall through to the input-derived defaults below.
-    }
+    } catch {}
   }
   return {
     nameWithOwner: repository,
@@ -394,7 +384,7 @@ function deriveRepositoryCloneUrlsFromCreateOutput(
   };
 }
 
-/** @public Service construction is part of the canonical Effect module API. */
+/** @public */
 export const make = Effect.gen(function* () {
   const process = yield* VcsProcess.VcsProcess;
   const budget = yield* GitHubGraphQlBudget.GitHubGraphQlBudget;

@@ -65,7 +65,6 @@ it.effect("shrinks the WAL file back to the size limit after a large write", () 
   const tempDir = NodeFS.mkdtempSync(NodePath.join(NodeOS.tmpdir(), "t3-sqlite-wal-"));
   const dbPath = NodePath.join(tempDir, "state.sqlite");
   const walFileSize = () => NodeFS.statSync(`${dbPath}-wal`).size;
-  // About 25% more 4 KB rows than the limit holds, in one transaction.
   const rowCount = Math.ceil((WAL_SIZE_LIMIT_BYTES * 1.25) / 4000);
 
   return Effect.gen(function* () {
@@ -77,8 +76,6 @@ it.effect("shrinks the WAL file back to the size limit after a large write", () 
     `;
     assert.isAbove(walFileSize(), WAL_SIZE_LIMIT_BYTES);
 
-    // The auto-checkpoint after the large commit copied every frame into the
-    // database, so the next commit restarts the WAL and cuts the file back.
     yield* sql`INSERT INTO wal_probe(payload) VALUES (x'00')`;
     assert.isAtMost(walFileSize(), WAL_SIZE_LIMIT_BYTES);
   }).pipe(

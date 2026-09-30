@@ -26,7 +26,6 @@ function hyprlandCaptureBinding(appId: string, lua: boolean): string {
     : `bind = CTRL SHIFT, 2, global, ${action}`;
 }
 
-/** Omarchy owns its defaults; instructions always point at a user-owned config. */
 export async function hyprlandCaptureShortcut(
   appId: string,
   configHome = process.env.XDG_CONFIG_HOME || NodePath.join(NodeOS.homedir(), ".config"),

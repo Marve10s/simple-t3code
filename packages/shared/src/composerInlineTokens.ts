@@ -18,26 +18,9 @@ export interface CollectComposerInlineTokensOptions {
   readonly preserveTrailingFrom?: ReadonlyArray<ComposerInlineToken>;
 }
 
-/**
- * A skill name may start with a digit, but compact monetary amounts and
- * numeric expressions like "$20", "$20k", "$100M", and "$1e6" must stay prose:
- * the composer chips any matched `$name` token, known or not. Tokens beginning
- * with digits must not match numbers with currency/exponent suffixes, and must
- * contain at least one letter.
- */
 const SKILL_TOKEN_REGEX =
   /(^|\s)\p{Sc}(?![0-9][0-9_]*(?:[kKmMbBtT]|[eE][0-9]+)?(?:\s|$))(?=[a-zA-Z0-9:_-]*[a-zA-Z])([a-zA-Z0-9][a-zA-Z0-9:_-]*)(?=\s)/gu;
 const MENTION_TOKEN_REGEX = /(^|\s)@(?:"((?:\\.|[^"\\])*)"|([^\s@"]+))(?=\s)/g;
-/**
- * The label body is bounded rather than `*`. Unbounded, every whitespace in
- * the composer is a candidate start: the engine scans the rest of the text for
- * a closing `]`, fails, and rescans from the next whitespace — quadratic on
- * input like " [[[[[…". A cap makes each attempt constant-bounded.
- *
- * Only a basename ever survives the `label !== basename` check below, so this
- * cannot reject a link a user could meaningfully write; the longest filename
- * any common filesystem allows is 255.
- */
 const MAX_FILE_LINK_LABEL_LENGTH = 512;
 const FILE_LINK_TOKEN_REGEX = new RegExp(
   `(^|\\s)\\[((?:\\\\.|[^\\]\\\\]){0,${MAX_FILE_LINK_LABEL_LENGTH}})\\]\\(([^)\\s]+)\\)(?=\\s)`,
@@ -45,7 +28,6 @@ const FILE_LINK_TOKEN_REGEX = new RegExp(
 );
 const URI_SCHEME_REGEX = /^[A-Za-z][A-Za-z0-9+.-]*:/;
 const WINDOWS_DRIVE_PATH_REGEX = /^[A-Za-z]:[\\/]/;
-// Autocomplete emits canonical file links, so ambiguous bare @scope/package text stays a package.
 const SCOPED_PACKAGE_REFERENCE_REGEX =
   /^[a-z0-9][a-z0-9._-]*\/[a-z0-9][a-z0-9._-]*(?:\/[^\s@"]+)*$/;
 
@@ -60,9 +42,7 @@ function collectMentionTokens(text: string): ComposerInlineToken[] {
     let path = encodedPath;
     try {
       path = decodeURIComponent(encodedPath);
-    } catch {
-      // Preserve malformed source rather than dropping a user-authored token.
-    }
+    } catch {}
     const separatorIndex = Math.max(path.lastIndexOf("/"), path.lastIndexOf("\\"));
     const basename = separatorIndex >= 0 ? path.slice(separatorIndex + 1) : path;
     const hasExternalScheme = URI_SCHEME_REGEX.test(path) && !WINDOWS_DRIVE_PATH_REGEX.test(path);

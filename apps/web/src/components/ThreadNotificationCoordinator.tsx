@@ -208,9 +208,7 @@ function EnvironmentNotifications({
             params: { environmentId, threadId: thread.id },
           });
         });
-      } catch {
-        // Some browsers expose Notification but reject desktop presentation.
-      }
+      } catch {}
     }
     previous.current = next;
   }, [

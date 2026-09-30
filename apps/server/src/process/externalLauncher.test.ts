@@ -20,16 +20,11 @@ import { HostProcessPlatform } from "@t3tools/shared/hostProcess";
 import { SpawnExecutableResolution } from "@t3tools/shared/shell";
 import * as ExternalLauncher from "./externalLauncher.ts";
 
-// Tests below write `#!/bin/sh` stubs into a real temp dir and hand that
-// directory to a posix-mocked resolver as PATH. On a Windows host the temp
-// path carries a drive letter, so the posix `:` split shatters it; there is
-// no posix executable to find there anyway.
 const windowsHost = HostProcessPlatform.defaultValue() === "win32";
 
 interface MockSpawnResult {
   readonly exitCode?: number;
   readonly stdout?: string;
-  /** Never deliver an exit code, like a child wedged on a broken desktop session. */
   readonly stall?: boolean;
 }
 
@@ -289,8 +284,6 @@ it.effect("reveals a file in File Explorer through PowerShell on Windows", () =>
     const path = yield* Path.Path;
     const binDir = yield* fileSystem.makeTempDirectoryScoped({ prefix: "t3-editors-" });
     yield* fileSystem.writeFileString(path.join(binDir, "explorer.CMD"), "@echo off\r\n");
-    // resolvePowerShellPath builds `${SYSTEMROOT}\System32\...` with Windows
-    // separators, which on the posix test filesystem is one file name.
     const systemRoot = path.join(binDir, "system-root");
     const powerShellPath = `${systemRoot}\\System32\\WindowsPowerShell\\v1.0\\powershell.exe`;
     yield* fileSystem.makeDirectory(path.dirname(powerShellPath), { recursive: true });
@@ -301,8 +294,6 @@ it.effect("reveals a file in File Explorer through PowerShell on Windows", () =>
       const launcher = yield* ExternalLauncher.ExternalLauncher;
       yield* launcher.launchEditor({
         editor: "file-manager",
-        // Web file links normalize separators even when the server runs on
-        // Windows. Explorer's `/select` switch requires Windows separators.
         cwd: "C:/workspace with spaces/media/author's clip.mp4",
         reveal: true,
       });
@@ -331,8 +322,6 @@ it.effect("reveals a file in File Explorer through PowerShell on Windows", () =>
     ]);
     const encodedCommand = spawned.args[spawned.args.length - 1] ?? "";
     const decodedCommand = Buffer.from(encodedCommand, "base64").toString("utf16le");
-    // explorer.exe expects `/select,"<path>"` with only the path quoted;
-    // PowerShell 5.1's Start-Process passes the argument string verbatim.
     assert.equal(
       decodedCommand,
       "$ProgressPreference = 'SilentlyContinue'; Start-Process 'explorer.exe' -ArgumentList ('/select,\"' + 'C:\\workspace with spaces\\media\\author''s clip.mp4' + '\"')",
@@ -341,12 +330,6 @@ it.effect("reveals a file in File Explorer through PowerShell on Windows", () =>
   }).pipe(Effect.scoped, Effect.provide(NodeServices.layer)),
 );
 
-// Real-chain smoke check for the Explorer selection contract: runs the exact
-// PowerShell source the reveal launch encodes, against a stub that records
-// the raw argument tail it receives, and asserts a spaced path arrives as the
-// single `/select,"<path>"` switch. Mock argv assertions cannot prove this —
-// only Windows' own PowerShell -> CreateProcess quoting chain can, so the
-// test runs only where that chain exists.
 // oxlint-disable-next-line t3code/no-global-process-runtime -- the skip decision needs the real host platform, outside any Effect runtime.
 it.skipIf(process.platform !== "win32")(
   "delivers the raw /select switch for spaced paths through real PowerShell",
@@ -378,9 +361,6 @@ it.skipIf(process.platform !== "win32")(
         { timeout: 30_000 },
       );
 
-      // Start-Process returns before the recorder runs; wait for its output.
-      // The waits run outside the Effect runtime on purpose: the test
-      // exercises the real Windows process chain in real time.
       // @effect-diagnostics-next-line globalTimers:off
       const sleep = (millis: number) => new Promise((resolve) => setTimeout(resolve, millis));
       // @effect-diagnostics-next-line globalDate:off
@@ -424,8 +404,6 @@ it.effect("does not advertise reveal on Windows when PowerShell is missing", () 
       ),
     );
 
-    // Plain "open in file manager" still works through explorer; only the
-    // reveal capability, which launches PowerShell, must stay hidden.
     assert.equal(result.editors.includes("file-manager"), true);
     assert.isUndefined(result.kind);
   }).pipe(Effect.scoped, Effect.provide(NodeServices.layer)),
@@ -474,8 +452,6 @@ it.effect.skipIf(windowsHost)(
       assert.equal(result.kind, "file-explorer");
       assert.equal(result.editors.includes("file-manager"), true);
       assert.ok(spawned);
-      // The reveal routes through interop PowerShell so Explorer receives its
-      // raw `/select,"<path>"` switch even for spaced paths.
       assert.equal(spawned.command, "powershell.exe");
       const encodedCommand = spawned.args[spawned.args.length - 1] ?? "";
       const decodedCommand = Buffer.from(encodedCommand, "base64").toString("utf16le");
@@ -521,9 +497,6 @@ it.effect.skipIf(windowsHost)(
     }).pipe(Effect.scoped, Effect.provide(NodeServices.layer)),
 );
 
-// When interop PowerShell is missing the capability advertises the Linux
-// "files" kind (or nothing), so the reveal must open the Linux file manager
-// the label promised even though plain open still prefers File Explorer.
 it.effect.skipIf(windowsHost)(
   "reveals through the Linux file manager when WSL lacks interop PowerShell",
   () =>
@@ -576,9 +549,6 @@ it.effect.skipIf(windowsHost)(
     }).pipe(Effect.scoped, Effect.provide(NodeServices.layer)),
 );
 
-// Interop can exist without `explorer.exe` on PATH (appendWindowsPath=false)
-// while WSLg still provides a working Linux file manager; the host must keep
-// the Linux open/reveal path instead of losing the editor entirely.
 it.effect.skipIf(windowsHost)(
   "falls back to the Linux file manager when WSL lacks the Explorer bridge",
   () =>
@@ -669,8 +639,6 @@ it.effect.skipIf(windowsHost)(
         ),
       );
 
-      // Explorer's raw switch cannot express a double quote, so the launch
-      // opens the parent directory instead of misparsing a /select argument.
       assert.ok(spawned);
       assert.equal(spawned.command, "explorer.exe");
       assert.deepEqual(spawned.args, ['\\\\wsl.localhost\\Ubuntu-24.04\\home\\t3\\work "quoted"']);
@@ -776,9 +744,6 @@ it.effect.skipIf(windowsHost)(
     }).pipe(Effect.scoped, Effect.provide(NodeServices.layer)),
 );
 
-// `xdg-open` with a display variable but no `inode/directory` handler exits
-// nonzero after the launch has already detached: without this gate the server
-// advertises a reveal that is a silent no-op.
 it.effect.skipIf(windowsHost)(
   "does not advertise a Linux file manager without a directory handler",
   () =>
@@ -842,10 +807,6 @@ it.effect.skipIf(windowsHost)(
     }).pipe(Effect.scoped, Effect.provide(NodeServices.layer)),
 );
 
-// The handler probe carries its own timeout because the editor scan's outer
-// timeout in server.getConfig degrades to an EMPTY editor list: a wedged
-// xdg-mime must cost only the file manager, never the other editors. Runs on
-// the live clock so the probe's real timeout fires.
 it.live.skipIf(windowsHost)("a stalled handler probe drops only the file manager", () =>
   Effect.gen(function* () {
     const fileSystem = yield* FileSystem.FileSystem;
@@ -1040,8 +1001,6 @@ for (const { platform, installPath, editor, args } of [
   );
 }
 
-// `agy` is the standalone Antigravity CLI, which installs to ~/.local/bin on
-// macOS and Linux and to its own bin folder on Windows. It is not the IDE.
 for (const { platform, installPath, onPath } of [
   { platform: "darwin", installPath: ".local/bin/agy", onPath: true },
   { platform: "linux", installPath: ".local/bin/agy", onPath: false },
@@ -1156,14 +1115,11 @@ it.effect("memoizes editor discovery and refreshes after the cache window", () =
     const statCallsAfterFirstScan = statCalls;
     assert.isAbove(statCallsAfterFirstScan, 0);
 
-    // Past the shared command-resolution cache TTL (30s) but within the
-    // discovery cache window: the memoized set is reused without any scan.
     yield* TestClock.adjust("31 seconds");
     const second = yield* launcher.resolveAvailableEditors();
     assert.deepEqual([...second], [...first]);
     assert.equal(statCalls, statCallsAfterFirstScan);
 
-    // Past the discovery cache window the next call rescans.
     yield* TestClock.adjust("30 seconds");
     yield* launcher.resolveAvailableEditors();
     assert.isAbove(statCalls, statCallsAfterFirstScan);
@@ -1186,10 +1142,6 @@ it.effect("memoizes editor discovery and refreshes after the cache window", () =
   );
 });
 
-// A client that disconnects mid-scan interrupts the shared discovery effect on
-// the connection fiber. The cache must not retain that interrupt: doing so
-// replayed it to every later connect for the whole TTL, so `server.getConfig`
-// failed and no client could reconnect until the server restarted.
 it.effect("rescans after an interrupted discovery instead of caching the interrupt", () => {
   const fileInfo = { type: "File" } as FileSystem.File.Info;
   let blockFirstScan = true;
@@ -1198,9 +1150,6 @@ it.effect("rescans after an interrupted discovery instead of caching the interru
     Layer.provide(
       Layer.mergeAll(
         FileSystem.layerNoop({
-          // The first scan parks inside `stat` so the interrupt lands while
-          // discovery is in flight, which is what a client disconnecting
-          // mid-connect does to the shared effect.
           stat: () =>
             Effect.gen(function* () {
               scans += 1;
@@ -1226,7 +1175,6 @@ it.effect("rescans after an interrupted discovery instead of caching the interru
     yield* Effect.yieldNow;
     yield* Fiber.interrupt(fiber);
 
-    // The next connect must still get a real answer well inside the TTL.
     blockFirstScan = false;
     scans = 0;
     const editors = yield* launcher.resolveAvailableEditors();

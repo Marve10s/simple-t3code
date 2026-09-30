@@ -5,7 +5,6 @@ import * as HttpApiBuilder from "effect/unstable/httpapi/HttpApiBuilder";
 import { annotateEnvironmentRequest, requireEnvironmentScope } from "../auth/http.ts";
 import * as PullRequestService from "./PullRequestService.ts";
 
-/** The patch is often the largest PR payload and benefits from HTTP compression and flow control. */
 export const pullRequestHttpApiLayer = HttpApiBuilder.group(
   EnvironmentHttpApi,
   "pullRequests",

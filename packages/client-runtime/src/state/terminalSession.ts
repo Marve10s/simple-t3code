@@ -85,7 +85,6 @@ export const EMPTY_TERMINAL_SESSION_STATE = Object.freeze<TerminalSessionState>(
 
 let terminalAttachGeneration = 0;
 
-/** A reinstalled attach stream must not reuse an old renderer's output cursor. */
 export function nextTerminalAttachSeedState(): TerminalBufferState {
   return {
     ...EMPTY_TERMINAL_BUFFER_STATE,

@@ -244,21 +244,18 @@ describe("VcsStatusBroadcaster", () => {
     return Effect.gen(function* () {
       const broadcaster = yield* VcsStatusBroadcaster.VcsStatusBroadcaster;
 
-      // Nobody loaded this cwd yet: no host request is spent.
       assert.isNull(yield* broadcaster.refreshPullRequestStatus("/repo"));
       assert.equal(state.remoteStatusCalls, 0);
 
       yield* broadcaster.getStatus({ cwd: "/repo" });
       assert.equal(state.remoteStatusCalls, 1);
 
-      // Loaded and no PR known: ask GitManager to retry the missing PR.
       state.currentRemoteStatus = remoteStatusWithPr;
       const refreshed = yield* broadcaster.refreshPullRequestStatus("/repo");
       assert.deepStrictEqual(refreshed, remoteStatusWithPr);
       assert.equal(state.remoteStatusCalls, 2);
       assert.equal(state.remoteInvalidationCalls, 0);
 
-      // The agent switches branches. The previous branch's PR must not block a read.
       state.currentLocalStatus = { ...baseLocalStatus, refName: "feature/next" };
       state.currentRemoteStatus = baseRemoteStatus;
       yield* broadcaster.refreshLocalStatus("/repo");
@@ -282,7 +279,6 @@ describe("VcsStatusBroadcaster", () => {
             Effect.gen(function* () {
               remoteReads += 1;
               if (remoteReads === 2) {
-                // Hold an older empty response while the turn-end refresh queues.
                 yield* Deferred.succeed(firstPollStarted, undefined);
                 yield* Deferred.await(releaseFirstPoll);
                 return baseRemoteStatus;
@@ -343,7 +339,6 @@ describe("VcsStatusBroadcaster", () => {
       const initial = yield* broadcaster.getStatus({ cwd: "/repo" }).pipe(Effect.forkScoped);
       yield* Deferred.await(firstReadStarted);
       const refresh = yield* broadcaster.refreshStatus("/repo").pipe(Effect.forkScoped);
-      // Run ready fibers before releasing the delayed first read.
       yield* TestClock.adjust(Duration.zero);
       yield* Deferred.succeed(releaseFirstRead, undefined);
       yield* Fiber.join(initial);

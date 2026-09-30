@@ -22,11 +22,6 @@ interface CallResult {
 
 const encode = (value: string) => Stream.make(new TextEncoder().encode(value));
 
-/**
- * Answers `tailscale status --json` with a valid tailnet name, and lets each
- * test set the outcome of the `off` (pre-clear) and `serve` calls separately —
- * they are the same subcommand and are told apart by the trailing `off`.
- */
 const spawnerLayer = (input: {
   readonly off?: CallResult;
   readonly serve?: CallResult;
@@ -71,8 +66,6 @@ describe("unshareDevServer", () => {
     }),
   );
 
-  // `tailscale serve … off` exits 1 when the port had no mapping, which is the
-  // normal first-share case — the port is clear, so this must not be an error.
   it.effect("treats a missing handler as cleared", () =>
     Effect.gen(function* () {
       const result = yield* unshareDevServer(5788).pipe(
@@ -89,7 +82,6 @@ describe("unshareDevServer", () => {
       );
       assert.isFalse(result.cleared);
       assert.include(result.explanation, "permission denied");
-      // Structured, so a wrapping error can keep the real chain.
       assert.equal(result.cause?._tag, "TailscaleCommandExitError");
     }),
   );
@@ -107,8 +99,6 @@ describe("shareDevServer", () => {
     }),
   );
 
-  // Vite binds `localhost`, which modern Node resolves to `::1` first, so a
-  // 127.0.0.1 target would proxy to a loopback nothing listens on.
   it.effect("proxies to the localhost name Vite binds, not 127.0.0.1", () =>
     Effect.gen(function* () {
       const calls: Array<ReadonlyArray<string>> = [];
@@ -121,9 +111,6 @@ describe("shareDevServer", () => {
     }),
   );
 
-  // The stale-mapping clear runs before serve, so a failure here leaves the
-  // port serving nothing. Saying only "serve failed" would let an operator
-  // assume their previous mapping survived.
   it.effect("reports that the prior mapping was cleared when serve fails", () =>
     Effect.gen(function* () {
       const error: DevShareError = yield* shareDevServer({ webPort: 5788 }).pipe(
@@ -139,13 +126,10 @@ describe("shareDevServer", () => {
       assert.instanceOf(error, DevServeFailedError);
       assert.equal(error.stage, "serve");
       assert.equal(error.webPort, 5788);
-      // The underlying failure is preserved rather than flattened to a string.
       assert.equal(
         (error.cause as { _tag?: string } | undefined)?._tag,
         "TailscaleCommandExitError",
       );
-      // Unclassifiable stderr is never quoted (it can carry auth keys), so the
-      // message points at the command instead of echoing the CLI.
       assert.notInclude(error.message, "port already in use");
       assert.include(error.message, "run the command by hand");
       assert.include(error.message, "no longer served");
@@ -153,8 +137,6 @@ describe("shareDevServer", () => {
     }),
   );
 
-  // A recognized failure gets our own wording for it — enough to act on
-  // without passing CLI text through.
   it.effect("explains a recognized serve failure without quoting stderr", () =>
     Effect.gen(function* () {
       const error: DevShareError = yield* shareDevServer({ webPort: 5788 }).pipe(
@@ -178,8 +160,6 @@ describe("shareDevServer", () => {
     }),
   );
 
-  // Serving over routes we could not remove yields a URL that loads but whose
-  // /ws and /api quietly point at a dead backend.
   it.effect("refuses to serve when the existing mapping could not be cleared", () =>
     Effect.gen(function* () {
       const error: DevShareError = yield* shareDevServer({ webPort: 5788 }).pipe(
@@ -188,7 +168,6 @@ describe("shareDevServer", () => {
       );
 
       assert.instanceOf(error, DevServeFailedError);
-      // A distinct stage: the prior mapping survived, so nothing was replaced.
       assert.equal(error.stage, "clear-existing");
       assert.include(error.message, "could not clear the existing mapping");
       assert.include(error.message, "permission denied");

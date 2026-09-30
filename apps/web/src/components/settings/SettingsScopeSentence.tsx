@@ -29,7 +29,6 @@ import {
   settingsScopeEnvironmentLabel,
 } from "./settingsScopeAxis";
 
-/** Pages whose every row is saved on this client; they have no scope to pick. */
 export const SETTINGS_DEVICE_ONLY_PATHS: ReadonlySet<string> = new Set([
   "/settings/appearance",
   "/settings/snap-shot",
@@ -44,12 +43,6 @@ interface SettingsScopeMenuProps {
   readonly onChange: (next: SettingsScopeSearch) => void;
 }
 
-/**
- * "Applying settings for <project> across <environment>" at the top of a settings
- * page. The two pickers are the targets a change is written to. A project is
- * the same project on every environment, so the environment alone decides
- * where a project override is written.
- */
 export function SettingsScopeSentence() {
   const scope = useOptionalSettingsScope();
   const pathname = useLocation({ select: (location) => location.pathname });
@@ -64,14 +57,12 @@ export function SettingsScopeSentence() {
   };
   return (
     <p className="flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-1 px-3 text-base text-muted-foreground sm:px-4">
-      {/* Each connective stays with its picker so a wrap never strands "on". */}
       <span className="flex min-w-0 items-center gap-1.5">
         <span className="shrink-0">Applying settings for</span>
         <ProjectScopeMenu {...props} />
       </span>
       <span className="flex min-w-0 items-center gap-1.5">
         <span className="shrink-0">
-          {/* A legacy checkout link names one environment without `machine`. */}
           {scope.search.machine || scope.scope.kind === "checkout" ? "on" : "across"}
         </span>
         <EnvironmentScopeMenu {...props} />

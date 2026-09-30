@@ -308,9 +308,6 @@ const loadPrimaryConnectionRegistration = Effect.fn(
   });
 });
 
-// A desktop-local secondary backend (e.g. a parallel WSL backend) lives on its
-// own loopback origin, so — unlike the same-origin primary — it authenticates
-// with a bearer token minted from the bootstrap credential the desktop issues.
 const loadSecondaryConnectionRegistration = Effect.fn(
   "web.connectionPlatform.loadSecondaryConnectionRegistration",
 )(function* (entry: DesktopEnvironmentBootstrap) {
@@ -336,14 +333,7 @@ const loadSecondaryConnectionRegistration = Effect.fn(
     scopes: AuthStandardClientScopes,
     clientMetadata: clientMetadata(),
   }).pipe(Effect.mapError(mapRemoteEnvironmentError));
-  // Keep the desktop pool's stable backend id in the connection id. The
-  // descriptor environment id still scopes projects and RPC state, while the
-  // backend id lets desktop-only operations (notably the WSL folder picker)
-  // route back to the instance that owns the environment.
   const connectionId = desktopLocalConnectionId(entry.id);
-  // Prefer the desktop's bootstrap label (it identifies the backend and distro,
-  // e.g. "WSL: Ubuntu") over the generic descriptor label, so consumers can show
-  // a meaningful name without recovering it from the bootstrap list later.
   const label = entry.label || descriptor.label;
   return {
     registration: new BearerConnectionRegistration({
@@ -366,9 +356,6 @@ const loadSecondaryConnectionRegistration = Effect.fn(
   };
 });
 
-// Poll cadence for the desktop bootstrap topology. There is no change event on
-// the bridge, so the renderer polls; successful registrations are cached by a
-// signature of their endpoint + token until bearer credentials approach expiry.
 const PLATFORM_POLL_INTERVAL = "3 seconds";
 const SECONDARY_BEARER_REFRESH_SKEW_MS = 5_000;
 
@@ -472,10 +459,6 @@ const platformConnectionSourceLayer = Layer.effect(
     }
     const cacheRef = yield* Ref.make(new Map<string, CachedPlatformRegistration>());
 
-    // Resolve the full set of platform-managed environments the host currently
-    // reports: the primary (same-origin cookie auth) plus any desktop-local
-    // backends running alongside it (bearer auth). Reused registrations come
-    // from the cache; a failed entry is skipped and retried on the next poll.
     const buildPlatformRegistrations = Effect.gen(function* () {
       const previous = yield* Ref.get(cacheRef);
       const nowEpochMs = yield* Clock.currentTimeMillis;

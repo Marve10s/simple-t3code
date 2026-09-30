@@ -87,9 +87,6 @@ export interface PrimaryEnvironmentTarget {
 const LOOPBACK_HOSTNAMES = new Set(["127.0.0.1", "::1", "localhost"]);
 
 function getDesktopLocalEnvironmentBootstrap(): DesktopEnvironmentBootstrap | null {
-  // The primary (Windows-native) backend keeps the "primary" id. The
-  // plural list may include a second WSL entry; the primary-target
-  // resolver only cares about the primary, so just find it.
   const bootstraps = window.desktopBridge?.getLocalEnvironmentBootstraps() ?? [];
   return bootstraps.find((entry) => entry.id === PRIMARY_LOCAL_ENVIRONMENT_ID) ?? null;
 }
@@ -200,10 +197,6 @@ function resolveConfiguredPrimaryTarget(): PrimaryEnvironmentTarget | null {
     return null;
   }
 
-  // Scheme checks run on the raw configured string, while the URL parser
-  // folds schemes to lowercase ("WSS://host" parses fine). Without the
-  // case folding an uppercase scheme would be classified as plaintext and
-  // swapped to http/ws, silently downgrading TLS.
   const resolvedHttpBaseUrl =
     configuredHttpBaseUrl ??
     (configuredWsBaseUrl?.toLowerCase().startsWith("wss:")
@@ -303,8 +296,6 @@ export function resolvePrimaryEnvironmentHttpUrl(
   return url.toString();
 }
 
-// Null only when the desktop app runs with its local environment disabled;
-// every other host has a primary (falling back to the page origin).
 export function readPrimaryEnvironmentTarget(): PrimaryEnvironmentTarget | null {
   if (isLocalEnvironmentDisabled()) {
     return null;

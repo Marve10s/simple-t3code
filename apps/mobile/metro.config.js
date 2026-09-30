@@ -109,7 +109,6 @@ async function prepareDeviceStream() {
         ["stream.ts", "hubAccess.ts"],
       ],
     ]) {
-      // The generated module participates in Metro's normal Fast Refresh.
       fs.watch(directory, { persistent: false }, (_event, filename) => {
         if (filename && !files.includes(String(filename))) return;
         rebuild = rebuild.then(generateDeviceStreamScript).catch((error) => {

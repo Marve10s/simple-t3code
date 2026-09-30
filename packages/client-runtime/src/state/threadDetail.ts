@@ -21,15 +21,6 @@ const EMPTY_ACTIVITIES: ReadonlyArray<OrchestrationThreadActivity> = Object.free
 const EMPTY_PROPOSED_PLANS: ReadonlyArray<OrchestrationProposedPlan> = Object.freeze([]);
 const EMPTY_CHECKPOINTS: ReadonlyArray<OrchestrationCheckpointSummary> = Object.freeze([]);
 
-/**
- * Combine detail-only collections with the shell's authoritative thread metadata.
- *
- * Shell and detail subscriptions are intentionally independent. A cached detail can
- * therefore briefly outlive a newer shell snapshot after reconnecting. Workspace
- * consumers must use the shell branch/worktree/project fields so they do not target
- * a stale checkout while retaining messages, activities, plans, and checkpoints
- * from the detail subscription.
- */
 export function mergeEnvironmentThread(
   detail: EnvironmentThread | null,
   shell: EnvironmentThreadShell | null,

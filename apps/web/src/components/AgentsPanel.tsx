@@ -1,15 +1,3 @@
-/**
- * Agents right-panel surface: the fleet view over the native subagent fold.
- * The chat carries one expandable row per spawn batch and links here.
- *
- * Visualization rules (from live-test feedback):
- * - Spawn order is stable. Activity and completion update rows in place.
- * - Agent rows reserve three fixed lines for identity, activity, and metrics;
- *   changing data must never change their height.
- * - Workflow expansion is presentation state. A live run stays expanded when
- *   it settles; older collapsed runs can still be opened at run granularity.
- * - Static status dots, DOM-write elapsed timers, plain token counters.
- */
 import { useAtomValue } from "@effect/atom-react";
 import type {
   AgentPanelModel,
@@ -29,18 +17,10 @@ import { orchestrationEnvironment } from "~/state/orchestration";
 import { ScrollArea } from "~/components/ui/scroll-area";
 import { Button } from "~/components/ui/button";
 
-/**
- * In-flight states all present as Working (one steady state, per the
- * monitoring-pill design: detail belongs in the activity sub-line, and a
- * stalled/waiting/queued subagent is still the fleet doing its job, not a
- * user problem). Only settled states differentiate.
- */
 const STATUS_VISUALS: Record<RuntimeSubagent["status"], { dotClass: string; label: string }> = {
   pending: { dotClass: "bg-info", label: "Working" },
   running: { dotClass: "bg-info", label: "Working" },
   waiting: { dotClass: "bg-info", label: "Working" },
-  // Idle reads as settled (muted, not sky): a resting Codex child looks done
-  // unless resumed — live-test: sky idle dots read as stuck in-progress.
   idle: { dotClass: "bg-muted-foreground/50", label: "Idle · resumable" },
   completed: { dotClass: "bg-success", label: "Completed" },
   failed: { dotClass: "bg-destructive", label: "Failed" },
@@ -79,10 +59,6 @@ function elapsedBetween(startedAt: string, endIso: string | null): string {
   return formatElapsedSeconds((end - start) / 1000);
 }
 
-/**
- * Elapsed time for the current activation. Live agents self-tick via DOM
- * writes (zero React commits per tick); settled agents freeze at completedAt.
- */
 function AgentElapsed({ agent }: { agent: RuntimeSubagent }) {
   const textRef = useRef<HTMLSpanElement>(null);
   const live = agent.status === "running" || agent.status === "waiting";
@@ -112,11 +88,6 @@ function AgentElapsed({ agent }: { agent: RuntimeSubagent }) {
   );
 }
 
-/**
- * Status-dependent activity line. Live rows lead with what is happening now;
- * settled rows lead with the outcome. Errors are the only inline previews on
- * failed rows because they explain a red row at a glance.
- */
 function agentActivityText(agent: RuntimeSubagent): string | null {
   const live =
     agent.status === "running" || agent.status === "pending" || agent.status === "waiting";
@@ -136,7 +107,6 @@ function agentActivityText(agent: RuntimeSubagent): string | null {
   );
 }
 
-/** Flat, non-interactive agent status line. No unfold. */
 function AgentRow({ agent }: { agent: RuntimeSubagent }) {
   const visuals = STATUS_VISUALS[agent.status];
   const statusLabel =
@@ -205,12 +175,6 @@ function workflowMembers(group: AgentPanelWorkflowGroup): ReadonlyArray<RuntimeS
   return [...group.phases.flatMap((phase) => phase.members), ...group.unphasedMembers];
 }
 
-/**
- * Phase rail: the run's shape at a glance. One segment per phase in order,
- * separated by chevrons; each segment shows title + one dot per member.
- * The whole arc (done → live → pending) is visible without scrolling the
- * member list.
- */
 function PhaseRail({ group }: { group: AgentPanelWorkflowGroup }) {
   if (group.phases.length === 0) {
     return null;
@@ -259,10 +223,6 @@ function PhaseRail({ group }: { group: AgentPanelWorkflowGroup }) {
   );
 }
 
-/**
- * Read-only workflow script viewer, fetched through the contained
- * getWorkflowScript RPC (never a raw filesystem read from the client).
- */
 function WorkflowScriptView({
   environmentId,
   threadId,
@@ -310,11 +270,6 @@ function WorkflowScriptView({
   );
 }
 
-/**
- * Collapsible phase section. A phase opens when it becomes active, then keeps
- * that shape as it settles so completion never yanks rows out from under the
- * user. Manual toggles stick until a later activation begins.
- */
 function PhaseSection({
   phase,
   defaultOpen = false,
@@ -374,7 +329,6 @@ function PhaseSection({
   );
 }
 
-/** Expanded workflow: phase rail + full phase tree. */
 function ExpandedWorkflowSection({
   group,
   environmentId,
@@ -451,10 +405,6 @@ function ExpandedWorkflowSection({
   );
 }
 
-/**
- * Collapsed workflow: one summary line. The parent owns expansion so a live
- * workflow keeps its shape when it settles.
- */
 function CollapsedWorkflowSection({
   group,
   onExpand,
@@ -464,8 +414,6 @@ function CollapsedWorkflowSection({
 }) {
   const members = workflowMembers(group);
   const failed = members.filter((member) => member.status === "failed").length;
-  // Coordinator usage may already aggregate members (panel-footer rule):
-  // count it only when there are no member rows to sum.
   const totalTokens = members.reduce(
     (sum, member) => sum + (member.usage?.totalTokens ?? 0),
     members.length === 0 ? (group.workflow.usage?.totalTokens ?? 0) : 0,
@@ -498,7 +446,6 @@ function CollapsedWorkflowSection({
   );
 }
 
-/** A workflow's open state is presentation state, not a status derivative. */
 function WorkflowSection({
   group,
   environmentId,

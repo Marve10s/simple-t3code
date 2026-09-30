@@ -199,10 +199,6 @@ export function makeXAiAskUserQuestionCancelledResponse(): XAiAskUserQuestionCan
   return { outcome: "cancelled" };
 }
 
-// ---------------------------------------------------------------------------
-// x.ai/exit_plan_mode — plan approval gate (mirrors Grok Build TUI plan window)
-// ---------------------------------------------------------------------------
-
 const XAiExitPlanModeParams = Schema.Struct({
   sessionId: Schema.String,
   toolCallId: Schema.String,
@@ -226,7 +222,6 @@ function unwrapExitPlanModeParams(params: XAiExitPlanModeRequest): XAiExitPlanMo
   return "params" in params ? params.params : params;
 }
 
-/** Empty-state copy when Grok exits plan mode without a plan file. */
 export const XAI_EMPTY_PLAN_MARKDOWN =
   "# No plan written yet\n\n(The agent exited plan mode without writing a plan.)";
 
@@ -253,10 +248,6 @@ export interface XAiExitPlanModeResponse {
   readonly feedback?: string;
 }
 
-/**
- * Client captured the plan for T3's proposed-plan card. Abandon the native
- * Grok plan-approval gate so the turn unblocks; the user implements via T3 UI.
- */
 export function makeXAiExitPlanModeCapturedResponse(feedback?: string): XAiExitPlanModeResponse {
   return {
     outcome: "abandoned",
@@ -286,7 +277,6 @@ function addGrokSessionPrefix(
   prefixes.add(nestedGrokDir ? `${root}/.grok/sessions/` : `${root}/sessions/`);
 }
 
-/** Injected host bits so these helpers stay off `process.platform` / `process.env`. */
 export interface GrokPlanPathHost {
   readonly platform: NodeJS.Platform;
   readonly environment: NodeJS.ProcessEnv;
@@ -298,7 +288,6 @@ function grokPlanSessionPrefixes(environment: NodeJS.ProcessEnv): ReadonlySet<st
   addGrokSessionPrefix(prefixes, "~", true);
   addGrokSessionPrefix(prefixes, environment.HOME ?? "", true);
   addGrokSessionPrefix(prefixes, environment.USERPROFILE ?? "", true);
-  // ACP mock and isolated Grok spawns use a HOME that is not the server process home.
   addGrokSessionPrefix(prefixes, "/tmp/mock-home", true);
   const grokHome = environment.GROK_HOME ?? "";
   addGrokSessionPrefix(prefixes, grokHome, false);
@@ -313,12 +302,6 @@ const CASE_INSENSITIVE_CANONICAL_HOME_GROK_SESSION_PATH = new RegExp(
   "i",
 );
 
-/**
- * True when a path is Grok's session plan file under a Grok home
- * (`~/.grok/sessions/.../plan.md`, `$HOME/.grok/sessions/...`, or `$GROK_HOME/sessions/...`).
- * Deliberately does not match workspace files named `plan.md` (e.g. docs/plan.md
- * or a repo-local `.grok/sessions/.../plan.md`).
- */
 export function isGrokPlanMarkdownPath(
   path: string | undefined | null,
   host: GrokPlanPathHost,
@@ -342,7 +325,6 @@ export function isGrokPlanMarkdownPath(
       continue;
     }
     const rest = haystack.slice(needle.length);
-    // Session layout: <home>/.grok/sessions/<encoded-cwd>/<session-id>/plan.md
     if (rest !== "plan.md" && rest.endsWith("plan.md")) {
       return true;
     }
@@ -352,10 +334,6 @@ export function isGrokPlanMarkdownPath(
   ).test(haystack);
 }
 
-/**
- * Extract plan markdown from a Grok write/edit tool call targeting plan.md.
- * Used so T3 can show the plan while plan mode is still active (before exit).
- */
 export function extractGrokPlanMarkdownFromToolCallData(
   data: Record<string, unknown> | undefined,
   host: GrokPlanPathHost,
@@ -411,10 +389,6 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
-/**
- * Adds Grok's private prompt-completion fallback around a standards-only ACP runtime.
- * The underlying runtime remains unaware of xAI methods and metadata.
- */
 export const makeXAiPromptCompletionRuntime = Effect.fn("makeXAiPromptCompletionRuntime")(
   function* (runtime: AcpSessionRuntime.AcpSessionRuntime["Service"]) {
     const activeSessionIdRef = yield* Ref.make<string | undefined>(undefined);

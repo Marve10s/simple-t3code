@@ -1,11 +1,3 @@
-/**
- * ProjectionThreadRepository - Projection repository interface for threads.
- *
- * Owns persistence operations for projected thread records in the
- * orchestration read model.
- *
- * @module ProjectionThreadRepository
- */
 import {
   CommandId,
   IsoDateTime,
@@ -66,28 +58,14 @@ export const GetProjectionThreadInput = Schema.Struct({
 });
 export type GetProjectionThreadInput = typeof GetProjectionThreadInput.Type;
 
-/**
- * ProjectionThreadRepositoryShape - Service API for projected thread records.
- */
 export interface ProjectionThreadRepositoryShape {
-  /**
-   * Insert or replace a projected thread row.
-   *
-   * Upserts by `threadId`.
-   */
   readonly upsert: (thread: ProjectionThread) => Effect.Effect<void, ProjectionRepositoryError>;
 
-  /**
-   * Read a projected thread row by id.
-   */
   readonly getById: (
     input: GetProjectionThreadInput,
   ) => Effect.Effect<Option.Option<ProjectionThread>, ProjectionRepositoryError>;
 }
 
-/**
- * ProjectionThreadRepository - Service tag for thread projection persistence.
- */
 export class ProjectionThreadRepository extends Context.Service<
   ProjectionThreadRepository,
   ProjectionThreadRepositoryShape

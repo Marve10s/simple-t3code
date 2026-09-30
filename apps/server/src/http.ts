@@ -52,13 +52,8 @@ const OTLP_TRACES_PROXY_PATH = "/api/observability/v1/traces";
 const LOOPBACK_HOSTNAMES = new Set(["127.0.0.1", "::1", "localhost"]);
 const DESKTOP_RENDERER_ORIGINS = ["t3code://app", "t3code-dev://app"];
 const SVG_CONTENT_SECURITY_POLICY = "default-src 'none'; style-src 'unsafe-inline'; sandbox";
-// HTML previews are agent output, not the app. The sandbox gives the document an
-// opaque origin: scripts run, but same-origin cookies, storage, and API calls are
-// out of reach. Relative sibling assets still load through their signed URLs.
 const HTML_CONTENT_SECURITY_POLICY = "sandbox allow-scripts allow-forms allow-popups allow-modals";
 
-// Types a browser may render as a document if a proxy strips the disposition
-// header. Downloads of these fall back to octet-stream.
 const DOWNLOAD_MIME_TYPE_PATTERN = /^[\w!#$&^.+-]+\/[\w!#$&^.+-]+$/;
 const isSafeDownloadMimeType = (mimeType: string): boolean =>
   DOWNLOAD_MIME_TYPE_PATTERN.test(mimeType) &&
@@ -68,12 +63,10 @@ const isSafeInlineMediaMimeType = (mimeType: string): boolean =>
 const isSafeInlineDocumentMimeType = (mimeType: string): boolean =>
   mimeType.toLowerCase() === "application/pdf" || mimeType.toLowerCase() === "text/html";
 
-/** RFC 6266 disposition with an ASCII fallback name plus a UTF-8 `filename*`. */
 export function downloadContentDisposition(fileName?: string): string {
   if (fileName === undefined) {
     return "attachment";
   }
-  // toWellFormed: encodeURIComponent throws URIError on unpaired surrogates.
   const sanitized = fileName.toWellFormed().replace(/[\p{Cc}"\\]/gu, "_");
   const asciiFallback = sanitized.replace(/[^\u0020-\u007e]/g, "_");
   const needsExtended = asciiFallback !== sanitized;
@@ -132,7 +125,6 @@ export function assetResponseHeaders(
   };
 }
 
-/** A single byte range for native media readers; unsupported range syntax uses the full file. */
 function assetByteRange(header: string, size: bigint) {
   const match = /^bytes=(\d*)-(\d*)$/i.exec(header.trim());
   if (!match || (!match[1] && !match[2])) return null;
@@ -172,9 +164,6 @@ export const assetFileResponse = Effect.fn("assetFileResponse")(function* (
   const mediaInfo = mediaFile ? yield* statMediaFile(asset.path, mediaFile) : undefined;
   const isMedia = /^(?:audio|video)\//i.test(headers["Content-Type"] ?? "");
   if (isMedia) {
-    // Host media can change in place. Do not invite conditional range requests
-    // with validators that cannot establish byte-for-byte identity. Attachment media
-    // carries no `file`, and must not outlive the signed URL that granted it either.
     headers["Cache-Control"] = "private, no-store";
   }
   let status = 200;
@@ -182,7 +171,6 @@ export const assetFileResponse = Effect.fn("assetFileResponse")(function* (
   let bytesToRead: bigint | undefined;
   if (isMedia) {
     headers["Accept-Ranges"] = "bytes";
-    // If-Range requires a matching validator. A full response is safe when we cannot validate it.
     if (method === "GET" && rangeHeader && ifRangeHeader === undefined) {
       const fs = yield* FileSystem.FileSystem;
       const info = mediaInfo ?? (yield* fs.stat(asset.path));
@@ -235,13 +223,6 @@ export const browserApiCorsLayer = Layer.unwrap(
   Effect.gen(function* () {
     const config = yield* ServerConfig.ServerConfig;
     const devOrigin = config.devUrl?.origin;
-    // Dev uses credentialed requests from Vite or the Electron custom origin, so both must be
-    // explicit. Packaged desktop omits credentials and uses Effect's default wildcard origin.
-    //
-    // T3CODE_DEV_ALLOWED_ORIGINS covers dev servers reached from a second
-    // origin — a tailnet name, a LAN IP, a phone. Browser dev normally proxies
-    // through Vite and is same-origin (no preflight at all), so this is a
-    // safety net for the desktop renderer and any direct-to-backend caller.
     return HttpRouter.cors({
       ...(devOrigin
         ? {
@@ -313,10 +294,6 @@ class DecodeOtlpTraceRecordsError extends Data.TaggedError("DecodeOtlpTraceRecor
   readonly cause: unknown;
 }> {}
 
-// Renderers export up to once a second while they have spans buffered, so
-// tracing this proxy would add more server spans than it forwards.
-// withTracerEnabled(false) drops the handler's spans, including the forward.
-// untracedRequestsLayer drops the HTTP server span.
 export const otlpTracesProxyRouteLayer = HttpRouter.add(
   "POST",
   OTLP_TRACES_PROXY_PATH,
@@ -373,12 +350,6 @@ export const otlpTracesProxyRouteLayer = HttpRouter.add(
 
 const UNTRACED_REQUEST_PATHS: ReadonlySet<string> = new Set([OTLP_TRACES_PROXY_PATH]);
 
-// Skips the HTTP server span for UNTRACED_REQUEST_PATHS. That span starts
-// before routing, so a route handler cannot skip it. TracerDisabledWhen is one
-// predicate for the whole server and the last layer to provide it wins, so
-// makeRoutesLayer provides this one last. Add paths here instead of providing
-// TracerDisabledWhen again; server.test.ts fails if a later layer replaces it.
-// The query string is ignored, as in routing.
 export const untracedRequestsLayer = Layer.succeed(HttpMiddleware.TracerDisabledWhen)((request) => {
   const queryIndex = request.url.indexOf("?");
   return UNTRACED_REQUEST_PATHS.has(
@@ -463,7 +434,6 @@ export const attachmentUploadRouteLayer = HttpRouter.add(
       });
     }
 
-    // Keep the request stream in the route scope until the response is sent.
     const bodyPull = yield* Stream.toPull(request.stream);
     const stored = yield* storeAttachmentUpload(claims, Stream.fromPull(Effect.succeed(bodyPull)));
     return stored.ok
@@ -510,7 +480,6 @@ const loadImmutableBuildAssets = Effect.gen(function* () {
 
 const openStaticFile = Effect.fn("openStaticFile")(function* (filePath: string) {
   const fileSystem = yield* FileSystem.FileSystem;
-  // Reject directories and special files before opening. Response metadata comes from the handle.
   const pathInfo = yield* fileSystem.stat(filePath).pipe(Effect.orElseSucceed(() => null));
   if (pathInfo?.type !== "File") return null;
   const file = yield* fileSystem.open(filePath, { flag: "r" });
@@ -603,7 +572,6 @@ const handleStaticAndDevRequest = Effect.fn("handleStaticAndDevRequest")(
     const mimeType = Option.getOrElse(Mime.getType(filePath), () => "application/octet-stream");
     const isHtml = mimeType === "text/html";
 
-    // A hash-like name is not enough: custom static files can use the same naming pattern.
     const relativePath = path.relative(staticRoot, filePath).replaceAll("\\", "/");
     const immutable =
       !isHtml &&
@@ -612,7 +580,6 @@ const handleStaticAndDevRequest = Effect.fn("handleStaticAndDevRequest")(
     const headers: Record<string, string> = {
       "Cache-Control": immutable ? "public, max-age=31536000, immutable" : "no-cache",
     };
-    // Deployments can preserve HTML size and mtime while changing its bundle URLs.
     const modifiedAt = isHtml ? undefined : Option.getOrUndefined(fileInfo.mtime);
     const etag = modifiedAt
       ? `W/"${fileInfo.size.toString(16)}-${modifiedAt.getTime().toString(16)}"`
@@ -622,8 +589,6 @@ const handleStaticAndDevRequest = Effect.fn("handleStaticAndDevRequest")(
       headers["Last-Modified"] = modifiedAt.toUTCString();
     }
 
-    // If-None-Match takes precedence over dates and uses weak comparison for
-    // GET/HEAD, including when compression changes the transferred bytes.
     const ifNoneMatch = request.headers["if-none-match"];
     const ifModifiedSince = request.headers["if-modified-since"];
     const unchanged =
@@ -646,8 +611,6 @@ const handleStaticAndDevRequest = Effect.fn("handleStaticAndDevRequest")(
     }
 
     const contentType = isHtml ? "text/html; charset=utf-8" : mimeType;
-    // The request scope closes the handle for GET, HEAD, 304, errors, and cancellation.
-    // HEAD still passes through compression, which selects headers without reading the stream.
     return HttpServerResponse.stream(streamStaticFile(opened.file, fileInfo.size), {
       headers,
       contentType,
@@ -660,7 +623,6 @@ const handleStaticAndDevRequest = Effect.fn("handleStaticAndDevRequest")(
   }),
 );
 
-// Read the installed build's manifest once. Unknown files use revalidation.
 export const staticAndDevRouteLayer = Layer.unwrap(
   loadImmutableBuildAssets.pipe(
     Effect.map((assets) => HttpRouter.add("GET", "*", handleStaticAndDevRequest(assets))),

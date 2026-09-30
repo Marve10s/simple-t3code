@@ -21,7 +21,6 @@ export interface ProvisionedSshEnvironment extends PreparedSshEnvironment {
   readonly label: string;
 }
 
-/** Stable for one signed-in session, including same-account token refreshes. */
 export interface CloudSessionIdentity {
   readonly accountId: string;
 }

@@ -10,11 +10,6 @@ import {
   useCodexBackgroundEnabled,
 } from "./codexBackgrounds";
 
-/**
- * Paints a background image behind the new-chat hero (see simple-codex.css).
- * The image is chosen per draft: random by default, so every new chat gets
- * its own, or the one the user pinned in Settings → Appearance.
- */
 export function CodexHeroBackground() {
   const [enabled] = useCodexBackgroundEnabled();
   const [choice] = useCodexBackgroundChoice();
@@ -44,7 +39,6 @@ export function CodexHeroBackground() {
       root.style.removeProperty("--codex-hero-image");
       return;
     }
-    // Decode off the main thread first so the swap never stalls a frame.
     const image = new Image();
     image.src = background.src;
     let cancelled = false;

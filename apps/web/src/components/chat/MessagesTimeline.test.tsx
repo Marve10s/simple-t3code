@@ -188,8 +188,6 @@ beforeAll(async () => {
   ({ MessagesTimeline, resolvePreviewAnnotationImage } = await import("./MessagesTimeline"));
 }, 30_000);
 
-// The scroll-settling test clears every global stub; mounted timeline rows
-// still touch `window` through the tooltip's focus handling.
 beforeEach(stubDomGlobals);
 
 const ACTIVE_THREAD_ENVIRONMENT_ID = EnvironmentId.make("environment-local");
@@ -304,8 +302,6 @@ describe("MessagesTimeline", () => {
     expect(markup).toContain('aria-label="Next turn"');
   });
 
-  // Expanding history uses this suite's existing test renderer, deprecated in
-  // React 19. Migrate these interaction tests together when a DOM test setup is added.
   it.each([{}, { text: "Text-only answer", file: "Answer with a file" }])(
     "renders attachment-only question history alongside text answers: %j",
     async (answers) => {
@@ -367,19 +363,15 @@ describe("MessagesTimeline", () => {
         expect(questionToggle.props["aria-label"]).toContain(
           Object.values(answers)[0] ?? "spec.txt",
         );
-        // The question leads the collapsed row so the exchange reads as a
-        // question and answer without expanding (heading + accessible label).
         expect(JSON.stringify(renderer!.toJSON()).match(/Provide a spec/g)).toHaveLength(2);
         await act(() => questionToggle.props.onClick());
         const markup = JSON.stringify(renderer!.toJSON());
-        // Expanded, the question also appears in the history: label, heading, history.
         expect(markup.match(/Provide a spec/g)).toHaveLength(3);
         expect(markup).toContain("spec.txt");
         expect(markup).toContain("Provide a screenshot");
         expect(markup).toContain("shot.png");
         for (const answer of Object.values(answers)) expect(markup).toContain(answer);
         await act(() => questionToggle.props.onClick());
-        // Collapsing hides the history but keeps the question heading.
         expect(JSON.stringify(renderer!.toJSON())).toContain("Provide a spec");
       } finally {
         await act(() => renderer?.unmount());
@@ -424,10 +416,8 @@ describe("MessagesTimeline", () => {
           node.props["aria-label"] === "Which repository?" && node.props["aria-expanded"] === false,
       );
       const markup = JSON.stringify(renderer!.toJSON());
-      // Heading + accessible label.
       expect(markup.match(/Which repository\?/g)).toHaveLength(2);
       await act(() => questionToggle.props.onClick());
-      // Expanded history adds a third occurrence alongside heading and label.
       expect(JSON.stringify(renderer!.toJSON()).match(/Which repository\?/g)).toHaveLength(3);
     } finally {
       await act(() => renderer?.unmount());
@@ -505,7 +495,6 @@ describe("MessagesTimeline", () => {
         await act(() => {
           renderer = create(<ThreadProbe />);
         });
-        // The user scrolled up to read, so the composer is resting.
         await act(() => composerState!.setIsComposerScrollCollapsed(true));
         const toggle = renderer!.root.findByProps({ "aria-expanded": false });
         await act(() => toggle.props.onClick());
@@ -628,7 +617,6 @@ describe("MessagesTimeline", () => {
 
     expect(resolveTimelineIsAtEnd({ isAtEnd: true })).toBe(true);
     expect(resolveTimelineIsAtEnd(undefined)).toBeUndefined();
-    // Within the pixel band above the content bottom counts as the end...
     expect(
       resolveTimelineIsAtEnd({
         isAtEnd: false,
@@ -637,7 +625,6 @@ describe("MessagesTimeline", () => {
         scrollLength: 800,
       }),
     ).toBe(true);
-    // ...but half a viewport up (LegendList's isNearEnd territory) does not.
     expect(
       resolveTimelineIsAtEnd({
         isAtEnd: false,
@@ -646,9 +633,6 @@ describe("MessagesTimeline", () => {
         scrollLength: 800,
       }),
     ).toBe(false);
-    // LegendList's isAtEnd is true anywhere within the composer-height band
-    // (it subtracts the inset); the last row is still hidden under the
-    // composer there, so the flag must not short-circuit the geometry.
     expect(
       resolveTimelineIsAtEnd({
         isAtEnd: true,
@@ -657,7 +641,6 @@ describe("MessagesTimeline", () => {
         scrollLength: 800,
       }),
     ).toBe(false);
-    // Geometry missing (older state shape): fall back to the strict flag.
     expect(resolveTimelineIsAtEnd({ isAtEnd: false })).toBe(false);
 
     expect(resolveTimelineMinimapHeightStyle(5)).toBe("min(32px, calc(100vh - 18rem))");
@@ -707,42 +690,28 @@ describe("MessagesTimeline", () => {
         itemBounds: [{ top: 80, height: 20 }],
       }),
     ).toBeNull();
-    // Comfortable width: the column is capped at 768px.
     expect(resolveTimelineMinimapHasPersistentGutter(832, 768)).toBe(false);
     expect(resolveTimelineMinimapHasPersistentGutter(863, 768)).toBe(false);
     expect(resolveTimelineMinimapHasPersistentGutter(864, 768)).toBe(true);
-    // Wider Chat width settings consume the gutter the minimap relies on.
     expect(resolveTimelineMinimapHasPersistentGutter(1400, 1152)).toBe(true);
     expect(resolveTimelineMinimapHasPersistentGutter(1200, 1152)).toBe(false);
     expect(resolveTimelineMinimapHasPersistentGutter(2560, 2560)).toBe(false);
 
-    // No usable gutter (zoomed in / narrow pane): the strip must go inert
-    // instead of overlaying the centered content column.
     expect(resolveTimelineMinimapHitStripWidth(768, 768)).toBe(0);
     expect(resolveTimelineMinimapHitStripWidth(792, 768)).toBe(0);
-    // Partial gutter: strip shrinks to what fits between the viewport edge
-    // and the content column.
     expect(resolveTimelineMinimapHitStripWidth(820, 768)).toBe(14);
-    // Full gutter: unchanged 40px-wide strip.
     expect(resolveTimelineMinimapHitStripWidth(872, 768)).toBe(40);
     expect(resolveTimelineMinimapHitStripWidth(1400, 768)).toBe(40);
-    // Full Chat width: the column spans the viewport, so the strip is inert
-    // however wide the window gets.
     expect(resolveTimelineMinimapHitStripWidth(2560, 2560)).toBe(0);
-    // Wide Chat width on a window just wider than the column: partial strip.
     expect(resolveTimelineMinimapHitStripWidth(1204, 1152)).toBe(14);
     expect(resolveTimelineMinimapHitStripWidth(0, 0)).toBe(0);
     expect(resolveTimelineMinimapHitStripWidth(Number.NaN, 768)).toBe(0);
 
-    // Prev/next buttons reach 14px past the strip's left edge; a narrower
-    // strip means they would sit on the content column.
     expect(resolveTimelineMinimapNavigationInteractive(40)).toBe(true);
     expect(resolveTimelineMinimapNavigationInteractive(14)).toBe(true);
     expect(resolveTimelineMinimapNavigationInteractive(8)).toBe(false);
     expect(resolveTimelineMinimapNavigationInteractive(0)).toBe(false);
 
-    // The collapsed target stays narrow, but an open preview keeps its full
-    // 20rem width plus the 2rem offset from the minimap rail interactive.
     expect(resolveTimelineMinimapInteractiveWidth(0, false)).toBe(0);
     expect(resolveTimelineMinimapInteractiveWidth(14, false)).toBe(14);
     expect(resolveTimelineMinimapInteractiveWidth(40, false)).toBe(40);
@@ -958,8 +927,6 @@ describe("MessagesTimeline", () => {
         ...buildUserTimelineEntry("Play the recording.").message,
         attachments: [
           {
-            // A newer server can introduce attachment types this build does
-            // not know. They ride the open contract member.
             type: "recording",
             id: "attachment-voice-memo",
             name: "voice-memo.ogg",
@@ -1008,8 +975,6 @@ describe("MessagesTimeline", () => {
         frames.clear();
         callbacks.forEach((callback) => callback(0));
       });
-    // A work entry renders without the DOM globals that message rows need
-    // under react-test-renderer.
     const entries = [
       {
         id: "entry-settle-work",
@@ -1057,7 +1022,6 @@ describe("MessagesTimeline", () => {
       });
       expect(animatedAttr(renderer)).toBe(false);
 
-      // Two frames later the switch has settled and gliding resumes.
       flushFrame();
       flushFrame();
       expect(animatedAttr(renderer)).toBe(true);
@@ -1122,8 +1086,6 @@ describe("MessagesTimeline", () => {
     };
     const timelineEntries = [firstEntry, secondEntry];
 
-    // While the send anchor holds the end space open, ChatView owns streaming
-    // scrolls and LegendList must not re-pin behind it.
     expect(
       renderToStaticMarkup(
         <MessagesTimeline
@@ -1134,9 +1096,6 @@ describe("MessagesTimeline", () => {
       ),
     ).not.toContain('data-maintain-scroll-at-end="enabled"');
 
-    // Dropping the anchor is what actually gives end-following back, so
-    // returning to the live edge has to release it — re-enabling live follow
-    // alone leaves nothing pinned to the stream.
     expect(
       renderToStaticMarkup(
         <MessagesTimeline
@@ -1147,7 +1106,6 @@ describe("MessagesTimeline", () => {
       ),
     ).toContain('data-maintain-scroll-at-end="enabled"');
 
-    // Reading history still wins over both.
     expect(
       renderToStaticMarkup(
         <MessagesTimeline
@@ -1521,7 +1479,6 @@ describe("MessagesTimeline", () => {
     expect(markup).toContain("lucide-terminal");
     expect(markup).not.toContain("lucide-x");
     expect(markup).not.toContain("text-destructive");
-    // The failure stays discoverable for screen readers.
     expect(markup).toContain("tool call failed");
   });
 
@@ -2028,17 +1985,13 @@ describe("MessagesTimeline", () => {
       />,
     );
 
-    // Images report their size like every other attachment chip.
     expect(markup).toContain('aria-label="Image attachment, shot.png, 1 KB"');
-    // Selection copy re-emits chips as their canonical links.
     expect(markup).toContain('data-markdown-copy="![shot.png](t3-context://v1/image/img-1)"');
     expect(markup).toContain('aria-label="File attachment, notes.txt, 1 KB"');
     expect(markup).toContain(">1 KB</span>");
     expect(markup).not.toContain('aria-label="Download notes.txt"');
     expect(markup).toContain("legacy.txt");
     expect(markup).not.toContain('href="t3-context://');
-    // A picture keeps its tile even though it also has a chip: the chip names it, the tile is
-    // the only way to see it. A plain file's row is what a chip replaces.
     expect(markup).toContain("grid-cols-2");
   });
 
@@ -2192,7 +2145,6 @@ describe("MessagesTimeline", () => {
     );
 
     expect(markup).toContain('aria-label="Received 1 update and used 1 tool, tool call failed"');
-    // Ordinary tool failures do not use destructive row styling.
     expect(markup).not.toContain("text-destructive");
   });
 
@@ -2267,8 +2219,6 @@ describe("MessagesTimeline", () => {
         (node) => node.type === "span" && String(node.props.className).includes("select-text"),
       )[0];
       const stopPropagation = vi.fn();
-      // Only the click that ends a selection may be withheld from the row
-      // toggle; the plain click has to reach it so the label can collapse.
       for (const isCollapsed of [false, true]) {
         label!.props.onClick({
           currentTarget: { ownerDocument: { getSelection: () => ({ isCollapsed }) } },

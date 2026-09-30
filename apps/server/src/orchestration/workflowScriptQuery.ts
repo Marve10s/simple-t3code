@@ -1,18 +1,4 @@
 // @effect-diagnostics nodeBuiltinImport:off
-/**
- * Read-only access to persisted workflow scripts for the Agents surface's
- * "{} script" affordance.
- *
- * Containment rules (lifted from the reviewed #3650 inspection service):
- * - the resolved realpath must live under ~/.claude/projects (where the
- *   Claude harness persists workflow scripts) — realpath re-containment
- *   defeats symlink escapes, including a symlinked leaf file;
- * - only .js leaf files are served;
- * - reads are size-capped rather than failed, with a truncation marker.
- *
- * The client-supplied path is a hint from the workflow's runHandles; it is
- * never trusted beyond these checks.
- */
 import * as NodeFSP from "node:fs/promises";
 import * as NodeOS from "node:os";
 import * as NodePath from "node:path";
@@ -48,8 +34,6 @@ export const readWorkflowScript = Effect.fn("orchestration.readWorkflowScript")(
       }),
   });
 
-  // Realpath the FILE itself (not just its directory): a symlink named
-  // like a script inside a contained directory must not escape.
   const resolved = yield* Effect.tryPromise({
     try: () => NodeFSP.realpath(requested),
     catch: (cause) =>
@@ -73,12 +57,6 @@ export const readWorkflowScript = Effect.fn("orchestration.readWorkflowScript")(
     });
   }
 
-  // TOCTOU-safe read (review finding): open FIRST, then verify what was
-  // actually opened via the file descriptor. Re-checking the path after
-  // open would race against a swap; fstat on the handle cannot. The two
-  // containment checks fail with their own tagged reasons (not manufactured
-  // Errors folded into read-failed); "read-failed" is reserved for genuine
-  // platform failures with the real cause attached.
   const read = yield* Effect.tryPromise({
     try: async () => {
       const handle = await NodeFSP.open(resolved, "r");
@@ -87,9 +65,6 @@ export const readWorkflowScript = Effect.fn("orchestration.readWorkflowScript")(
         if (!stat.isFile()) {
           return { failure: "not-regular-file" as const };
         }
-        // The opened inode must be the same one realpath resolved to: a
-        // process swapping the path between realpath and open changes the
-        // inode, which this comparison catches.
         const pathStat = await NodeFSP.lstat(resolved);
         if (stat.ino !== pathStat.ino || stat.dev !== pathStat.dev) {
           return { failure: "changed-during-read" as const };

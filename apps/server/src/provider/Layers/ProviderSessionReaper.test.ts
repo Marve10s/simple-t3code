@@ -138,8 +138,6 @@ describe("ProviderSessionReaper", () => {
     runtime = null;
   });
 
-  // Shared start sequence so each test adds no manual Effect runners
-  // (no-manual-effect-runtime-in-tests tracks this file's legacy count).
   async function startReaper() {
     await runtime!.runPromise(
       Effect.gen(function* () {
@@ -164,7 +162,6 @@ describe("ProviderSessionReaper", () => {
             currentTimeNanosUnsafe: () => BigInt(nowMs) * 1_000_000n,
             monotonicTimeNanos: clock.monotonicTimeNanos,
             monotonicTimeNanosUnsafe: () => clock.monotonicTimeNanosUnsafe(),
-            // Reaching the next scheduled sleep proves this sweep has finished.
             sleep: () => Deferred.succeed(swept, undefined).pipe(Effect.andThen(Effect.never)),
           }),
         );
@@ -457,7 +454,6 @@ describe("ProviderSessionReaper", () => {
       await sweepAt(completedAtMs);
       expect(harness.stopSession).not.toHaveBeenCalled();
 
-      // Ingestion changes the timestamp and clears the active turn in the same session row.
       readModel.threads[0]!.session = {
         ...readModel.threads[0]!.session!,
         status,

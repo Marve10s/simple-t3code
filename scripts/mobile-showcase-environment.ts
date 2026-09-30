@@ -54,10 +54,6 @@ const PROJECT_SCRIPTS = JSON.stringify([
 const SHOWCASE_TERMINAL_PROMPT =
   "\u001b[1;32m→\u001b[0m \u001b[1;36mt3code\u001b[0m \u001b[1;34mgit:(\u001b[1;31mfeat/remote-command-center\u001b[1;34m)\u001b[0m \u001b[1;33m✗\u001b[0m ";
 
-// A dev-server startup mirroring the web settings' terminal font preview:
-// zsh-style prompt, brand line, addresses, the thread's 612-test summary,
-// and a READY badge, so the scene exercises bold, dim, underline, the six
-// accent colors, and a background cell.
 export const SHOWCASE_TERMINAL_BUFFER = [
   `${SHOWCASE_TERMINAL_PROMPT}vpr dev`,
   "",
@@ -230,10 +226,6 @@ export const SHOWCASE_THREADS = [
       "Delayed work now carries a concise reason through the trace, so the wait is legible without changing scheduling behavior.",
     snoozeMinutes: 8 * 60,
   },
-  // Finished work, settled by hand: the list keeps it as a receded tail so
-  // the active block above reads as everything still in flight. The active
-  // block stays small enough that the settled tail begins above the fold —
-  // a store screenshot has to show that history exists, not just imply it.
   {
     id: "handoff-haptics",
     projectId: "t3code",
@@ -484,10 +476,6 @@ function seedDatabase(
   threads: ReadonlyArray<(typeof SHOWCASE_THREADS)[number]>,
   now: number,
 ): void {
-  // The environment server is already running against this file and keeps
-  // writing (migrations, projections) while we seed, so the write lock is
-  // genuinely contended — without a busy timeout `BEGIN IMMEDIATE` fails
-  // instantly with SQLITE_BUSY on a loaded machine.
   const database = new NodeSqlite.DatabaseSync(dbPath, { timeout: 30_000 });
   try {
     database.exec("BEGIN IMMEDIATE");
@@ -619,14 +607,9 @@ function seedDatabase(
     }
     database.exec("COMMIT");
   } catch (error) {
-    // A failed BEGIN (or an error SQLite already auto-rolled back) leaves no
-    // transaction, and the rollback's own "cannot rollback" error would then
-    // replace the one that actually explains the failure.
     try {
       database.exec("ROLLBACK");
-    } catch {
-      // Nothing to roll back.
-    }
+    } catch {}
     throw error;
   } finally {
     database.close();
@@ -674,8 +657,6 @@ export async function seedShowcaseEnvironment(input: {
         });
       }),
   );
-  // The environment server begins listening before it finishes migrating the
-  // database, so wait for the schema before deleting from and reseeding it.
   await waitForSeedableSchema(dbPath);
   seedDatabase(dbPath, workspaceRoots, projects, threads, now);
 

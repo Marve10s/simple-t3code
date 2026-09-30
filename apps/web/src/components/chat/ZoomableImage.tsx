@@ -14,7 +14,6 @@ export interface ZoomableImageHandle {
   pan: (key: string) => boolean;
 }
 
-/** Zooms around the pointer and keeps the whole image accessible by dragging or scrolling. */
 export function ZoomableImage({
   src,
   name,
@@ -59,7 +58,6 @@ export function ZoomableImage({
       pan(key) {
         const viewport = viewportRef.current;
         if (!viewport || zoomRef.current <= 1) return false;
-        // A vertical scrollbar alone must not swallow gallery navigation.
         if (
           (key === "ArrowLeft" || key === "ArrowRight") &&
           viewport.scrollWidth <= viewport.offsetWidth
@@ -158,7 +156,6 @@ export function ZoomableImage({
           cursor: zoom > 1 ? (dragging ? "grabbing" : "grab") : "zoom-in",
         }}
         onClick={(event) => {
-          // Pointer capture also produces a click after dragging; leave the image zoomed.
           if (suppressClickRef.current || event.detail > 1) return;
           changeZoom(zoomRef.current > 1 ? 1 : 2, { x: event.clientX, y: event.clientY });
         }}

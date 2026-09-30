@@ -6,11 +6,6 @@ import { loadRepoEnv } from "../../scripts/lib/public-config.ts";
 
 const repoEnv = loadRepoEnv();
 
-// The main process is bundled the same way the server CLI is: every JS
-// dependency is inlined and only packages Node must load from disk stay
-// external. The packaged app then installs just those externals, instead of a
-// full production install of apps/desktop's dependency tree next to a server
-// bundle that already carries its own copy of the same libraries.
 const isMainProcessExternal = (id: string) =>
   id === "electron" || id.startsWith("electron/") || isDesktopRuntimeExternalDependency(id);
 const shouldLaunchElectronAfterPack = process.env.T3CODE_DESKTOP_DEV === "1";
@@ -86,7 +81,6 @@ export default defineConfig({
       },
     },
     {
-      // boot.cjs requires the other two at runtime, so all three stay separate files.
       format: "cjs",
       outDir: "dist-electron",
       dts: false,
@@ -107,9 +101,6 @@ export default defineConfig({
       define: publicConfigDefine,
       entry: ["src/preload.ts"],
       deps: {
-        // Sandboxed Electron preloads cannot reliably resolve package imports
-        // from inside the packaged ASAR. Bundle Clerk's preload bridge into the
-        // preload artifact instead of leaving a runtime require() behind.
         alwaysBundle: (id) => id === "@clerk/electron" || id.startsWith("@clerk/electron/"),
       },
     },
@@ -133,7 +124,6 @@ export default defineConfig({
       entry: ["src/preview-pip-preload.ts"],
     },
     {
-      // Sandboxed preloads must be self-contained, without shared runtime chunks.
       format: "cjs",
       outDir: "dist-electron",
       dts: false,
@@ -143,8 +133,6 @@ export default defineConfig({
     },
   ],
   test: {
-    // The Windows lane runs workspace suites concurrently; filesystem-heavy
-    // desktop integration tests can exceed Vitest's 5 second default there.
     testTimeout: 15_000,
     setupFiles: ["../../packages/shared/src/testing/longTempDir.ts"],
   },

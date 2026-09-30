@@ -79,10 +79,6 @@ const make = Effect.gen(function* () {
 
   const worker = yield* makeDrainableWorker(processThreadDeletedSafely);
 
-  // Highest event sequence the subscriber has handed to the worker. Waiting
-  // through a successful thread.created sequence covers every deletion that
-  // was ahead of that create in the engine queue; the worker drain then covers
-  // the in-flight cleanup.
   const seenSequence = yield* SubscriptionRef.make(0);
   const noteSeen = (sequence: number) =>
     SubscriptionRef.update(seenSequence, (seen) => Math.max(seen, sequence));
@@ -91,8 +87,6 @@ const make = Effect.gen(function* () {
     yield* forkParked(
       Stream.runForEach(
         orchestrationEngine.streamDomainEvents.pipe(
-          // Events that landed before the subscription are not replayed, so
-          // start the watermark at the current head instead of zero.
           Stream.onStart(orchestrationEngine.latestSequence.pipe(Effect.flatMap(noteSeen))),
         ),
         (event) =>

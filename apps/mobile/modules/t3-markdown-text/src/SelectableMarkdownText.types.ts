@@ -29,7 +29,6 @@ export interface MarkdownHighlightedToken {
 }
 
 export interface MarkdownCodeHighlightInput {
-  /** Identity of the mounted code block, for incremental highlighting. */
   readonly session?: object;
   readonly code: string;
   readonly language?: string | null;
@@ -39,7 +38,6 @@ export interface MarkdownCodeHighlighter {
   (
     input: MarkdownCodeHighlightInput,
   ): Promise<ReadonlyArray<ReadonlyArray<MarkdownHighlightedToken>>>;
-  /** Optional synchronous result for a small append to an already warm block. */
   read?: (
     input: MarkdownCodeHighlightInput,
   ) => ReadonlyArray<ReadonlyArray<MarkdownHighlightedToken>> | undefined;
@@ -56,12 +54,6 @@ export interface MarkdownImageRequest {
   readonly title: string | null;
 }
 
-/**
- * App-supplied renderer for markdown images. The module cannot load
- * workspace-relative image paths itself — the host app resolves them (for
- * example through a signed asset URL) and returns the element to show.
- * Returning null falls back to the module's plain remote-URI rendering.
- */
 export type MarkdownImageRenderer = (image: MarkdownImageRequest) => import("react").ReactNode;
 
 export interface MarkdownFileContextMenuAction {
@@ -77,7 +69,6 @@ export interface MarkdownFileContextMenu {
 
 export interface SelectableMarkdownTextProps {
   readonly markdown: string;
-  /** Opaque context payload supplied by the host for native selection copy. */
   readonly contextClipboardFragment?: string;
   readonly textStyle: NativeMarkdownTextStyle;
   readonly highlightCode: MarkdownCodeHighlighter;

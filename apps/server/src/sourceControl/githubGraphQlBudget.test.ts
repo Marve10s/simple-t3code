@@ -111,7 +111,6 @@ describe("GitHub GraphQL budget", () => {
       const query = "query { viewer { login } }";
       yield* budget.observe("github.com", rateLimit(512, 5_000, RESET_AT, 8));
       yield* budget.query("github.com", query);
-      // The admission reserved eight points, but the completed read only cost one.
       yield* budget.observe("github.com", rateLimit(511, 5_000, RESET_AT, 1));
 
       for (let count = 0; count < 4; count += 1) {

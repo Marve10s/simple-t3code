@@ -54,7 +54,6 @@ function memberKey(member: { environmentId: string; id: string }): string {
   return `${member.environmentId}:${member.id}`;
 }
 
-/** `project` is the Projects page shortcut: the new-thread defaults people change most. */
 export type ProjectSettingsCategory = "general" | "integrations" | "source-control" | "project";
 
 export function ProjectSettingsPanel({
@@ -81,8 +80,6 @@ export function ProjectSettingsPanel({
     [selected, environmentId, checkoutKey],
   );
 
-  // Remember the members of the last rendered group so a grouping-rule change
-  // (which changes the group key) can follow the project to its new group.
   const lastSelectionRef = useRef<{
     key: string;
     environmentId: EnvironmentId | null;
@@ -99,8 +96,6 @@ export function ProjectSettingsPanel({
     };
   }, [selected, members, environmentId, checkoutKey]);
 
-  // A grouping-rule change replaces the group key mid-visit; follow the
-  // project to its new key instead of parking on the not-found state.
   useEffect(() => {
     if (members.length > 0) return;
     const last = lastSelectionRef.current;
@@ -204,8 +199,6 @@ function ProjectDetail({
     );
   }, []);
 
-  // Group-shared fields live on each physical project record, so a
-  // group-level edit fans out to every member.
   const updateAllMembers = useCallback(
     async (
       input: Partial<{
@@ -236,8 +229,6 @@ function ProjectDetail({
           () => undefined,
         );
         if (result._tag === "Failure") {
-          // A partial fan-out is possible: earlier members already took the
-          // write. Name the environment so the user knows where it stopped.
           reportFailure(
             group.memberProjects.length > 1
               ? `${failureTitle} on ${member.environmentLabel ?? "the current environment"}`
@@ -273,7 +264,6 @@ function ProjectDetail({
     [group.memberProjects, updateAllMembers],
   );
 
-  // ----- project icon -----
   const [faviconPickerOpen, setFaviconPickerOpen] = useState(false);
   const [iconPickerOpen, setIconPickerOpen] = useState(false);
   const [isSavingFavicon, setIsSavingFavicon] = useState(false);

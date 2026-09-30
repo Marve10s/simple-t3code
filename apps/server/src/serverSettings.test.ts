@@ -44,7 +44,6 @@ const makeServerSettingsLayer = () =>
     ),
   );
 
-/** Like `makeServerSettingsLayer`, but also exposes the secret store for assertions. */
 const makeServerSettingsLayerWithSecrets = () =>
   ServerSettingsModule.layer.pipe(
     Layer.provideMerge(ServerSecretStore.layer),
@@ -331,7 +330,6 @@ it.layer(NodeServices.layer)("server settings", (it) => {
         });
         const change = Option.getOrUndefined(yield* Stream.runHead(changes));
         const raw = yield* fileSystem.readFileString(serverConfig.settingsPath);
-        // Inspect raw persisted JSON before schema decoding can apply defaults.
         // @effect-diagnostics-next-line preferSchemaOverJson:off
         const persisted = JSON.parse(raw) as Record<string, unknown>;
 
@@ -349,7 +347,6 @@ it.layer(NodeServices.layer)("server settings", (it) => {
     Effect.gen(function* () {
       const serverSettings = yield* ServerSettingsModule.ServerSettingsService;
 
-      // Start with Claude text generation selection
       yield* serverSettings.updateSettings({
         textGenerationModelSelection: {
           instanceId: ProviderInstanceId.make("claudeAgent"),
@@ -362,8 +359,6 @@ it.layer(NodeServices.layer)("server settings", (it) => {
         },
       });
 
-      // Switch to Codex — the stale Claude "effort" in options must not
-      // cause the update to lose the selected model.
       const next = yield* serverSettings.updateSettings({
         textGenerationModelSelection: {
           instanceId: ProviderInstanceId.make("codex"),
@@ -678,8 +673,6 @@ it.layer(NodeServices.layer)("server settings", (it) => {
       const serverConfig = yield* ServerConfig.ServerConfig;
       const fileSystem = yield* FileSystem.FileSystem;
       const serverSettings = yield* ServerSettingsModule.ServerSettingsService;
-      // The Providers UI writes providerInstances only, so the legacy providers
-      // map decodes to defaults where codex is enabled and listed first.
       yield* fileSystem.writeFileString(
         serverConfig.settingsPath,
         '{"providerInstances":{"codex":{"driver":"codex","enabled":false,"config":{}}}}',
@@ -872,8 +865,6 @@ it.layer(NodeServices.layer)("server settings", (it) => {
       const serverConfig = yield* ServerConfig.ServerConfig;
       const fileSystem = yield* FileSystem.FileSystem;
       const serverSettings = yield* ServerSettingsModule.ServerSettingsService;
-      // Old settings files can carry both flags with conflicting values.
-      // The explicit false must win so a user's disable sticks.
       yield* fileSystem.writeFileString(
         serverConfig.settingsPath,
         '{"providerInstances":{"grok":{"driver":"grok","enabled":true,"config":{"enabled":false}},"codex_work":{"driver":"codex","config":{"enabled":true,"homePath":"~/.codex"}},"cursor":{"driver":"cursor","config":{"enabled":"nope"}}}}',
@@ -888,14 +879,11 @@ it.layer(NodeServices.layer)("server settings", (it) => {
         enabled: false,
         config: {},
       });
-      // A lone in-config flag is lifted to the envelope and stripped.
       assert.deepEqual(settings.providerInstances[codexWorkId], {
         driver: ProviderDriverKind.make("codex"),
         enabled: true,
         config: { homePath: "~/.codex" },
       });
-      // A malformed flag is left alone so driver schema validation can
-      // surface it instead of the fold silently repairing the config.
       assert.deepEqual(settings.providerInstances[ProviderInstanceId.make("cursor")], {
         driver: ProviderDriverKind.make("cursor"),
         config: { enabled: "nope" },
@@ -964,7 +952,6 @@ it.layer(NodeServices.layer)("server settings", (it) => {
         autoCompactWindow: "",
       });
       assert.deepEqual(next.providers.opencode, {
-        // OpenCode is disabled by default; this update only touches paths.
         enabled: false,
         binaryPath: "/opt/homebrew/bin/opencode",
         serverUrl: "http://127.0.0.1:4096",
@@ -1322,7 +1309,6 @@ it.layer(NodeServices.layer)("server settings", (it) => {
         assert.isAbove(forClient.accessToken.length, 0);
         assert.isAbove(forClient.apiToken.length, 0);
 
-        // A client echoing the redacted values back, or omitting them, keeps the saved tokens.
         yield* serverSettings.updateSettings({ bitbucket: forClient });
         yield* serverSettings.updateSettings({ bitbucket: { email: "other@example.com" } });
         assert.deepEqual((yield* serverSettings.getSettings).bitbucket, {
@@ -1348,7 +1334,6 @@ it.layer(NodeServices.layer)("server settings", (it) => {
       const fileSystem = yield* FileSystem.FileSystem;
       const secrets = yield* ServerSecretStore.ServerSecretStore;
       const serverSettings = yield* ServerSettingsModule.ServerSettingsService;
-      // A token was saved, then the user deleted it from settings.json directly.
       yield* secrets.set("bitbucket-access-token", new TextEncoder().encode("stale-token"));
       yield* fileSystem.writeFileString(serverConfig.settingsPath, "{}");
 
@@ -1369,7 +1354,6 @@ it.layer(NodeServices.layer)("server settings", (it) => {
         '{"bitbucket":{"accessToken":"hand-edited-token"}}',
       );
 
-      // Loading alone moves it: no settings update is needed.
       const loaded = yield* serverSettings.getSettings;
 
       assert.equal(loaded.bitbucket.accessToken, "hand-edited-token");
@@ -1397,7 +1381,6 @@ it.layer(NodeServices.layer)("server settings", (it) => {
           '{"bitbucket":{"email":"me@example.com","apiToken":"hand-edited-token"}}',
         );
 
-        // The form resends the redacted token when only the email changes.
         const forClient = ServerSettingsModule.redactServerSettingsForClient(
           yield* serverSettings.getSettings,
         ).bitbucket;
@@ -1645,8 +1628,6 @@ it.layer(NodeServices.layer)("server settings", (it) => {
         Schema.fromJsonString(Schema.Array(ProjectScript)),
       )([script]);
       for (const [projectId, modelColumn, envMode, autoPull, scripts] of [
-        // The legacy project also carries aggregate scripts, but its stored
-        // null override reset them; the fold must not bring them back.
         [legacyProject, modelJson, "worktree", 1, scriptsJson],
         [scriptedProject, null, null, 0, scriptsJson],
       ] as const) {
@@ -1681,7 +1662,6 @@ it.layer(NodeServices.layer)("server settings", (it) => {
           [scriptedProject]: { defaultAutoPull: true, defaultProjectScripts: [script] },
         },
       );
-      // Derived legacy views keep older clients reading the same values.
       assert.deepEqual<ServerSettings["projectAutoPullOverrides"]>(
         settings.projectAutoPullOverrides,
         {
@@ -1693,7 +1673,6 @@ it.layer(NodeServices.layer)("server settings", (it) => {
         [scriptedProject]: [script],
       });
 
-      // A reset survives the next load: the fold does not run again.
       yield* serverSettings.updateSettings({
         projectSettingsOverrides: { [legacyProject]: null },
       });
@@ -1728,7 +1707,6 @@ it.layer(NodeServices.layer)("server settings", (it) => {
       const settings = yield* serverSettings.getSettings;
       assert.isFalse(settings.projectSettingsFolded);
       assert.deepEqual(settings.projectSettingsOverrides, {});
-      // The user's file is still there to repair; nothing was written over it.
       assert.equal(yield* fileSystem.readFileString(serverConfig.settingsPath), broken);
     }).pipe(Effect.provide(makeServerSettingsLayer())),
   );

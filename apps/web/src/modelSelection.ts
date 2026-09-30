@@ -37,22 +37,6 @@ const MAX_CUSTOM_MODEL_COUNT = 32;
 export const MAX_CUSTOM_MODEL_LENGTH = 256;
 const DEFAULT_TEXT_GENERATION_INSTANCE_ID = ProviderInstanceId.make("codex");
 
-/**
- * Resolve the custom-model list for a given instance, preferring the
- * instance's own `providerInstances[id].config.customModels` blob when
- * present and falling back to the legacy per-kind
- * `settings.providers[kind].customModels` bucket for default instances only.
- *
- * The Settings UI promotes the legacy bucket into an explicit
- * `providerInstances[defaultId]` entry on every edit (the "migrate on
- * first write" scheme documented in
- * `ProviderInstanceRegistryHydration`), so this helper exists primarily
- * so readers pick up that promotion immediately — and so first-time
- * viewers on pre-migration settings still see their legacy list on
- * default slots. Custom instances intentionally do not read the legacy
- * per-driver bucket; otherwise one custom model added to `claude_openrouter`
- * can appear on the stock `claudeAgent` instance.
- */
 function readInstanceCustomModels(
   settings: UnifiedSettings,
   instanceId: ProviderInstanceId,
@@ -103,8 +87,6 @@ function appendUnavailableDynamicModelSelection(
   if (!slug) return options;
   if (provider === "antigravity" && slug === ANTIGRAVITY_DEFAULT_MODEL) return options;
 
-  // A model that exists in the raw catalog can be absent from `options`
-  // because the user hid it. Keep that preference authoritative.
   if (resolveSelectableModel(provider, slug, rawModels) !== null) return options;
   if (hiddenModels.includes(slug)) return options;
   if (options.some((option) => option.slug === slug)) return options;
@@ -186,9 +168,6 @@ function getAppModelOptions(
   selectedModel?: string | null,
 ): AppModelOption[] {
   const rawModels = getProviderModels(providers, provider);
-  // Server-reported custom rows mirror settings and can lag a removal, so
-  // only built-ins are taken from the snapshot; custom rows are rebuilt from
-  // settings below.
   const options: AppModelOption[] = rawModels
     .filter((model) => !model.isCustom)
     .map(toAppModelOption);
@@ -199,10 +178,6 @@ function getAppModelOptions(
     ),
   );
 
-  // Read from the default instance's config first (that's where edits
-  // now land), falling back to the legacy per-kind bucket so unmigrated
-  // settings and the initial render before the first write both still
-  // see the user's authored custom models.
   const defaultInstanceId = defaultInstanceIdForDriver(provider);
   const customModels = readInstanceCustomModels(settings, defaultInstanceId, provider);
   for (const entry of normalizeCustomModelEntries(customModels, builtInModelSlugs)) {
@@ -224,19 +199,6 @@ function getAppModelOptions(
   );
 }
 
-/**
- * Instance-scoped variant of {@link getAppModelOptions}. Built-in models
- * come from the instance's own `entry.models` snapshot (rather than the
- * first-matching-kind fallback in `getProviderModels`), so each custom
- * instance gets the precise model list its driver reported. Custom model
- * slugs come from the instance's own `providerInstances[id].config.customModels`
- * when present, falling back to the legacy per-kind
- * `settings.providers[driverKind].customModels` bucket for default
- * instances only. This keeps two instances of the same kind from leaking
- * custom slugs into each other. Custom rows reported by the server are
- * ignored so a slug removed in Settings disappears without waiting for the
- * next provider probe.
- */
 export function getAppModelOptionsForInstance(
   settings: UnifiedSettings,
   entry: ProviderInstanceEntry,
@@ -324,11 +286,6 @@ export function resolveAppModelSelectionForInstance(
   return options.find((option) => option.isDefault)?.slug ?? options[0]?.slug ?? null;
 }
 
-/**
- * Instance-keyed model options map. Each configured instance gets its own
- * option list so the model picker can show the same driver's built-in and
- * custom instances side by side without collapsing them.
- */
 export function getCustomModelOptionsByInstance(
   settings: UnifiedSettings,
   providers: ReadonlyArray<ServerProvider>,
@@ -349,11 +306,6 @@ export function getCustomModelOptionsByInstance(
   return out;
 }
 
-/**
- * Drop the opencode "plan" agent option from a stored model selection.
- * Used when legacy plan mode is turned off so server-side text-generation
- * tasks (title, branch, PR) cannot keep dispatching the plan agent.
- */
 export function withoutPlanAgentSelection(
   selection: ModelSelection | null | undefined,
 ): ModelSelection | null | undefined {
@@ -369,10 +321,6 @@ export function withoutPlanAgentSelection(
   return createModelSelection(selection.instanceId, selection.model, options);
 }
 
-// The dropdown hides the opencode "plan" agent while legacy plan mode is off,
-// but the persisted text-generation selections are only healed when the toggle
-// flips. Users who already have plan mode off and a stored "plan" selection
-// never trip the toggle handler, so resolve the heal once per settings load.
 export function resolvePlanAgentHealPatch(input: {
   readonly planModeEnabled: boolean;
   readonly textGenerationModelSelection: ModelSelection | null | undefined;
@@ -412,8 +360,6 @@ export function resolveAppModelSelectionState(
   const entry =
     selectedEntry ?? entries.find((candidate) => candidate.enabled && candidate.isAvailable);
   if (entry) {
-    // When the instance changed due to fallback (e.g. selected instance was disabled),
-    // don't carry over the old instance's model — use the fallback instance's default.
     const selectedModel = selectedEntry ? selection.model : null;
     const model =
       resolveAppModelSelectionForInstance(

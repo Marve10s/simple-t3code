@@ -19,8 +19,6 @@ function CollapsibleTrigger({ className, ...props }: CollapsiblePrimitive.Trigge
 }
 
 function CollapsiblePanel({ className, ...props }: CollapsiblePrimitive.Panel.Props) {
-  // Reuses the local shadcn/Base UI panel; skip height travel for reduced motion.
-  // https://ui.shadcn.com/docs/components/base/collapsible
   return (
     <CollapsiblePrimitive.Panel
       className={cn(

@@ -86,9 +86,6 @@ export function DraftHeroHeadline({
       threads,
     ],
   );
-  // Same-named projects on two machines are only told apart by where they
-  // live, so rows on another machine carry its icon once the catalog spans
-  // more than one environment; a single-machine catalog stays as it was.
   const showProjectEnvironments = useMemo(
     () => projectGroupsSpanEnvironments(projectGroups),
     [projectGroups],
@@ -137,10 +134,6 @@ export function DraftHeroHeadline({
       <Tooltip>
         <TooltipTrigger
           render={
-            // The trigger's accessible name comes from its visible text (the
-            // project title) so the hero sentence reads naturally: an
-            // aria-label here would replace the title with an action phrase
-            // mid-sentence and baffle screen-reader users.
             <MenuTrigger
               render={<InlineButton tone="picker" />}
               className="pointer-events-auto max-w-64 align-baseline"
@@ -165,9 +158,6 @@ export function DraftHeroHeadline({
             if (!draftId) {
               return;
             }
-            // Project selection changes the target of the open draft in
-            // place. The prompt stays in the same composer session, so the
-            // sidebar only gets a draft row if the user later navigates away.
             const currentDraft = getComposerDraft(draftId);
             setLogicalProjectDraftThreadId(
               entry.group.projectKey,
@@ -231,10 +221,6 @@ export function DraftHeroHeadline({
     </button>
   );
 
-  // The composer hero is a sentence, so the heading's accessible name must be
-  // a complete sentence too. The project picker is a control rendered inline
-  // in the h1; without an explicit label its widget state bleeds into the
-  // announced phrase.
   const headingLabel = hasResolvedProject
     ? `What should we build in ${activeProjectDisplayName}?`
     : canChooseProject

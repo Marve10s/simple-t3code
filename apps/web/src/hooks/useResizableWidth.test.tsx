@@ -103,7 +103,6 @@ describe("panel resize cleanup", () => {
       });
       await act(() => frame?.(0));
       expect(result.width).toBe(450);
-      // Queue another move to check that interruption cancels pending work too.
       await act(() => result.handlers.onPointerMove(pointer(25)));
       expect(style.cursor).toBe("col-resize");
       expect(style.userSelect).toBe("none");

@@ -361,12 +361,8 @@ describe("RelayEnvironmentDiscovery", () => {
           );
         }
 
-        // Let the scoped wakeup subscription start before emitting, mirroring
-        // a real sign-in which always happens long after service start.
         yield* Effect.yieldNow;
 
-        // Sign-in activates the session and emits credentials-changed; the
-        // list must populate without any screen having asked for a refresh.
         yield* harness.wake("credentials-changed");
         const populated = yield* SubscriptionRef.changes(discovery.state).pipe(
           Stream.filter(

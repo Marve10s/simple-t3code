@@ -20,7 +20,6 @@ const rates: RateTable = new Map([
 function record(overrides: Partial<UsageRecord> = {}): UsageRecord {
   return {
     provider: "claude",
-    // 2026-08-07T04:05Z is still Aug 6 in Los Angeles.
     timestampMs: Date.parse("2026-08-07T04:05:13.944Z"),
     model: "claude-fable-5",
     sessionId: "session-a",
@@ -153,7 +152,6 @@ describe("UsageAggregator", () => {
   it("prices against the rate table", () => {
     const result = aggregate([record()]);
 
-    // 100*1e-5 + 1000*1e-6 + 10*1.25e-5 + 50*5e-5
     expect(result.buckets[0]?.costUsd).toBeCloseTo(0.004625, 9);
     expect(result.buckets[0]?.costSource).toBe("modelPriced");
   });

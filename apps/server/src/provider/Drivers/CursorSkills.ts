@@ -1,13 +1,3 @@
-/**
- * CursorSkills — workspace-aware discovery and native invocation for Cursor.
- *
- * Cursor discovers Agent Skills recursively from user and project roots but
- * its ACP command catalog only appears after opening a real session. Scanning
- * the same roots avoids starting an agent and its MCP servers just to populate
- * a composer menu.
- *
- * @module provider/Drivers/CursorSkills
- */
 import * as NodeOS from "node:os";
 
 import type { ServerProviderSkill } from "@t3tools/contracts";
@@ -153,9 +143,6 @@ const discoverSkillsInRoot = Effect.fn("discoverCursorSkillsInRoot")(function* (
       return;
     }
     visitedDirectories.add(resolvedDirectory);
-    // A symlink whose target lives outside the root is a skill package
-    // boundary: read its own SKILL.md so linked skill libraries show up, but
-    // never walk the target tree.
     const insideRoot =
       resolvedDirectory === rootDirectory ||
       resolvedDirectory.startsWith(`${rootDirectory}${path.sep}`);
@@ -275,7 +262,6 @@ export const probeCursorSkills = Effect.fn("probeCursorSkills")(function* (
   return inspection.skills;
 });
 
-/** Cursor invokes Agent Skills with `/name`; T3 composers insert `$name`. */
 export function hasCursorSkillMention(prompt: string): boolean {
   return HAS_SKILL_MENTION_PATTERN.test(prompt);
 }

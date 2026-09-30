@@ -32,7 +32,6 @@ type DevicePreviewRouteScreenProps = StaticScreenProps<{
   readonly threadId: string;
 }>;
 
-/** The nested native stack supplies the navigation bar inside the modal. */
 export function DevicePreviewRouteScreen({ route }: DevicePreviewRouteScreenProps) {
   const navigation = useNavigation();
   const onClose = useCallback(() => navigation.goBack(), [navigation]);

@@ -1,14 +1,3 @@
-/**
- * ProviderServiceLive - Cross-provider orchestration layer.
- *
- * Routes validated transport/API calls to provider adapters through
- * `ProviderAdapterRegistry` and `ProviderSessionDirectory`, and exposes a
- * unified provider event stream for subscribers.
- *
- * It does not implement provider protocol details (adapter concern).
- *
- * @module ProviderServiceLive
- */
 import {
   EventId,
   MessageId,
@@ -229,7 +218,6 @@ function compactAccessibilityForPrompt(
   };
 }
 
-/** How long a manual context compaction may run before ProviderService gives up on it. */
 const COMPACTION_COMPLETION_TIMEOUT = "10 minutes";
 
 interface PendingCompaction {
@@ -242,19 +230,8 @@ interface PendingCompaction {
   expectedTurnId: TurnId | undefined;
 }
 
-/**
- * Hook for tests that want to override the canonical event logger pulled
- * from `ProviderEventLoggers`. Production wiring leaves this undefined and
- * reads the logger off the tag.
- */
 export interface ProviderServiceLiveOptions {
   readonly canonicalEventLogger?: EventNdjsonLogger;
-  /**
-   * Overrides MCP credential issuance. The real issuer reads a module-global
-   * registry that only a running MCP server installs, which makes the
-   * agent-browser-access gate unobservable from a unit test; this seam lets a
-   * test see whether a credential was requested at all.
-   */
   readonly issueMcpCredential?: typeof McpSessionRegistry.issueActiveMcpCredential;
 }
 
@@ -428,7 +405,6 @@ function readPersistedCwd(
   return trimmed.length > 0 ? trimmed : undefined;
 }
 
-/** Stopped rows with no active turn are settled; shutdown leaves them untouched. */
 function isSettledBinding(binding: ProviderSessionDirectory.ProviderRuntimeBinding): boolean {
   if (binding.status !== "stopped") return false;
   const payload = binding.runtimePayload;
@@ -479,10 +455,6 @@ const makeProviderService = Effect.fn("makeProviderService")(function* (
   const analytics = yield* Effect.service(AnalyticsService.AnalyticsService);
   const serverConfig = yield* ServerConfig.ServerConfig;
   const eventLoggers = yield* ProviderEventLoggers.ProviderEventLoggers;
-  // Options-provided logger wins (test overrides); otherwise we take whatever
-  // the `ProviderEventLoggers` tag exposes — `undefined` means "no canonical
-  // log writer is attached", which downstream code already handles as a
-  // no-op.
   const canonicalEventLogger = options?.canonicalEventLogger ?? eventLoggers.canonical;
 
   const registry = yield* ProviderAdapterRegistry.ProviderAdapterRegistry;
@@ -754,11 +726,6 @@ const makeProviderService = Effect.fn("makeProviderService")(function* (
         activeByTurnId: new Map(),
         deferredCompletionsByTurnId: new Map(),
       };
-      // A start never binds send metadata on its own. Claude can start a
-      // synthetic turn for leftover agent output while sendTurn is still
-      // preparing the real turn, so only the adapter's sendTurn response
-      // links a request to its turn. Completions that land before that
-      // response wait in deferredCompletionsByTurnId.
       const current = session.activeByTurnId.get(String(event.turnId));
       const metadata: TurnAnalyticsMetadata = {
         ...(current?.metadata ?? {
@@ -882,16 +849,6 @@ const makeProviderService = Effect.fn("makeProviderService")(function* (
     });
     yield* recordCompletedTurnProperties(properties);
   });
-  /**
-   * Whether the credential minted below may drive the user's browser.
-   *
-   * Deny on an unreadable settings file rather than letting the read failure
-   * escape: adding `ServerSettingsError` to `ProviderServiceError` would widen
-   * a union every caller handles, for a branch that only decides whether one
-   * optional toolset is attached. Denying is the safe direction — an explicit
-   * "off" silently becoming "on" would violate the user's stated choice,
-   * whereas the reverse costs an agent one toolset and is visible immediately.
-   */
   const agentAccessSettings = Effect.fn("ProviderService.agentAccessSettings")(
     function* (threadId: ThreadId) {
       const settings = yield* serverSettings.getSettings;
@@ -905,9 +862,6 @@ const makeProviderService = Effect.fn("makeProviderService")(function* (
         device: settings.enableAgentDeviceAccess,
       };
       if (!browserOverridden && !deviceOverridden) return environment;
-      // Provider-only runtimes may omit orchestration. An unresolved project
-      // must not bypass an explicit project override, but a capability no
-      // project overrides keeps its environment value.
       const denied = {
         browser: browserOverridden ? false : environment.browser,
         device: deviceOverridden ? false : environment.device,
@@ -939,7 +893,6 @@ const makeProviderService = Effect.fn("makeProviderService")(function* (
     return capabilities;
   });
 
-  /** Install only the local CLI here. device_open supplies a separate config for each host. */
   const hostPlatform = yield* HostProcessPlatform;
   const agentDeviceEnvironment = Effect.gen(function* () {
     const devices = yield* Effect.serviceOption(DeviceService.DeviceService);
@@ -1127,8 +1080,6 @@ const makeProviderService = Effect.fn("makeProviderService")(function* (
       ) {
         yield* recordTurnCompletedAnalytics(source, canonicalEvent);
         if (source.provider === "claudeAgent") {
-          // Background Claude turns have no sendTurn response to persist their
-          // new native boundary. Save it before clients can checkpoint the turn.
           yield* Effect.gen(function* () {
             const adapter = yield* registry.getByInstance(source.instanceId);
             const session = (yield* adapter.listSessions()).find(
@@ -1195,14 +1146,6 @@ const makeProviderService = Effect.fn("makeProviderService")(function* (
       yield* processFallbackCompactionEvent(pendingCompaction, canonicalEvent);
     });
 
-  // `subscribedAdapters` is our source-of-truth for "which instance adapters
-  // are currently wired into the runtime event bus". It both tracks the set
-  // of live subscriptions (so `reconcileInstanceSubscriptions` can diff and
-  // fork only the *new* or *rebuilt* ones) and serves as the dynamic adapter
-  // list consumed by `stopStaleSessionsForThread`, `listSessions`, and
-  // `runStopAll` — replacing the pre-Slice-D startup snapshot so hot-added
-  // instances become visible to those call sites as soon as settings edits
-  // land.
   const subscribedAdapters = yield* Ref.make(
     new Map<ProviderInstanceId, ProviderAdapterShape<ProviderAdapterError>>(),
   );
@@ -1211,12 +1154,6 @@ const makeProviderService = Effect.fn("makeProviderService")(function* (
     Effect.map((map) => Array.from(map.entries())),
   );
 
-  // Rebuild the map of id → adapter from the registry and fork a new event
-  // subscription for every instance that is either brand new or whose adapter
-  // identity changed (indicating the underlying `ProviderInstance` was torn
-  // down and rebuilt by `ProviderInstanceRegistry.reconcile`). Orphaned
-  // fibers for removed/replaced instances exit on their own because their
-  // adapter's `streamEvents` source terminates when the old scope closes.
   const reconcileInstanceSubscriptions = Effect.gen(function* () {
     const previous = yield* Ref.get(subscribedAdapters);
     const currentIds = yield* registry.listInstances();
@@ -1511,11 +1448,6 @@ const makeProviderService = Effect.fn("makeProviderService")(function* (
           "provider.cwd.effective": effectiveCwd ?? "",
         });
         if (effectiveCwd !== undefined) {
-          // Fail fast with an actionable error when the workspace folder is
-          // gone (e.g. moved, deleted, or replaced by a plain file).
-          // Otherwise every adapter surfaces this as a misleading "failed to
-          // spawn <binary>" process error. Stat failures other than "missing"
-          // fall through to the adapter.
           const workspaceIsDirectory = yield* fileSystem.stat(effectiveCwd).pipe(
             Effect.map((workspaceStat) => workspaceStat.type === "Directory"),
             Effect.catch((statError) => Effect.succeed(statError.reason._tag !== "NotFound")),
@@ -1566,10 +1498,6 @@ const makeProviderService = Effect.fn("makeProviderService")(function* (
         });
         timedOutNativeCompactions.delete(threadId);
 
-        // Changing runtime mode restarts the session, so the transition is only
-        // observable here, by diffing against the mode the previous session for
-        // this thread was bound to. Recording it separately is what makes the
-        // "started supervised, switched to full access" funnel answerable.
         const previousRuntimeMode = persistedBinding?.runtimeMode;
         if (previousRuntimeMode !== undefined && previousRuntimeMode !== input.runtimeMode) {
           yield* analytics.record("provider.runtime_mode.changed", {
@@ -1617,13 +1545,6 @@ const makeProviderService = Effect.fn("makeProviderService")(function* (
       });
     }
 
-    // Every attachment gets an on-disk path in the prompt so the model's tools
-    // can dereference the actual file. All attachments then go to the adapter,
-    // and each adapter decides what its provider ingests natively. Folded
-    // clipboard text remains path-only everywhere: eagerly embedding it would
-    // spend the same context the client deliberately preserved by folding it.
-    // Unresolvable ids are skipped here and surface as adapter errors when the
-    // file is read.
     let inputTextWithAttachmentContext = inputTextWithCitations;
     const appendAttachmentContext = (context: string | undefined) => {
       if (context === undefined) return true;
@@ -1652,8 +1573,6 @@ const makeProviderService = Effect.fn("makeProviderService")(function* (
             ? `[Pasted text "${attachment.name}" is saved at: ${attachmentPath}. Inspect it as needed.]`
             : `[Attached ${attachment.type} "${attachment.name}" is saved at: ${attachmentPath}]`,
       );
-      // Most adapters see generic files only through this path line, so a file
-      // without one would be silently dropped. Images still go natively.
       if (!appended && attachment.type === "file") {
         return yield* toValidationError(
           "ProviderService.sendTurn",
@@ -1741,11 +1660,6 @@ const makeProviderService = Effect.fn("makeProviderService")(function* (
         "provider.kind": routed.adapter.provider,
         ...(input.modelSelection?.model ? { "provider.model": input.modelSelection.model } : {}),
       });
-      // A turn is the clearest sign a session is still alive. The MCP
-      // credential is minted once at session start and cannot be rotated into
-      // an already-spawned agent process, so we keep the existing token valid
-      // rather than issuing a new one: sessions that go a long time between
-      // browser tool calls used to lose the toolkit outright.
       yield* McpSessionRegistry.touchActiveMcpThread(input.threadId);
       const analyticsModelSelection =
         input.modelSelection?.instanceId === routed.instanceId ? input.modelSelection : undefined;
@@ -1801,7 +1715,6 @@ const makeProviderService = Effect.fn("makeProviderService")(function* (
         runtimePayload: {
           ...(input.modelSelection !== undefined ? { modelSelection: input.modelSelection } : {}),
           activeTurnId: turn.turnId,
-          // Admission and marker consumption must survive the same restart.
           continueAfterServerUpdate: null,
           continueAfterServerUpdatePrepared: null,
           lastRuntimeEvent: "provider.sendTurn",
@@ -1813,9 +1726,6 @@ const makeProviderService = Effect.fn("makeProviderService")(function* (
         ...(subscriptionSharing ? { subscriptionSharing: true } : {}),
         model: input.modelSelection?.model,
         interactionMode: input.interactionMode,
-        // Session-start events alone skew runtime mode toward users who toggle
-        // often, since every toggle restarts the session. Recording it per turn
-        // gives a usage-weighted view and lets it cross with interactionMode.
         runtimeMode: routed.runtimeMode,
         attachmentCount: attachments.length,
         hasInput: typeof input.input === "string" && input.input.trim().length > 0,
@@ -2153,9 +2063,6 @@ const makeProviderService = Effect.fn("makeProviderService")(function* (
         ),
       );
       const activeSessions = sessionsByProvider.flatMap((sessions) => sessions);
-      // Only live adapter sessions appear in this response. Resolving every
-      // historical binding here makes each call scale with the full thread
-      // history instead of the active session set.
       const persistedBindings = yield* Effect.forEach(
         [...new Set(activeSessions.map((session) => session.threadId))],
         (threadId) =>
@@ -2340,8 +2247,6 @@ const makeProviderService = Effect.fn("makeProviderService")(function* (
   );
 
   const runStopAll = Effect.fn("runStopAll")(function* () {
-    // Continuation is project-scopable, so decide it per session's project;
-    // without orchestration the environment value is all there is.
     const stopSettings = yield* serverSettings.getSettings.pipe(
       Effect.asSome,
       Effect.orElseSucceed(() => Option.none<ServerSettingsValue>()),
@@ -2406,8 +2311,6 @@ const makeProviderService = Effect.fn("makeProviderService")(function* (
     yield* Effect.forEach(currentAdapters, ([, adapter]) => adapter.stopAll()).pipe(Effect.asVoid);
     yield* McpSessionRegistry.revokeAllActiveMcpCredentials();
     McpProviderSession.clearAllMcpProviderSessions();
-    // Stopped rows stay for their resume cursors, so long-lived installs hold
-    // thousands. Only rewrite the ones this shutdown actually stops.
     const bindings = yield* directory.listBindings().pipe(
       Effect.map((all) => all.filter((binding) => !isSettledBinding(binding))),
       Effect.orElseSucceed(() => []),
@@ -2431,8 +2334,6 @@ const makeProviderService = Effect.fn("makeProviderService")(function* (
         });
       }),
     ).pipe(Effect.asVoid);
-    // Not `sessionCount`: that older property counted every row, so a new name
-    // keeps the two meanings in separate series.
     yield* analytics.record("provider.sessions.stopped_all", {
       stoppedSessionCount: bindings.length,
     });
@@ -2463,9 +2364,6 @@ const makeProviderService = Effect.fn("makeProviderService")(function* (
     assertConversationRollbackSupported,
     rollbackConversation,
     uploadFeedback,
-    // Each access creates a fresh PubSub subscription so that multiple
-    // consumers (ProviderRuntimeIngestion, CheckpointReactor, etc.) each
-    // independently receive all runtime events.
     get streamEvents(): ProviderServiceMethod<"streamEvents"> {
       return Stream.fromPubSub(runtimeEventPubSub);
     },

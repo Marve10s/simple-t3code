@@ -276,8 +276,6 @@ export function projectQuestionToolInput(data: Record<string, unknown>, title: u
   );
   const questions = input?.questions ?? asRecord(input?.params)?.questions;
   if (!Array.isArray(questions)) return {};
-  // Clients match native tools to the canonical question; choices and answers
-  // already live on the user-input activities and need not cross the wire twice.
   return {
     toolName,
     input: {

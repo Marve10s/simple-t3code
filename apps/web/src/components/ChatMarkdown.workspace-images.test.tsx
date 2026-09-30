@@ -216,7 +216,6 @@ describe("ChatMarkdown workspace images", () => {
       "![remote](https://example.com/badge.svg) ![workspace](.t3/workspace-image.svg)",
     );
 
-    // Two images in one paragraph are badges: neither reserves a slot.
     expect(html).not.toContain("aspect-video");
     expect(html).toContain('src="https://example.com/badge.svg"');
     expect(html).toContain('src="https://signed.test/workspace-image.svg"');
@@ -248,7 +247,6 @@ describe("ChatMarkdown workspace images", () => {
   it("keeps an authored id on a remote image so fragment links resolve", () => {
     const html = render('<img id="diagram" src="https://example.com/diagram.png" alt="diagram">');
 
-    // The sanitizer prefixes authored ids; the loading slot carries it too.
     expect(html).toContain('<span id="user-content-diagram"');
   });
 
@@ -367,7 +365,6 @@ describe("ChatMarkdown workspace images", () => {
     expect(frameClassName(loadingBytes)).toEqual(loadingUrl);
     expect(frameClassName(failure)).toEqual(loadingUrl);
     expect(failure).toContain("Image unavailable");
-    // The bytes are requested inside the frame but never paint at an unknown size.
     expect(loadingBytes).toMatch(/<img[^>]*src="https:\/\/signed[^>]*class="invisible/);
     expect(loadingBytes).not.toContain('loading="lazy"');
   });

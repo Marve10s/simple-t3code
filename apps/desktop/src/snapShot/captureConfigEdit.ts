@@ -187,8 +187,6 @@ export function editCaptureConfig(
       after += `${after && !after.endsWith("\n") ? newline : ""}${newline}binds {${newline}    ${binding}${newline}}${newline}`;
     readKdlNodes(after);
   } else {
-    // Do not append executable Lua inside a block/string, or after an early return.
-    // The normal Omarchy binding file is a sequence of top-level hl.bind calls.
     after += `${after && !after.endsWith("\n") ? newline : ""}${newline}${binding}${newline}`;
   }
   return { after, shortcut: keys };

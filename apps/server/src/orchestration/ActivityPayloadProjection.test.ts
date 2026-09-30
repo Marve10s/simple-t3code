@@ -14,12 +14,6 @@ function activity(payload: Record<string, unknown>): OrchestrationThreadActivity
   } as unknown as OrchestrationThreadActivity;
 }
 
-/**
- * Wire-survival regression: the slimming pass rewrites payload.data but must
- * never strip the top-level per-agent fields the subagent fold depends on.
- * If slimming ever moves to an allowlist over the whole payload, these
- * assertions are the tripwire.
- */
 describe("projectActivityPayload", () => {
   it("preserves tool attribution (agentId/parentToolUseId) through data slimming", () => {
     const projected = projectActivityPayload(
@@ -39,7 +33,6 @@ describe("projectActivityPayload", () => {
     const payload = projected.payload as Record<string, unknown>;
     expect(payload.agentId).toBe("task-123");
     expect(payload.parentToolUseId).toBe("toolu_abc");
-    // Slimming itself still applies to data.
     const data = payload.data as Record<string, unknown>;
     expect(data.somethingClientNeverReads).toBeUndefined();
   });

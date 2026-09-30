@@ -55,7 +55,6 @@ export function selectFaviconCandidates(candidates: ReadonlyArray<string>): Read
   const seen = new Set<string>();
   let inputUnits = 0;
   for (const candidate of candidates) {
-    // Charge a minimum per entry so a large array of tiny malformed values is bounded too.
     inputUnits += Math.max(MIN_FAVICON_CANDIDATE_INPUT_UNITS, candidate.length);
     if (inputUnits > MAX_FAVICON_CANDIDATE_INPUT_UNITS) break;
     if (!isSupportedFaviconUrl(candidate) || seen.has(candidate)) continue;
@@ -356,7 +355,6 @@ function jpegExifMetadata(segment: Buffer): JpegExifMetadata | null {
   };
   const relativeIfdOffset = readUInt32(tiffOffset + 4);
   if (relativeIfdOffset === null) return metadataWithoutOrientation();
-  // Keep untrusted metadata parsing linear even when IFD pointers overlap.
   let remainingIfdEntryVisits = Math.ceil(segment.byteLength / 12);
   const budgetExhausted = Symbol("ifd-entry-budget-exhausted");
   type IfdOrientation = number | null | typeof budgetExhausted;
@@ -636,8 +634,6 @@ async function rasterizeFavicon(
   ]);
 
   const result = new Promise<RasterizationResult>((resolve, reject) => {
-    // Electron cannot cancel isolated-world execution. This timeout ends only
-    // the logical attempt; renderer work may finish after a newer attempt starts.
     const timeout = AbortSignal.timeout(FAVICON_RASTER_TIMEOUT_MS);
     let settled = false;
     const finish = (complete: () => void) => {
@@ -665,8 +661,6 @@ async function rasterizeFavicon(
     );
     if (signal.aborted) onAbort();
   });
-  // The logical timeout does not cancel Electron's renderer work. Keep the
-  // gate closed until that physical execution actually settles.
   const launchAllowed = execution.then(
     () => undefined,
     () => undefined,

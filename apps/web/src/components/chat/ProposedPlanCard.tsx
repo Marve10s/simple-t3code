@@ -150,8 +150,6 @@ export const ProposedPlanCard = memo(function ProposedPlanCard({
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex min-w-0 items-center gap-2">
           <Badge variant="secondary">Plan</Badge>
-          {/* Same heading level as the message author headings in the timeline,
-              so a plan's own headings nest beneath it in the outline. */}
           <h3 className="truncate text-sm font-medium text-foreground">{title}</h3>
         </div>
         <Menu>

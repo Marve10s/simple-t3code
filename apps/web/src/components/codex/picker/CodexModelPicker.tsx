@@ -22,11 +22,6 @@ import "./codexPicker.css";
 
 type UpstreamPickerProps = ComponentProps<typeof ProviderModelPicker>;
 
-/**
- * The composer's model picker, after Synara's original design: model, effort,
- * fast mode and the other model options in one control. While several models
- * are selected at once, upstream's picker takes over.
- */
 export function CodexModelPicker(
   props: UpstreamPickerProps & {
     traits: CodexPickerTraits | null;

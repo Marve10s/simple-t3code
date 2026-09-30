@@ -1,12 +1,3 @@
-/**
- * Thread-scoped right-panel surface state.
- *
- * This is intentionally a shallow workspace model: it owns an ordered set of
- * surface descriptors and the active surface, while each feature continues to
- * own its durable resource state. Browser surfaces point at preview tab ids,
- * terminal surfaces point at terminal session ids, file surfaces point at
- * workspace paths, and diff/files remain singleton surfaces.
- */
 import { scopedThreadKey, scopeThreadRef } from "@t3tools/client-runtime/environment";
 import {
   EnvironmentId,
@@ -56,26 +47,14 @@ export type RightPanelSurface =
   | {
       id: `file:${string}` | `attachment:${string}`;
       kind: "file";
-      /** Workspace-relative, or absolute for a host file outside the workspace. */
       relativePath: string;
       revealLine: number | null;
       revealRequestId: number;
-      /** Present when the file lives in the thread's attachment store rather
-          than at a workspace or host path. */
       attachment?: ChatFileAttachment;
     }
   | {
-      /**
-       * A change request opened beside a thread or in the pull-request list's shared panel.
-       * The reference lives in the id so several pull requests can remain open as peer tabs.
-       */
       id: `pull-request:${string}`;
       kind: "pull-request";
-      /**
-       * Which server the change request was read from. The list spans every connected one, so
-       * two of them can hold the same project id; a panel beside a thread leaves this out and
-       * takes the environment from its own ref.
-       */
       environmentId?: string;
       projectId: string;
       host?: string;
@@ -83,27 +62,17 @@ export type RightPanelSurface =
       number: number;
       url?: string;
     }
-  /** The thread's linked pull requests, one singleton tab beside any number of `pull-request` tabs. */
   | { id: "pull-requests"; kind: "pull-requests" }
   | { id: "agents"; kind: "agents" };
 
 const RIGHT_PANEL_STORAGE_KEY = "t3code:right-panel-state:v2";
-// v9 removed the "plan" surface kind (plans render inline in the transcript).
-// v10 keys pull-request surfaces by reference instead of a singleton tab.
-// v11 stops persisting the pull-request list's shared panel, so a restart opens the page fresh.
-// v12 adds the device surface.
 const RIGHT_PANEL_STORAGE_VERSION = 13;
 
-/** A fixed workspace-level ref: each PR surface carries its own real environment. */
 export const PULL_REQUESTS_PANEL_REF = scopeThreadRef(
   EnvironmentId.make("pull-requests-panel"),
   ThreadId.make("pull-requests-panel"),
 );
 
-/**
- * The pull-request list's shared panel is session
- * state: reopening the app should show the list, not last session's tabs and detail fetches.
- */
 const isPullRequestsPanelKey = (threadKey: string) => threadKey.endsWith(":pull-requests-panel");
 
 export interface ThreadRightPanelState {
@@ -115,13 +84,8 @@ export interface ThreadRightPanelState {
 
 interface RightPanelStoreState {
   byThreadKey: Record<string, ThreadRightPanelState>;
-  /** Session-only count of user panel choices per thread. Automatic updates do not advance it. */
   userActionRevisionByThreadKey: Record<string, number>;
   getUserActionRevision: (ref: ScopedThreadRef) => number;
-  /**
-   * Open a surface on behalf of the app, not the user. Refused when the user
-   * made a panel choice after `expectedUserActionRevision` was read.
-   */
   openProactive: (
     ref: ScopedThreadRef,
     surface: Extract<RightPanelSurface, { kind: "diff" | "pull-request" | "pull-requests" }>,
@@ -239,8 +203,6 @@ export function pullRequestSurfaceId(target: {
   repository: string;
   number: number;
 }): PullRequestSurface["id"] {
-  // The environment leads the id where there is one, so the same change request read from two
-  // servers is two tabs rather than one tab that changes its mind about which server it is on.
   const scope =
     target.environmentId === undefined ? "" : `${encodeURIComponent(target.environmentId)}:`;
   const host = target.host === undefined ? "" : `${encodeURIComponent(target.host.toLowerCase())}:`;
@@ -300,9 +262,6 @@ const updateThread = (
   return { ...byThreadKey, [threadKey]: next };
 };
 
-// Every store action is a user choice unless it goes through `automaticUpdate`.
-// Only `openProactive` and resource reconciliation are automatic, so a new
-// action counts as a user choice by default.
 const automaticUpdate = (
   state: RightPanelStoreState,
   threadKey: string,
@@ -364,8 +323,6 @@ export function migratePersistedRightPanelState(persistedState: unknown): {
                 threadState && typeof threadState === "object" ? threadState : null;
               const surfaces = Array.isArray(validThreadState?.surfaces)
                 ? validThreadState.surfaces.flatMap<RightPanelSurface>((surface) => {
-                    // Dropped surface kind: plans now render inline in the
-                    // transcript (v9).
                     if ((surface as { kind?: string }).kind === "plan") return [];
                     if (surface.kind === "file") {
                       const revealLine =
@@ -392,7 +349,6 @@ export function migratePersistedRightPanelState(persistedState: unknown): {
                         return [];
                       }
                       const { environmentId, ...rest } = surface;
-                      // Anything else stored under that name is not an environment.
                       return [
                         pullRequestSurface({
                           ...rest,
@@ -442,16 +398,11 @@ export function migratePersistedRightPanelState(persistedState: unknown): {
                 : rawActiveSurfaceId === "pull-request"
                   ? (surfaces.find((surface) => surface.kind === "pull-request")?.id ?? null)
                   : null;
-              // A migration that dropped every surface (e.g. plan-only panels
-              // in v9) must not reopen an empty panel.
               const isOpen =
                 surfaces.length > 0 &&
                 (typeof validThreadState?.isOpen === "boolean"
                   ? validThreadState.isOpen
                   : persistedActiveSurfaceId !== null);
-              // An open panel needs an active surface: if migration dropped
-              // the persisted one (e.g. plan was active), fall back to the
-              // first survivor instead of rendering an open empty panel.
               const activeSurfaceId =
                 persistedActiveSurfaceId ?? (isOpen ? (surfaces[0]?.id ?? null) : null);
               return [
@@ -492,8 +443,6 @@ export const useRightPanelStore = create<RightPanelStoreState>()(
           ) {
             return state;
           }
-          // A linked PR takes priority over a completed-turn diff. Manual actions
-          // always apply, and later user choices reject both proactive requests.
           if (
             surface.kind === "diff" &&
             (selectActiveRightPanel(state.byThreadKey, ref) === "pull-request" ||
@@ -581,7 +530,6 @@ export const useRightPanelStore = create<RightPanelStoreState>()(
             if (requestedPath === ".") {
               return upsertSurface(current, singletonSurface("files"));
             }
-            // Workspace entry paths use '/', including on Windows.
             const relativePath = /^[A-Za-z]:\/+$/.test(requestedPath)
               ? requestedPath
               : requestedPath.replace(/\/+$/, "") || requestedPath;
@@ -909,7 +857,6 @@ export function selectActiveRightPanelSurface(
   return selectSelectedRightPanelSurface(byThreadKey, ref);
 }
 
-/** The selected surface even while the panel is hidden, so a layout control can restore it. */
 export function selectSelectedRightPanelSurface(
   byThreadKey: Record<string, ThreadRightPanelState>,
   ref: ScopedThreadRef | null | undefined,

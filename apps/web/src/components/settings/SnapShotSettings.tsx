@@ -130,7 +130,6 @@ export function SnapShotSettings() {
           wizard &&
           (action === "allow-screen-recording" || action === "allow-accessibility")
         ) {
-          // macOS can quit the app from its permission prompt.
           saveSnapShotSetupResume(wizard.wasEnabled);
         }
         await bridge.setupSnapShot(action);
@@ -289,12 +288,8 @@ export function SnapShotSettings() {
       if (!current) return;
       if (current.macPermissions) requested = "access";
       if (!settings.snapShotEnabled && captureSetupInitialStep(current, requested) !== "access") {
-        // Opening setup is the opt-in. Restore registration before resuming a
-        // later step, just as Continue does on the access step.
         current = await save({ snapShotEnabled: true });
         if (!current) {
-          // A settings write can succeed even if the following status check
-          // fails. Keep Finish later available to turn capture back off.
           setWizard({ initialStep: "access", wasEnabled: false });
           return;
         }

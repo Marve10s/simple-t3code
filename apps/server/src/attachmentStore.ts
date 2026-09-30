@@ -42,8 +42,6 @@ export function toSafeThreadAttachmentSegment(threadId: string): string | null {
 
 export function attachmentFileExtension(fileName: string): string {
   const extension = NodePath.extname(fileName).toLowerCase();
-  // ".part" is reserved for in-flight uploads; a stored "archive.part" would
-  // look stale to sweepStalePendingAttachments and get deleted.
   if (extension === ".part" || !/^\.[a-z0-9]{1,10}$/.test(extension)) {
     return ".bin";
   }
@@ -100,7 +98,6 @@ export function parseThreadSegmentFromAttachmentId(attachmentId: string): string
   return match[1]?.toLowerCase() ?? null;
 }
 
-/** Null for attachment types this build does not know; callers skip those. */
 export function attachmentRelativePath(attachment: ChatAttachment): string | null {
   switch (attachment.type) {
     case "image": {

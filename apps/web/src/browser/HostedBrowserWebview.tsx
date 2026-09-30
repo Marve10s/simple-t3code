@@ -50,10 +50,6 @@ export function HostedBrowserWebview(props: {
   readonly initialUrl: string | null;
   readonly viewport: PreviewViewportSetting;
   readonly pictureInPicture: boolean;
-  /**
-   * Fixed for the tab's lifetime: Electron only honours `partition` before the
-   * guest attaches, so a live change here would not move the tab anyway.
-   */
   readonly profileId: string | undefined;
   readonly zoomFactor: number;
 }) {
@@ -129,18 +125,13 @@ export function HostedBrowserWebview(props: {
       if (!lease) return;
       void (async () => {
         try {
-          // The main-process tab and the DOM webview are created by separate
-          // effects. Wait for the former so registration cannot race and fail
-          // with PreviewTabNotFoundError on a fast about:blank attachment.
           await lease.ready;
           if (disposed || webviewRef.current !== webview) return;
           const webContentsId = webview.getWebContentsId();
           if (Number.isInteger(webContentsId) && webContentsId > 0) {
             await bridge.registerWebview(runtimeTabId, webContentsId);
           }
-        } catch {
-          // did-attach/dom-ready will retry if the guest was not ready yet.
-        }
+        } catch {}
       })();
     };
     const recoverGuest = () => {
@@ -156,9 +147,6 @@ export function HostedBrowserWebview(props: {
         }
       }, recovery.delayMs);
     };
-    // A click inside the guest only reaches this document as a webview focus
-    // event, so open menus and popovers never see the outside press that
-    // would dismiss them. Replay it as a pointerdown on the webview itself.
     const dismissHostPopups = () => {
       webview.dispatchEvent(
         new PointerEvent("pointerdown", { bubbles: true, pointerType: "mouse" }),
@@ -268,9 +256,6 @@ export function HostedBrowserWebview(props: {
   const wrapperStyle = resolveHostedBrowserWebviewWrapperStyle({
     active,
     renderingActive,
-    // Electron 43 can permanently blank a macOS webview after `visibility: hidden`.
-    // Inactive macOS guests intentionally remain paintable offscreen; other platforms still
-    // suspend them, and automation continues to see the macOS guests as inactive.
     keepPaintableWhenInactive: isMacPlatform(navigator.platform),
     cornerRadius: presentation.cornerRadius,
     zIndex: presentation.zIndex,
@@ -300,11 +285,6 @@ export function HostedBrowserWebview(props: {
         <webview
           key={webviewGeneration}
           ref={setWebviewRef}
-          // Must be an attribute on the element itself: Electron reads it when the
-          // guest attaches, so setting it from the ref callback lands too late and
-          // the guest attaches with popups disabled. React types `allowpopups` as a
-          // boolean, but react-dom drops boolean values for unrecognized attributes,
-          // so the literal string has to be spread past the type.
           {...({ allowpopups: "true" } as unknown as { readonly allowpopups?: boolean })}
           src={webviewGeneration === 0 ? initialSrc : recoverySrc}
           partition={config.partition}

@@ -206,7 +206,6 @@ const verifyWithEnvironmentKeys = Effect.fnUntraced(function* <A, E>(input: {
     if (Option.isSome(proof)) {
       return proof.value;
     }
-    // A linked environment can have rotated keys; try the remaining active keys.
   }
   return null;
 });

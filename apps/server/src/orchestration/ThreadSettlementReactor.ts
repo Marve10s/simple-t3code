@@ -38,8 +38,7 @@ export class ThreadSettlementReactor extends Context.Service<
   }
 >()("t3/orchestration/ThreadSettlementReactor") {}
 
-/** @public Service construction is part of the canonical Effect module API. */
-/** Whether any environment default or project override can settle a thread. */
+/** @public */
 function autoSettlementConfigured(settings: ServerSettingsValue): boolean {
   if (settings.sidebarAutoSettleOnMerge || settings.sidebarAutoSettleAfterDays !== null) {
     return true;
@@ -51,15 +50,11 @@ function autoSettlementConfigured(settings: ServerSettingsValue): boolean {
   );
 }
 
-/** Identity of every settlement input, so unrelated settings edits do not trigger a sweep. */
-/** @internal Exported for tests. */
+/** @internal */
 export function autoSettlementSettingsKey(settings: ServerSettingsValue): string {
   return JSON.stringify([
     settings.sidebarAutoSettleOnMerge,
     settings.sidebarAutoSettleAfterDays,
-    // Only entries that touch settlement, in a stable order, so a project
-    // override on an unrelated key does not queue a sweep. JSON drops
-    // undefined, so inherit (absent) and never (null) need distinct marks.
     Object.entries(settings.projectSettingsOverrides)
       .filter(
         ([, entry]) =>
@@ -77,7 +72,7 @@ export function autoSettlementSettingsKey(settings: ServerSettingsValue): string
   ]);
 }
 
-/** @public Service construction is part of the canonical Effect module API. */
+/** @public */
 export const make = Effect.gen(function* () {
   const engine = yield* OrchestrationEngine.OrchestrationEngineService;
   const snapshots = yield* ProjectionSnapshotQuery.ProjectionSnapshotQuery;
@@ -98,12 +93,8 @@ export const make = Effect.gen(function* () {
     const snapshot = yield* readSweepSnapshot(snapshots, threadId ?? null);
     const now = DateTime.formatIso(yield* DateTime.now);
     const projects = new Map(snapshot.projects.map((project) => [project.id, project]));
-    // A merge rechecks all candidates, including branches that discovery has
-    // not linked yet. Those lookups can still have cached the PR as open.
     const candidates = snapshot.threads.filter((thread) => isAutoSettlementCandidate(thread, now));
 
-    // Return the thread when it still needs a pull request decision. A rejected
-    // dispatch skips it for this snapshot instead of retrying through a lookup.
     const settleThread = Effect.fnUntraced(
       function* (thread: (typeof candidates)[number], pullRequest: SettlementPullRequest | null) {
         const settings = resolveProjectSettings(
@@ -144,8 +135,6 @@ export const make = Effect.gen(function* () {
         ),
     );
 
-    // Inactivity needs no host state. Finish these decisions before any lookup
-    // can fail or wait on the network, including lookups shared by recent threads.
     const lookupCandidates = (yield* Effect.forEach(
       candidates,
       (thread) => settleThread(thread, null),
@@ -156,7 +145,6 @@ export const make = Effect.gen(function* () {
       .filter((thread) => thread !== null)
       .filter((thread) => !thread.pullRequests.some((link) => link.source !== "stack-dismissed"));
 
-    // Use the same cwd as PR discovery so both paths share GitManager's cache.
     const lookupCwdByThreadId = new Map<string, string>();
     yield* Effect.forEach(
       lookupCandidates,
@@ -177,8 +165,6 @@ export const make = Effect.gen(function* () {
       { concurrency: 8, discard: true },
     );
     if (mergedPullRequest !== null) {
-      // The merge confirmed a state the branch cache can still call open.
-      // Recheck those branches now instead of waiting for cache expiry.
       const cwds = [...new Set(lookupCwdByThreadId.values())];
       yield* Effect.forEach(cwds, (cwd) => git.invalidateStatus(cwd), {
         concurrency: 8,
@@ -260,13 +246,6 @@ export const make = Effect.gen(function* () {
         } satisfies SettlementPullRequest;
         const cwd = lookupCwdByThreadId.get(thread.id);
         if (summary.state !== "open" && thread.branch !== null && cwd !== undefined) {
-          // A reused branch can already have a new open PR while discovery
-          // is replacing its old link. Do not let settlement win that race.
-          // Only pay for the uncached lookup when this sweep would otherwise
-          // settle: a terminal link that settles nothing (resumed thread,
-          // settle-on-merge off) would re-query the host every minute. A
-          // group that becomes eligible after this check waits for the next
-          // sweep rather than settling on the unverified link.
           if (!(yield* wouldSettle(group, terminal))) return undefined;
           const current = yield* git.branchPullRequest(
             { cwd, branch: thread.branch },
@@ -336,8 +315,6 @@ export const make = Effect.gen(function* () {
       case "thread.pull-request-linked":
       case "thread.pull-request-synced":
       case "thread.pull-request-unlinked":
-        // Merge notifications can arrive before the linked snapshot is projected.
-        // Recheck the persisted state so terminal links settle without the timer.
         return worker.enqueue(event.payload.threadId);
       case "thread.session-set":
         if (

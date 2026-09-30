@@ -4,8 +4,6 @@ import { describe, expect, it } from "vite-plus/test";
 import { deriveWorkLogEntries } from "./session-logic";
 import { workEntryDisplayLabel } from "./components/chat/MessagesTimeline.logic";
 
-// These are the already-truncated fields emitted by ProviderRuntimeIngestion
-// for the malformed-skill diagnostic reported in issue 1084.
 const retainedMessage =
   "2026-03-14T16:11:12.550224Z ERROR codex_core::codex: failed to load skill /home/sebherrerabe/repos/devsuite/.agent/skills/monorepo-scaffolding/SKILL.md: invalid YAML: mapping va...";
 const warningSummary =

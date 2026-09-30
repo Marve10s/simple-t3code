@@ -1,11 +1,3 @@
-/**
- * ProjectionStateRepository - Projection repository interface for projector cursors.
- *
- * Owns persistence operations for projection cursor state used to resume
- * incremental event projection.
- *
- * @module ProjectionStateRepository
- */
 import { IsoDateTime, NonNegativeInt } from "@t3tools/contracts";
 import * as Option from "effect/Option";
 import * as Schema from "effect/Schema";
@@ -26,38 +18,20 @@ export const GetProjectionStateInput = Schema.Struct({
 });
 export type GetProjectionStateInput = typeof GetProjectionStateInput.Type;
 
-/**
- * ProjectionStateRepositoryShape - Service API for projector state records.
- */
 export interface ProjectionStateRepositoryShape {
-  /**
-   * Insert or replace a projection cursor row.
-   *
-   * Upserts by projector name.
-   */
   readonly upsert: (row: ProjectionState) => Effect.Effect<void, ProjectionRepositoryError>;
 
-  /** Insert or replace projector cursors in one statement. Empty batches do nothing. */
   readonly upsertMany: (
     rows: ReadonlyArray<ProjectionState>,
   ) => Effect.Effect<void, ProjectionRepositoryError>;
 
-  /**
-   * Read projection cursor state for a projector key.
-   */
   readonly getByProjector: (
     input: GetProjectionStateInput,
   ) => Effect.Effect<Option.Option<ProjectionState>, ProjectionRepositoryError>;
 
-  /**
-   * List all projector cursor rows.
-   */
   readonly listAll: () => Effect.Effect<ReadonlyArray<ProjectionState>, ProjectionRepositoryError>;
 }
 
-/**
- * ProjectionStateRepository - Service tag for projection cursor persistence.
- */
 export class ProjectionStateRepository extends Context.Service<
   ProjectionStateRepository,
   ProjectionStateRepositoryShape

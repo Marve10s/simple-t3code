@@ -224,7 +224,6 @@ const make = Effect.gen(function* () {
   const textGeneration = yield* TextGeneration;
   const serverSettingsService = yield* ServerSettingsService;
   const terminalManager = yield* TerminalManager.TerminalManager;
-  /** Environment settings with the thread's project overrides applied. */
   const projectSettingsForThread = Effect.fnUntraced(function* (threadId: ThreadId) {
     const settings = yield* serverSettingsService.getSettings;
     if (Object.keys(settings.projectSettingsOverrides).length === 0) return settings;
@@ -253,10 +252,7 @@ const make = Effect.gen(function* () {
   const threadModelSelections = new Map<string, ModelSelection>();
   const compactingThreadIds = new Set<ThreadId>();
   type QueuedTurnStart = Extract<ProviderIntentEvent, { type: "thread.turn-start-requested" }>;
-  // Turn starts received while a thread compacts, replayed in order once its session is restored.
   const turnsAfterCompaction = new Map<ThreadId, Array<QueuedTurnStart>>();
-  // Replay command id → the queued turn start it re-requests. `sent` settles once the replay's
-  // provider send finishes, which is what lets the next queued turn follow it in order.
   const resumedTurnStarts = new Map<
     CommandId,
     {
@@ -337,11 +333,8 @@ const make = Effect.gen(function* () {
         messageId: event.payload.messageId,
       });
       if (turnsAfterCompaction.get(threadId) !== queued) return;
-      // In flight from here on: a cancellation reports it when the replay runs, not from the queue.
       queued.shift();
       if (Option.isNone(turnStart)) continue;
-      // Reissue the durable request after restoration clears compaction's
-      // pending slot. Reusing the message id preserves a single user bubble.
       const commandId = yield* serverCommandId("after-compaction");
       const sent = yield* Deferred.make<void>();
       resumedTurnStarts.set(commandId, { event, queued, sent });
@@ -471,12 +464,6 @@ const make = Effect.gen(function* () {
       .pipe(Effect.map(Option.getOrUndefined));
   });
 
-  /**
-   * Recreates a thread's worktree from its branch when the directory has
-   * disappeared. Provider sessions resume into the persisted cwd, so a missing
-   * worktree makes every later turn fail as a bogus "session not found".
-   * Best-effort: on failure the turn proceeds and reports the real error.
-   */
   const ensureThreadWorktree = Effect.fnUntraced(function* (thread: {
     readonly id: ThreadId;
     readonly projectId: ProjectId;
@@ -501,10 +488,6 @@ const make = Effect.gen(function* () {
       worktreePath,
       branch,
     });
-    // A directory deleted without `git worktree remove` leaves an admin entry
-    // that makes `git worktree add` refuse the path; prune clears it.
-    // Best effort like the rest of this recovery: a settings read failure
-    // falls back to the checkout's t3.json.
     const submodules = yield* projectSettingsForThread(thread.id).pipe(
       Effect.map((settings) => settings.worktreeSubmodules),
       Effect.orElseSucceed(() => null),
@@ -575,8 +558,6 @@ const make = Effect.gen(function* () {
     options?: {
       readonly modelSelection?: ModelSelection;
       readonly pendingTurnStart?: boolean;
-      // First-turn prompt seed. A manual title that still equals this seed was
-      // written by the client's auto-title, not a user rename.
       readonly titleSeed?: string;
     },
   ) {
@@ -715,11 +696,6 @@ const make = Effect.gen(function* () {
           .refreshWorkspaceSnapshot({ instanceId: desiredInstanceId, cwd: effectiveCwd })
           .pipe(Effect.forkDetach)
       : Effect.void;
-    // OpenCode skips SessionPrompt.ensureTitle when session.create already has
-    // a title. Prompt seeds and "New thread" are not user titles, so omit them
-    // and let the provider generate one. A real rename is source "manual" and
-    // differs from the first-turn prompt seed (the web client writes that seed
-    // through thread.meta.update, which also marks the title manual).
     const manualTitle = thread.titleState?.source === "manual" ? thread.title.trim() : "";
     const promptSeed = options?.titleSeed?.trim();
     const sessionTitle =
@@ -762,7 +738,6 @@ const make = Effect.gen(function* () {
             providerName: session.provider,
             providerInstanceId: session.providerInstanceId,
             runtimeMode: desiredRuntimeMode,
-            // Provider turn ids are not orchestration turn ids.
             activeTurnId: null,
             lastError: session.lastError ?? null,
             updatedAt: session.updatedAt,
@@ -1292,7 +1267,6 @@ const make = Effect.gen(function* () {
       );
 
     const authCommandHandled = yield* Effect.gen(function* () {
-      // Native account commands belong to the thread's existing provider session.
       const instanceId =
         thread.session?.providerInstanceId ??
         event.payload.modelSelection?.instanceId ??
@@ -1502,8 +1476,6 @@ const make = Effect.gen(function* () {
         : {}),
       interactionMode: event.payload.interactionMode,
       createdAt: event.payload.createdAt,
-      // Later turns must not reuse the current title as titleSeed. Only the
-      // first prompt seed should suppress a not-yet-renamed session title.
       ...(!hasOtherUserMessages && event.payload.titleSeed !== undefined
         ? { titleSeed: event.payload.titleSeed }
         : {}),
@@ -1519,7 +1491,6 @@ const make = Effect.gen(function* () {
     const send = providerService
       .sendTurn(sendTurnRequest.value)
       .pipe(Effect.asVoid, Effect.catchCause(recoverTurnStartFailure));
-    // The forked send settles `sent` from here on, so drop the entry the post-processing hook uses.
     if (resumed && event.commandId !== null) resumedTurnStarts.delete(event.commandId);
     yield* send.pipe(
       Effect.ensuring(resumed ? Deferred.succeed(resumed.sent, undefined) : Effect.void),
@@ -1620,7 +1591,6 @@ const make = Effect.gen(function* () {
       });
     };
 
-    // Orchestration turn ids are not provider turn ids, so interrupt by session.
     yield* providerService
       .interruptTurn({ threadId: event.payload.threadId })
       .pipe(Effect.catchCause(recoverInterruptFailure));
@@ -1843,12 +1813,9 @@ const make = Effect.gen(function* () {
         return;
       case "thread.settled": {
         const thread = yield* projectionSnapshotQuery.getThreadShellById(event.payload.threadId);
-        // A thread re-engaged before this event ran keeps its shells and session.
         if (Option.isNone(thread) || thread.value.settledOverride !== "settled") {
           return;
         }
-        // Idle shells close so they stop holding the worktree. A terminal that
-        // runs a command (a dev server, an editor) stays for the user to close.
         yield* terminalManager.closeIdle({ threadId: event.payload.threadId });
         if (thread.value.session == null || thread.value.session.status === "stopped") {
           return;
@@ -1867,8 +1834,6 @@ const make = Effect.gen(function* () {
 
   const processDomainEventSafely = (event: ProviderIntentEvent) =>
     processDomainEvent(event).pipe(
-      // A replay that returned before forking its send still holds its entry; settle it so
-      // the compaction queue moves on. Forked sends drop the entry first and settle it themselves.
       Effect.ensuring(
         Effect.suspend(() => {
           const resumed = event.commandId !== null && resumedTurnStarts.get(event.commandId);
@@ -1918,12 +1883,9 @@ const make = Effect.gen(function* () {
       }
     });
 
-    // Subscribe before returning, even while event handling waits for server activation.
     const domainEvents = yield* orchestrationEngine.subscribeDomainEvents;
     yield* forkParked(Stream.runForEach(domainEvents, processEvent));
 
-    // Earlier events do not replay. Clear interrupted requests by their captured
-    // IDs, then schedule persisted refinements after subscribing to their events.
     const recoverTitles = clearInterruptedThreadTitleRegenerations(
       pendingTitles.interruptedRegenerations,
     ).pipe(

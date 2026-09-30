@@ -1,6 +1,5 @@
 import type { TurnId } from "@t3tools/contracts";
 
-// Match the titlebar fade inset so draft promotion preserves the first row's position.
 export const CHAT_TIMELINE_ANCHOR_OFFSET = 24;
 
 export type TimelineScrollMode = "following-end" | "anchoring-new-turn" | "free-scrolling";
@@ -39,12 +38,6 @@ export function getRowBottom(state: TimelineListMeasurementState, index: number)
   return top + Math.max(1, height);
 }
 
-/**
- * Whether the timeline's real rows extend past the viewport left above the
- * composer. The list's own content length includes the composer inset
- * spacer, so this measures from the last row instead. Unknown row geometry
- * or an unmeasured viewport counts as fitting.
- */
 export function timelineContentOverflowsViewport(
   state: TimelineListMeasurementState | undefined,
   input: { readonly composerInset: number; readonly anchorOffset: number },
@@ -124,7 +117,6 @@ export interface RememberedTimelinePosition {
   };
 }
 
-// Scoped thread keys keep separate environments independent. Bound the session cache.
 const rememberedTimelinePositions = new Map<string, RememberedTimelinePosition>();
 
 export function readTimelinePosition(threadKey: string) {

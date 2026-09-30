@@ -15,17 +15,10 @@ interface OptimisticPreferences {
   readonly versions: Partial<Record<keyof Preferences, number>>;
 }
 
-// A bare function is interpreted by useAtomSet as an update to the command's
-// AsyncResult, not as a preference transform. Keep transforms inside a payload.
 type PreferencesUpdate =
   | Partial<Preferences>
   | { readonly transform: (current: Preferences) => Partial<Preferences> };
 
-/**
- * Owns the device preference blob for the lifetime of the app registry.
- * Optimistic patches are kept separately so writes made while persistence is
- * still loading cannot be replaced by the eventual read result.
- */
 export function createMobilePreferencesState(runtime: Atom.AtomRuntime<MobilePreferencesStore>) {
   const storedPreferencesAtom = runtime
     .atom(
@@ -122,9 +115,6 @@ export function createMobilePreferencesState(runtime: Atom.AtomRuntime<MobilePre
           ),
         );
       },
-      // The storage layer serializes preference read-modify-write operations.
-      // Keep every invocation alive so one preference update cannot interrupt
-      // another update to a different field in the shared blob.
       { concurrent: true },
     )
     .pipe(Atom.keepAlive, Atom.withLabel("mobile:preferences:update"));

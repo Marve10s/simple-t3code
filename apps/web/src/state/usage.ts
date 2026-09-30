@@ -1,11 +1,3 @@
-/**
- * Multi-environment usage state.
- *
- * Every connected environment answers the same typed query; the client merges
- * the results. Raw transcripts never leave the machine that produced them.
- *
- * @module state/usage
- */
 import { useAtomValue } from "@effect/atom-react";
 import {
   USAGE_CONTRACT_VERSION,
@@ -32,13 +24,6 @@ export interface EnvironmentUsageStatus {
   readonly needsCursorKeychainAccess: boolean;
 }
 
-/**
- * Reads every environment's summary for one window.
- *
- * Keyed by the serialised window so switching ranges does not thrash the atom
- * cache, and so each environment's query is shared with any other reader of the
- * same window.
- */
 const usageByWindowAtom = Atom.family((windowKey: string) =>
   Atom.make((get): readonly EnvironmentUsageStatus[] => {
     const input = JSON.parse(windowKey) as UsageSummaryInput;
@@ -68,13 +53,7 @@ export interface UsageView {
   readonly merged: MergedUsage;
   readonly environments: readonly EnvironmentUsageStatus[];
   readonly selectedEnvironments: readonly EnvironmentUsageStatus[];
-  /** True until at least one selected environment has answered. */
   readonly isPending: boolean;
-  /**
-   * True while environments that have not failed are still answering. Failed
-   * environments are reported through their own error rows: totals will not
-   * improve by waiting on them, so they must not read as "still reporting".
-   */
   readonly isPartial: boolean;
   readonly refresh: (input?: UsageSummaryInput) => Promise<void>;
 }

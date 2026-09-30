@@ -85,8 +85,6 @@ const serverConfigTestLayer = ServerConfig.layerTest(process.cwd(), process.cwd(
   Layer.provide(NodeServices.layer),
 );
 
-// startSession verifies the workspace folder exists before dispatching to an
-// adapter, so session cwd fixtures must be real directories.
 const fixtureCwdRoot = NodeFS.mkdtempSync(NodePath.join(NodeOS.tmpdir(), "provider-service-test-"));
 afterAll(() => NodeFS.rmSync(fixtureCwdRoot, { recursive: true, force: true }));
 function fixtureCwd(name: string): string {
@@ -550,7 +548,6 @@ for (const [enabled, completed] of [
         assert.propertyVal(admitted.value.runtimePayload, "activeTurnId", accepted.turnId);
         assert.propertyVal(admitted.value.runtimePayload, "continueAfterServerUpdate", null);
         if (completed) {
-          // Updates can mark an already-admitted turn immediately before it finishes.
           yield* directory.upsert({
             ...admitted.value,
             runtimePayload: {
@@ -2264,8 +2261,6 @@ routing.layer("ProviderServiceLive routing", (it) => {
       assert.include(turnText, '[Attached image "screenshot.png" is saved at: ');
       assert.equal(turnText.endsWith(`${attachment.id}.png]`), true);
 
-      // An attachment-only turn stays valid and the injected line becomes the
-      // whole input text, so the agent still learns the path.
       routing.codex.sendTurn.mockClear();
       yield* provider.sendTurn({
         threadId: session.threadId,
@@ -2291,8 +2286,6 @@ routing.layer("ProviderServiceLive routing", (it) => {
       const mixedInput = routing.codex.sendTurn.mock.calls[0]?.[0] as ProviderSendTurnInput;
       assert.include(mixedInput.input ?? "", '[Attached file "report.pdf" is saved at: ');
       assert.include(mixedInput.input ?? "", `${fileAttachment.id}.pdf]`);
-      // Every attachment reaches the adapter; each adapter decides what its
-      // provider ingests natively.
       assert.deepEqual(mixedInput.attachments, [attachment, fileAttachment]);
 
       routing.codex.sendTurn.mockClear();
@@ -3090,8 +3083,6 @@ routing.layer("ProviderServiceLive routing", (it) => {
       });
       assert.equal(Option.isSome(persisted), true);
       if (Option.isSome(persisted)) {
-        // The directory folds both adapter "ready" and "running" into its
-        // runtime "running" state. The payload proves sendTurn did not upsert.
         assert.equal(persisted.value.status, "running");
         const payload = persisted.value.runtimePayload;
         assert.equal(payload !== null && typeof payload === "object", true);
@@ -4110,8 +4101,6 @@ turnAnalytics.layer("ProviderServiceLive turn analytics", (it) => {
         runtimeMode: "full-access",
       });
       yield* Effect.yieldNow;
-      // Claude closes a leftover synthetic turn while it prepares the real
-      // turn, so both events arrive before sendTurn returns the real turn ID.
       primaryAnalyticsCodex.sendTurn.mockImplementationOnce((input) =>
         Effect.gen(function* () {
           primaryAnalyticsCodex.emit({
@@ -4368,8 +4357,6 @@ turnAnalytics.layer("ProviderServiceLive turn analytics", (it) => {
       const terminal = yield* Fiber.join(terminalReceipt);
       assert.equal(terminal._tag, "Some");
       assert.equal(nextSend.pollUnsafe(), undefined);
-      // The canceled request must not hold the completion. The live request
-      // still does, until its adapter response links it to the turn.
       assert.equal(recordedTurnAnalytics.eventsByName("provider.turn.completed").length, 0);
       yield* Deferred.succeed(nextReturnRelease, undefined);
       const nextTurn = yield* Fiber.join(nextSend);
@@ -5189,9 +5176,6 @@ describe("agent browser access", () => {
       return issued;
     });
 
-  // The capability on the credential is the observable that matters: a session
-  // always gets a credential (the pull request toolkit is never withheld), and
-  // `preview` on it is what actually grants or denies the browser tools.
   it.effect("issues a credential without preview when agent browser access is off", () =>
     Effect.gen(function* () {
       const threadId = asThreadId("thread-browser-off");
@@ -5258,8 +5242,6 @@ describe("agent browser access", () => {
     }).pipe(Effect.provide(NodeServices.layer)),
   );
 
-  // Without orchestration the project cannot be resolved, so an overridden
-  // capability is withheld; one no project overrides keeps its environment value.
   it.effect("withholds only the overridden capability when the project cannot be resolved", () =>
     Effect.gen(function* () {
       const threadId = asThreadId("thread-no-orchestration-device-override");

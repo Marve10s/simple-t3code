@@ -44,13 +44,7 @@ import {
 const decodeGrokSettings = Schema.decodeSync(GrokSettings);
 
 const DRIVER_KIND = ProviderDriverKind.make("grok");
-// npm's `latest` tracks Grok's stable channel, the one `grok update` installs
-// by default, so the registry stays the source for "latest".
 const GROK_NPM_PACKAGE = "@xai-official/grok";
-// `grok update` finds the installer that owns the binary itself, so the
-// resolved executable is its own updater. It installs under `GROK_HOME`, so it
-// runs with the instance's environment. No executable means nothing to update,
-// not "whatever is on PATH".
 const UPDATE: ProviderMaintenanceCapabilitiesResolver = {
   resolve: (context) =>
     Effect.succeed(
@@ -140,7 +134,6 @@ export const GrokDriver: ProviderDriver<GrokSettings, GrokDriverEnv> = {
             ),
           (snapshot) =>
             readGrokAccount(processEnv).pipe(
-              // The email lets clients recognize one account signed in on several environments.
               Effect.map(({ email, usageLimits }) => ({
                 ...snapshot,
                 auth: email ? { ...snapshot.auth, email } : snapshot.auth,

@@ -334,9 +334,6 @@ export function NewTaskBranchPickerRouteScreen() {
           return;
         }
 
-        // The checkout has already changed the repository. Persist the matching
-        // draft selection even if the native sheet was dismissed while the
-        // command was in flight; only visible-screen work is focus-gated below.
         flow.selectBranch(result.value);
         if (!mountedRef.current || !navigation.isFocused()) {
           return;

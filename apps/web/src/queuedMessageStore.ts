@@ -12,24 +12,13 @@ import type { TerminalContextDraft } from "./lib/terminalContext";
 import { randomUUID } from "./lib/utils";
 import type { ReviewCommentContext } from "./reviewCommentContext";
 
-/**
- * The composer's model and modes when the message was queued. The send uses
- * these instead of the live composer, so it can go out while the user is on
- * another thread.
- */
 export interface QueuedMessageSendSettings {
   modelSelection: ModelSelection;
   runtimeMode: RuntimeMode;
   interactionMode: ProviderInteractionMode;
-  /** Effort written into the prompt text, for providers that read it there. */
   promptEffort: string | null;
 }
 
-/**
- * A composer submission held back while the thread's turn is running. It
- * carries the full draft snapshot so the send path can dispatch it later with
- * the same text, attachments, and contexts the user pressed Enter on.
- */
 export interface QueuedComposerMessage {
   id: string;
   prompt: string;
@@ -39,36 +28,15 @@ export interface QueuedComposerMessage {
   previewAnnotations: PreviewAnnotationPayload[];
   reviewComments: ReviewCommentContext[];
   sendSettings: QueuedMessageSendSettings;
-  /**
-   * The newest completed tool activity at queue time. A different id later
-   * means a tool call finished after the user queued, which is the boundary
-   * the message goes out on.
-   */
   queuedAfterToolActivityId: string | null;
-  /**
-   * Set when the message was created by Stop or a failed restore, not by the
-   * user pressing send. It waits for Send now instead of leaving on its own.
-   */
   holdUntilUserAction?: boolean;
-  /**
-   * Set while a send is under way; the row stays until it settles. Stop can
-   * still take a "preparing" message back (uploads, thread settings), but not
-   * a "dispatching" one, whose turn start is already on the wire.
-   */
   sending?: "preparing" | "dispatching";
   createdAt: string;
 }
 
-/**
- * The thread as it was when its last queued turn start went out. The next
- * message waits until the server has moved past it, so a send that starts a
- * new turn and the message after it do not leave on one boundary.
- */
 interface QueuedDispatch {
-  /** The message that went out, or null for a dispatch restored after a failure. */
   messageId: string | null;
   thread: LocalDispatchSnapshot;
-  /** The dispatch this one replaced. If this send fails, that one still counts. */
   previous: LocalDispatchSnapshot | null;
 }
 
@@ -76,29 +44,15 @@ interface QueuedMessageStoreState {
   queuesByThreadKey: Record<string, QueuedComposerMessage[]>;
   lastDispatchByThreadKey: Record<string, QueuedDispatch>;
   enqueue: (threadKey: string, message: Omit<QueuedComposerMessage, "id">) => QueuedComposerMessage;
-  /**
-   * Marks one message as sending and returns it, or null when it is gone or
-   * the thread already has a send under way. The other messages are
-   * re-anchored to `toolActivityId` so only one leaves per tool boundary.
-   */
   beginSend: (
     threadKey: string,
     id: string,
     toolActivityId: string | null,
   ) => QueuedComposerMessage | null;
-  /** The turn start is going out. False when Stop took the message back first. */
   markDispatching: (threadKey: string, id: string, thread: LocalDispatchSnapshot) => boolean;
-  /** Drops a message whose send went out, or that had nothing left to send. */
   finishSend: (threadKey: string, id: string) => void;
-  /**
-   * Moves a message whose send failed back to the head, held for user action.
-   * The queue keeps its order and nothing behind it overtakes. False when
-   * Stop already took the message back.
-   */
   failSend: (threadKey: string, id: string) => boolean;
-  /** Removes one message without touching the others' anchors. Null when gone or sending. */
   remove: (threadKey: string, id: string) => QueuedComposerMessage | null;
-  /** Removes and returns every message for the thread that is not already on the wire. */
   drain: (threadKey: string) => QueuedComposerMessage[];
 }
 
@@ -106,7 +60,6 @@ const EMPTY_QUEUE: QueuedComposerMessage[] = [];
 
 type QueueState = Pick<QueuedMessageStoreState, "queuesByThreadKey" | "lastDispatchByThreadKey">;
 
-/** Replaces one thread's queue. `lastDispatch` null forgets it; an empty queue always does. */
 function withQueue(
   state: QueueState,
   threadKey: string,
@@ -121,7 +74,6 @@ function withQueue(
   return { queuesByThreadKey, lastDispatchByThreadKey };
 }
 
-/** In-memory only: a queued message is a live intent, not a draft worth persisting. */
 export const useQueuedMessageStore = create<QueuedMessageStoreState>()((set, get) => {
   const queueOf = (threadKey: string) => get().queuesByThreadKey[threadKey] ?? EMPTY_QUEUE;
   const update = (
@@ -182,8 +134,6 @@ export const useQueuedMessageStore = create<QueuedMessageStoreState>()((set, get
       const entry = queue.find((message) => message.id === id);
       if (!entry) return false;
       const { sending: _sending, ...rest } = entry;
-      // This send never reached the server, so only an earlier one is worth
-      // waiting for.
       const dispatch = get().lastDispatchByThreadKey[threadKey];
       update(
         threadKey,
@@ -217,11 +167,6 @@ export const useQueuedMessageStore = create<QueuedMessageStoreState>()((set, get
   };
 });
 
-/**
- * The newest finished tool call. Its id changing is the boundary a queued
- * message goes out on. Live arrays are sorted, but a snapshot loaded from the
- * database is not, so pick by sequence rather than position.
- */
 export function latestCompletedToolActivityId(
   activities: ReadonlyArray<{
     readonly id: string;
@@ -245,11 +190,6 @@ export function latestCompletedToolActivityId(
   return latest?.id ?? null;
 }
 
-/**
- * A queued message is due mid-turn once a tool call finished after it was
- * queued, and as soon as the turn is over otherwise. "connecting" is the gap
- * between a send and the provider picking it up, so nothing is due there.
- */
 export function isQueuedMessageDue(input: {
   message: Pick<QueuedComposerMessage, "queuedAfterToolActivityId" | "holdUntilUserAction">;
   phase: "connecting" | "running" | "ready" | "disconnected";

@@ -52,8 +52,6 @@ export class ElectronProtocolUnregistrationError extends Schema.TaggedError<Elec
   }
 }
 
-// The scheme either proxies to a dev server (`targetOrigin`) or serves the
-// built client from disk (`assetDirectory`).
 export type DesktopProtocolRegistrationInput = {
   readonly scheme: string;
   readonly clerkFrontendApiHostname: string | undefined;
@@ -80,11 +78,6 @@ export function makeDesktopContentSecurityPolicy(input: DesktopProtocolRegistrat
     "https://challenges.cloudflare.com",
   ];
 
-  // The renderer connects directly to user-configured environments in addition to
-  // the build-configured Clerk, relay, and OTLP endpoints. Those environment
-  // origins are not known when this response policy is created, so restrict
-  // connections by the network schemes the client supports instead of by host.
-  // GLTFLoader fetches embedded textures through blob URLs after parsing the model.
   const connectSources = ["'self'", "blob:", "http:", "https:", "ws:", "wss:"];
 
   return [
@@ -96,8 +89,6 @@ export function makeDesktopContentSecurityPolicy(input: DesktopProtocolRegistrat
     "style-src 'self' 'unsafe-inline'",
     `font-src 'self' ${input.scheme}: data:`,
     "worker-src 'self' blob:",
-    // Document viewers use local Blob URLs and signed assets from runtime environments.
-    // HTML viewers retain their own sandbox; the renderer's script policy stays unchanged.
     "frame-src 'self' blob: http: https:",
     "form-action 'self'",
   ].join("; ");
@@ -113,9 +104,6 @@ function withContentSecurityPolicy(response: Response, policy: string): Response
   });
 }
 
-/**
- * Must run synchronously during process bootstrap, before Electron emits `ready`.
- */
 function registerDesktopSchemePrivilegesSync(): void {
   Electron.protocol.registerSchemesAsPrivileged([
     {
@@ -126,8 +114,6 @@ function registerDesktopSchemePrivilegesSync(): void {
         supportFetchAPI: true,
         corsEnabled: true,
         stream: true,
-        // Custom schemes skip Chromium's V8 code cache unless they opt in.
-        // Dev stays off: Vite serves changing code at stable URLs.
         codeCache: true,
       },
     },
@@ -197,9 +183,6 @@ async function proxyRequest(
 
 const TRANSIENT_FETCH_RETRY_DELAYS_MS = [0, 50, 150] as const;
 
-// Serves the packaged web client without a backend: files resolve within the
-// asset directory, and any other path falls back to index.html so the SPA
-// router handles it, except for asset-shaped misses (`/missing.js`) which 404.
 const serveDesktopAsset = Effect.fn("desktop.protocol.serveAsset")(function* (
   request: Request,
   assetDirectory: string,
@@ -256,7 +239,7 @@ async function fetchWithTransientRetry(url: string, init: RequestInit): Promise<
   throw lastError;
 }
 
-/** @public Service construction is part of the canonical Effect module API. */
+/** @public */
 export const make = Effect.gen(function* () {
   const registered = yield* Ref.make(false);
   const context = yield* Effect.context<FileSystem.FileSystem | Path.Path>();

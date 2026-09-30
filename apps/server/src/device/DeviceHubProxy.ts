@@ -1,16 +1,3 @@
-/**
- * Same-origin proxy in front of expo-device-hub.
- *
- * The hub binds loopback and is never reachable directly: serve-sim exposes a
- * shell-exec route and serve-emu's action routes are unauthenticated, so the
- * only way to a device stream is through this route, which requires an
- * environment session with read scope (operate scope for input and tuning). Reusing the T3
- * origin is also what makes remote connections work unchanged — Tailscale and
- * T3 Connect already carry `/api/*` and WebSocket upgrades for the app itself.
- *
- * Only the routes the Device panel needs are forwarded. Anything under the
- * hub's dashboard, exec, or WebRTC surface is rejected here.
- */
 import {
   AuthOrchestrationReadScope,
   AuthOrchestrationOperateScope,
@@ -48,7 +35,6 @@ const ALLOWED_PATHS: ReadonlyArray<RegExp> = [
   /^\/vendor\/serve-emu\/health$/,
 ];
 
-/** Read paths are GET-only; only these accept other methods (screenshot captures, stream tuning). */
 const MUTABLE_PATHS: ReadonlyArray<RegExp> = [
   /^\/vendor\/serve-sim\/api\/screenshot$/,
   /^\/vendor\/serve-emu\/api\/(screenshot|stream-mode|stream-settings)$/,
@@ -61,7 +47,6 @@ const ALLOWED_WS_PATHS: ReadonlyArray<RegExp> = [
   /^\/vendor\/serve-emu\/ws$/,
 ];
 
-/** Hop-by-hop and origin headers that must not cross the proxy. */
 const DROPPED_REQUEST_HEADERS = new Set([
   "host",
   "connection",
@@ -80,13 +65,6 @@ const DROPPED_REQUEST_HEADERS = new Set([
 const isWebSocketUpgrade = (request: HttpServerRequest.HttpServerRequest) =>
   request.headers.upgrade?.toLowerCase() === "websocket";
 
-/**
- * `<img>` and WebSocket cannot set headers, so every proxied request
- * authenticates the way the `/ws` upgrade does: a cookie for browser
- * sessions, or a short-lived `wsTicket` minted over authenticated HTTP for
- * bearer and DPoP clients. The upgrade authenticator already implements that
- * fallback order, so it is used for plain requests as well.
- */
 const authenticate = (requiredScope: AuthEnvironmentScope) =>
   Effect.gen(function* () {
     const request = yield* HttpServerRequest.HttpServerRequest;
@@ -115,15 +93,10 @@ const forwardHeaders = (request: HttpServerRequest.HttpServerRequest, origin: st
     if (DROPPED_REQUEST_HEADERS.has(name) || value === undefined) continue;
     headers[name] = value;
   }
-  // serve-emu refuses mutations whose Origin differs from the request origin.
   if (request.headers.origin !== undefined) headers.origin = origin;
   return headers;
 };
 
-/**
- * Pipe a client WebSocket to the hub's with no framing changes. Frames are
- * opaque: H.264 access units one way, input packets the other.
- */
 const proxyWebSocket = Effect.fn("DeviceHubProxy.proxyWebSocket")(function* (
   request: HttpServerRequest.HttpServerRequest,
   upstreamUrl: string,
@@ -136,8 +109,6 @@ const proxyWebSocket = Effect.fn("DeviceHubProxy.proxyWebSocket")(function* (
     Effect.gen(function* () {
       const writeToClient = yield* client.writer;
       const writeToUpstream = yield* upstream.writer;
-      // Whichever side closes first ends the other via scope teardown: a close
-      // fails the pull with a SocketError, which loses the race.
       return yield* Effect.raceFirst(
         pumpFrames(upstream, writeToClient),
         pumpFrames(client, writeToUpstream),
@@ -176,7 +147,6 @@ const proxyHttp = Effect.fn("DeviceHubProxy.proxyHttp")(function* (
     }
     if (value !== undefined) headers[name] = value;
   }
-  // Long-lived MJPEG and AVCC responses must not be buffered by compression.
   headers["cache-control"] = "no-store, no-transform";
   return HttpServerResponse.stream(response.stream, {
     status: response.status,
@@ -212,10 +182,6 @@ const handler = Effect.gen(function* () {
   if (!ready) {
     return HttpServerResponse.text("Device hub is not running", { status: 503 });
   }
-  // The hub runs in standalone mode at its origin root; the panel builds every
-  // stream and socket URL itself, so nothing depends on the hub knowing the
-  // T3 prefix.
-  // The ticket authenticates here and must not travel on to the hub.
   const upstreamSearch = new URLSearchParams(url.value.search);
   upstreamSearch.delete("wsTicket");
   upstreamSearch.delete("hostId");

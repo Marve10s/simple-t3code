@@ -486,7 +486,6 @@ describe("draft hero submission transition", () => {
         hasWorktreeSetupCard: true,
       }),
     ).toBe(false);
-    // A background submission normally pins the hero, but never over the card.
     expect(
       resolveDraftHeroState({
         isLocalDraftThread: true,
@@ -2404,8 +2403,6 @@ describe("worktree setup visibility", () => {
     const cancelled = { ...settledDone, phase: "cancelled" as const };
     expect(visible(cancelled)).toEqual(cancelled);
 
-    // The setup belongs to the first turn. A follow-up send retires every
-    // settled outcome; only a script that is still running stays.
     expect(visible(scriptFailed, true)).toBeNull();
     expect(visible(failed, true)).toBeNull();
     expect(visible(cancelled, true)).toBeNull();

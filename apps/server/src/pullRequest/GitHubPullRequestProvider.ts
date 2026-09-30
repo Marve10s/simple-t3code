@@ -50,29 +50,10 @@ const CAPABILITIES: PullRequestCapabilities = {
   labels: true,
 };
 
-/**
- * What the signed-in account may do here, from the three things GitHub says about it.
- *
- * Merging needs a role that can push, which is the one thing a stranger on an open-source
- * repository never has. The other four actions go by `viewerCanUpdate`, because the author of a
- * pull request may close it, reopen it and move it in and out of draft with no more than read
- * access on the repository it was opened against.
- *
- * Commenting and reviewing are not gated at all: read access is enough to say something and
- * enough to approve or ask for changes, which is what open-source review consists of. Resolving a
- * conversation is the exception — GitHub allows it to whoever can write, and to the author of the
- * pull request the conversation is on.
- *
- * Asking somebody else for a review needs write access, which is the one thing here an author
- * cannot do on their own pull request: GitHub shows an outside contributor the reviewer control
- * and refuses the request behind it.
- */
 export function gitHubViewerPermissions(access: GitHubViewerAccess): PullRequestViewerPermissions {
   return {
     ...(access.canWrite ? { stackRebase: true } : {}),
     actions: [
-      // Arming a merge and taking the arming back are the merge, deferred: whoever may not
-      // merge here may not leave an instruction to merge later either.
       ...(access.canWrite
         ? ([
             "merge",
@@ -83,24 +64,17 @@ export function gitHubViewerPermissions(access: GitHubViewerAccess): PullRequest
           ] as const)
         : []),
       ...(access.canUpdate ? (["ready", "draft", "close", "reopen"] as const) : []),
-      // Whether this viewer may update the branch is GitHub's own answer, read with the
-      // comparison; without it the action is offered to nobody rather than to everybody.
       ...(access.canUpdateBranch === true ? (["update-branch"] as const) : []),
     ],
     comment: true,
     resolve: access.canWrite || access.didAuthor,
-    // Anyone may review a pull request they can see, except their own: GitHub refuses an author's
-    // approval and their request for changes ("Can not approve your own pull request"), and
-    // leaves them commenting, which is what an author has to say about their own change anyway.
     verdicts: access.didAuthor ? (["comment"] as const) : CAPABILITIES.review.verdicts,
     requestReviewers: access.canWrite,
     ...(access.canUpdateBranch === true ? { updateMethods: CAPABILITIES.updateMethods } : {}),
-    // Triage is the one role that labels without writing, which is what triage is for.
     labels: access.canTriage,
   };
 }
 
-/** The CLI tags that mean the tool itself is unusable, rather than one request failing. */
 export function gitHubProviderFailure(
   error: GitHubPullRequestCli.GitHubPullRequestCliError,
 ): PullRequestProviderFailure {
@@ -117,15 +91,6 @@ export function gitHubProviderFailure(
   return { reason: "failed" };
 }
 
-/**
- * `gh pr view --json` reports no avatar for anyone, so the ones the GraphQL read collected are
- * applied here by login. An actor already carrying one keeps it.
- *
- * A login GitHub did not answer for falls back to the picture every GitHub install serves at
- * `/<login>.png`. The lookup is one more request per repository and can be refused — a rate
- * limit, a slow host — and a face that comes and goes between two loads of the same page reads
- * as a bug in the page rather than as a request that failed quietly.
- */
 function withAvatar(
   actor: PullRequestActor | null,
   avatarsByLogin: ReadonlyMap<string, string>,
@@ -174,15 +139,10 @@ function withWorkflowApprovals(
   ];
 }
 
-/**
- * Null for anything that is not a plain user login: an app posts as `dependabot[bot]`, which
- * names no page, and a guessed URL that 404s is worse than the initials it would replace.
- */
 export function loginAvatarUrl(login: string, host: string): string | null {
   return /^[a-z0-9][a-z0-9-]{0,38}$/iu.test(login) ? `https://${host}/${login}.png?size=80` : null;
 }
 
-/** True where markdown would render nothing: whitespace, or only HTML comments. */
 const rendersEmpty = (body: string): boolean =>
   body.replace(/<!--[\s\S]*?-->/g, "").trim().length === 0;
 
@@ -237,8 +197,6 @@ export const make = Effect.gen(function* () {
                 host: input.host,
                 ids: [...new Set(page.items.flatMap((item) => item.authorId ?? []))],
               })
-              // A listing without faces is still a listing, so a failed lookup falls back to
-              // the initials rather than taking the rows down with it.
               .pipe(
                 Effect.orElseSucceed(() => new Map<string, string>()),
                 Effect.map((avatarsByLogin) => ({
@@ -252,11 +210,6 @@ export const make = Effect.gen(function* () {
           ),
         ),
 
-    /**
-     * The same listing for a whole host in one search. The avatar lookup the per-repository read
-     * needs is not here: a search reports an author's picture itself, so a face costs no request
-     * of its own — `withAvatar` still stands behind it for the login GitHub answered nothing for.
-     */
     listChangeRequestsAcross: (input) =>
       cli
         .searchPullRequests({
@@ -293,8 +246,6 @@ export const make = Effect.gen(function* () {
 
     getChangeRequestSummary: (input) =>
       cli.getPullRequestSummary(input).pipe(
-        // `gh pr view` names the author without an avatar; the login-shaped URL every user
-        // has stands in, without the second request the listing spends on it.
         Effect.map((summary) => ({
           ...summary,
           ...(summary.author === undefined
@@ -313,7 +264,6 @@ export const make = Effect.gen(function* () {
     getChangeRequest: (input) =>
       cli.getPullRequestDetail(input).pipe(
         Effect.flatMap((pullRequest) => {
-          // Fork workflows awaiting approval are absent from the normal check rollup.
           const approvals =
             pullRequest.state !== "open" || pullRequest.isCrossRepository !== true
               ? Effect.succeed({
@@ -387,8 +337,6 @@ export const make = Effect.gen(function* () {
       Effect.all(
         [
           cli.getPullRequestActivity(input),
-          // Line comments live on review threads, which `gh pr view --json` cannot reach. A
-          // GraphQL hiccup degrades to a truncated conversation rather than blanking activity.
           cli.listReviewThreadComments(input).pipe(
             Effect.orElseSucceed(() => ({
               comments: [],
@@ -441,10 +389,6 @@ export const make = Effect.gen(function* () {
           comments: [...pullRequest.comments, ...reviewThreads.comments]
             .map((comment) => ({
               ...comment,
-              // GitHub keeps the dismissal reason on the timeline event, not on the review,
-              // so a dismissed review with nothing visible of its own reads its words from
-              // there. "Visible" and not "empty": bot reviews often carry only an HTML
-              // marker comment, which markdown renders as nothing.
               body:
                 comment.kind === "review" &&
                 comment.reviewState?.toUpperCase() === "DISMISSED" &&
@@ -457,13 +401,9 @@ export const make = Effect.gen(function* () {
                 input.host,
                 reviewThreads.botLogins,
               ),
-              // A comment out of `gh pr view --json` carries none of its own: that read
-              // reports no reaction at all, so they arrive from the GraphQL page by node id.
               reactions: comment.reactions ?? reviewThreads.reactionsById.get(comment.id) ?? [],
             }))
             .toSorted((left, right) => left.createdAt.localeCompare(right.createdAt)),
-          // `gh pr view --json comments,reviews` follows GitHub's cursors itself, so those two
-          // are always whole and only the thread walk can stop short of the host.
           commentCount: pullRequest.comments.length + reviewThreads.commentCount,
           commentsTruncated: reviewThreads.truncated,
           reviewThreads: reviewThreads.reviewThreads.map((thread) => ({
@@ -488,10 +428,6 @@ export const make = Effect.gen(function* () {
       Effect.all(
         [
           cli.getViewerAccess({ ...input, allowReserve: true }),
-          // Whether this viewer may update the branch is only on the comparison, and the
-          // comparison only resolves through the head ref the detail carries. A failure here
-          // withholds that one action rather than the whole answer, the way the detail path
-          // leaves the banner unknown.
           input.includeUpdateBranch === false
             ? Effect.succeed(false)
             : cli.getPullRequestDetail(input).pipe(

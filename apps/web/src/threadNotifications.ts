@@ -67,7 +67,6 @@ export function setNotificationBadge(count: number) {
 let audioContext: AudioContext | undefined;
 const buffers = new Map<string, Promise<AudioBuffer>>();
 
-/** Called from a gesture so browsers allow later background playback. */
 export function unlockNotificationAudio() {
   audioContext ??= new AudioContext();
   void audioContext.resume().catch(() => undefined);

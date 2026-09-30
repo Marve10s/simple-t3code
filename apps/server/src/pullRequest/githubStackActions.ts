@@ -183,7 +183,6 @@ const encodeNodeIds = Schema.encodeSync(Schema.fromJsonString(Schema.Array(Schem
 
 const decodeMergeResponse = Schema.decodeEffect(Schema.fromJsonString(MergeResponse));
 
-/** Remote-only updates: a stack rebase never switches or rewrites the environment's checkout. */
 export const runGitHubStackAction = Effect.fn("runGitHubStackAction")(function* (input: {
   cwd: string;
   repository: string;
@@ -266,8 +265,6 @@ export const runGitHubStackAction = Effect.fn("runGitHubStackAction")(function* 
     const access = yield* decodeBranchAccess(permissions.stdout).pipe(
       Effect.mapError((cause) => new GitHubStackResponseInvalidError({ ...identity, cause })),
     );
-    // viewerCanUpdateBranch is false for an already-current layer, even if rebasing its parent
-    // will make it stale. Check branch write access separately before touching any layer.
     if (
       open.some((layer) => {
         const pr = access.data.repository?.[`pr${layer.number}`];
@@ -311,7 +308,6 @@ export const runGitHubStackAction = Effect.fn("runGitHubStackAction")(function* 
             repository: { pullRequest: pr },
           },
         } = yield* decodeRebaseBranch(read.stdout);
-        // A push to an earlier layer must not silently become the next layer's new base.
         const changed = processed.find(
           (head, index) => observed?.[index]?.headRefOid !== head.headSha,
         );
@@ -331,7 +327,6 @@ export const runGitHubStackAction = Effect.fn("runGitHubStackAction")(function* 
           processed.push({ id: pr.id, number: layer.number, headSha: pr.headRefOid });
           return;
         }
-        // Pass the reviewed revision to GitHub, including when a push races this read.
         const updated = yield* github.execute({
           cwd: input.cwd,
           args: [

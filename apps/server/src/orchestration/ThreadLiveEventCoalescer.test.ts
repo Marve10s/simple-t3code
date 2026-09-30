@@ -235,7 +235,6 @@ describe("ThreadLiveEventCoalescer", () => {
               .offer({ kind: "event", event: makeToolActivity(4, { kind: "tool.completed" }) })
               .pipe(Effect.result);
             expect(overflow._tag).toBe("Failure");
-            // Do not pull or acknowledge the batch. Cleanup must still finish.
             yield* coalescer.closed;
             expect(yield* coalescer.usage).toEqual({
               retainedItems: 1,

@@ -40,8 +40,6 @@ const decodeGrokSettings = Schema.decodeSync(GrokSettings);
 
 const __dirname = NodePath.dirname(NodeURL.fileURLToPath(import.meta.url));
 const mockAgentPath = NodePath.join(__dirname, "../../../scripts/acp-mock-agent.ts");
-// Stopping a session kills the agent with SIGTERM; Windows terminates the
-// process instead, so the mock never sees a signal to log.
 const windowsHost = HostProcessPlatform.defaultValue() === "win32";
 
 async function makeMockGrokWrapper(extraEnv?: Record<string, string>) {
@@ -1998,7 +1996,6 @@ it.layer(grokAdapterTestLayer)("GrokAdapterLive", (it) => {
       assert.equal(error._tag, "ProviderAdapterRequestError");
       assert.include(error.message, "Grok usage limit reached. Try again later.");
       assert.equal(readySession?.status, "ready");
-      // "grok-build" resolves to the session's current model instead of going over the wire.
       assert.equal(readySession?.model, "grok-4.6");
       assert.isUndefined(readySession?.activeTurnId);
       assert.lengthOf(terminalEvents, 1);
@@ -2589,15 +2586,6 @@ it.layer(grokAdapterTestLayer)("GrokAdapterLive", (it) => {
     }),
   );
 
-  // Production calls startSession from a request fiber that finishes as soon as
-  // the session exists. `Effect.forkChild` made the notification consumer a
-  // child of that fiber, and Effect interrupts a fiber's children when it
-  // completes, so the consumer died on return and every later session/update
-  // was dropped: the thread sat on "Working" forever while the provider
-  // streamed its whole turn. Every other test here calls startSession directly
-  // from the test fiber, which never completes, so the consumer survived and
-  // the bug stayed invisible. Running it in a fiber that finishes is what
-  // reproduces production.
   it.effect("keeps consuming notifications after the startSession fiber completes", () =>
     Effect.gen(function* () {
       const threadId = ThreadId.make("grok-consumer-outlives-start-session");
@@ -2628,9 +2616,6 @@ it.layer(grokAdapterTestLayer)("GrokAdapterLive", (it) => {
         .pipe(Effect.forkChild);
       yield* Fiber.join(startSessionFiber).pipe(Effect.timeout("10 seconds"));
 
-      // Forked, and the assertion waits on the projected event rather than on
-      // sendTurn: with the consumer dead the turn never settles, so awaiting it
-      // directly would hang until the suite timeout instead of failing here.
       const sendTurnFiber = yield* adapter
         .sendTurn({ threadId, input: "hello grok", attachments: [] })
         .pipe(Effect.forkChild);
@@ -2650,9 +2635,6 @@ it.layer(grokAdapterTestLayer)("GrokAdapterLive", (it) => {
 
       yield* Fiber.interrupt(runtimeEventsFiber);
       yield* adapter.stopSession(threadId);
-      // Live clock so the timeouts above are real: under the default test clock
-      // they wait on virtual time that never advances, and a regression would
-      // hang until the suite timeout instead of failing here.
     }).pipe(TestClock.withLive),
   );
 });

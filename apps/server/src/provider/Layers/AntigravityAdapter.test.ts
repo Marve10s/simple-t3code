@@ -421,7 +421,6 @@ it.layer(layer)("AntigravityAdapter", (it) => {
         modelSelection: { instanceId, model: nativeAlternative },
       });
       expect(second.model).toBe(nativeAlternative);
-      // The adapter resolves the cwd it was given through the host Path.
       expect(second.cwd).toBe((yield* Path.Path).resolve("/tmp"));
       expect(h.launches[1]?.resumeSessionId).toBe(nativeSessionId);
       expect(h.calls).toEqual([
@@ -802,8 +801,6 @@ it.layer(layer)("AntigravityAdapter", (it) => {
       yield* Fiber.join(sending);
       const started = yield* h.waitForEvent((event) => event.type === "task.started");
 
-      // Monitoring's Stop reaches the adapter as a turn interrupt. With no
-      // prompt to cancel, it has to end the session to stop the command.
       yield* h.adapter.interruptTurn(threadId);
       const stopped = yield* h.waitForEvent((event) => event.type === "task.completed");
       expect(stopped.payload).toMatchObject({ taskId: started.payload.taskId, status: "stopped" });
@@ -821,8 +818,6 @@ it.layer(layer)("AntigravityAdapter", (it) => {
         .sendTurn({ threadId, input: "Run two readers in one batch" })
         .pipe(Effect.forkChild);
       const prompt = yield* h.nextPrompt;
-      // ACP 1.1.1 capture: one launch call covers both children and returns
-      // only its description before either child finishes.
       const started = nativeToolUpdate({
         sessionUpdate: "tool_call",
         toolCallId: `${nativeSessionId}:2`,
@@ -888,7 +883,6 @@ it.layer(layer)("AntigravityAdapter", (it) => {
         cwd: process.cwd(),
         runtimeMode: "approval-required",
       });
-      // ACP history announces a completed tool first, even when its result failed.
       yield* h.emitNative(
         nativeToolUpdate({
           sessionUpdate: "tool_call",

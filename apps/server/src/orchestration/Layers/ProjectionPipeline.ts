@@ -79,11 +79,6 @@ export const ORCHESTRATION_PROJECTOR_NAMES = {
 type ProjectorName =
   (typeof ORCHESTRATION_PROJECTOR_NAMES)[keyof typeof ORCHESTRATION_PROJECTOR_NAMES];
 
-/**
- * Turn state to settle still-running turns with when their session leaves the
- * "running" status, or null while the session is (re)starting or running and
- * turns must stay unsettled.
- */
 function settledTurnStateForSessionStatus(
   status: OrchestrationSessionStatus,
 ): "completed" | "interrupted" | "error" | null {
@@ -139,7 +134,6 @@ function isStalePendingApprovalFailureDetail(detail: string | null): boolean {
   );
 }
 
-// A refresh reads each persisted summary source, so skip activities that cannot change the result.
 function shouldRefreshThreadShellSummary(event: OrchestrationEvent): boolean {
   if (event.type !== "thread.activity-appended") {
     return true;
@@ -606,7 +600,6 @@ const makeOrchestrationProjectionPipeline = Effect.fn("makeOrchestrationProjecti
     )(function* (event, attachmentSideEffects) {
       switch (event.type) {
         case "thread.created":
-          // A draft retry can re-create this id; links belong to the old incarnation.
           yield* projectionThreadPullRequestRepository.deleteByThreadId({
             threadId: event.payload.threadId,
           });
@@ -705,9 +698,6 @@ const makeOrchestrationProjectionPipeline = Effect.fn("makeOrchestrationProjecti
             ...existingRow.value,
             settledOverride: event.payload.reason === "user" ? "active" : null,
             settledAt: null,
-            // Re-entry stamp for active-list ordering. A thread already pinned
-            // active keeps its stamp: the activity reset that clears the pin
-            // is not a re-entry and must not reorder the list.
             unsettledAt:
               existingRow.value.settledOverride === "active"
                 ? existingRow.value.unsettledAt
@@ -850,9 +840,6 @@ const makeOrchestrationProjectionPipeline = Effect.fn("makeOrchestrationProjecti
               : {}),
             updatedAt: event.payload.updatedAt,
           });
-          // Legacy single-link events replay into the link table. The old
-          // field held one user-chosen link, so it only ever owns the manual
-          // rows; created/agent/stack links are left alone.
           if (event.payload.linkedPullRequest !== undefined) {
             yield* projectionThreadPullRequestRepository.deleteByThreadIdAndSource({
               threadId: event.payload.threadId,
@@ -927,7 +914,6 @@ const makeOrchestrationProjectionPipeline = Effect.fn("makeOrchestrationProjecti
           if (Option.isNone(existingRow)) {
             return;
           }
-          // A sync for a link the user removed in the meantime is stale; drop it.
           const links = yield* projectionThreadPullRequestRepository.listByThreadId({
             threadId: event.payload.threadId,
           });
@@ -980,9 +966,6 @@ const makeOrchestrationProjectionPipeline = Effect.fn("makeOrchestrationProjecti
         }
 
         case "thread.deleted": {
-          // A draft retry can re-create this id later in the log. During
-          // replay the attachment files on disk already belong to that later
-          // incarnation, so only an unsuperseded deletion removes them.
           const recreatedLater = yield* eventStore.hasEventAfter({
             aggregateKind: "thread",
             aggregateId: event.payload.threadId,
@@ -992,7 +975,6 @@ const makeOrchestrationProjectionPipeline = Effect.fn("makeOrchestrationProjecti
           if (!recreatedLater) {
             attachmentSideEffects.deletedThreadIds.add(event.payload.threadId);
           }
-          // A tombstoned thread must not show up as linked to a pull request.
           yield* projectionThreadPullRequestRepository.deleteByThreadId({
             threadId: event.payload.threadId,
           });
@@ -1010,9 +992,6 @@ const makeOrchestrationProjectionPipeline = Effect.fn("makeOrchestrationProjecti
           return;
         }
 
-        // A message cannot change any summary field except latestUserMessageAt,
-        // which is a monotonic maximum that folds in directly. The full refresh
-        // would re-read every message body in the thread per user message.
         case "thread.message-sent": {
           const existingRow = yield* projectionThreadRepository.getById({
             threadId: event.payload.threadId,
@@ -1063,7 +1042,6 @@ const makeOrchestrationProjectionPipeline = Effect.fn("makeOrchestrationProjecti
           }
           yield* projectionThreadRepository.upsert({
             ...existingRow.value,
-            // activeTurnId describes current work; a terminal session must not erase history.
             latestTurnId: event.payload.session.activeTurnId ?? existingRow.value.latestTurnId,
             updatedAt: event.occurredAt,
           });
@@ -1134,9 +1112,6 @@ const makeOrchestrationProjectionPipeline = Effect.fn("makeOrchestrationProjecti
       "applyThreadMessagesProjection",
     )(function* (event, attachmentSideEffects) {
       switch (event.type) {
-        // A draft retry re-creates a soft-deleted thread id. Every projector
-        // drops its own rows for the old incarnation here so replay from any
-        // per-projector cursor rebuilds the new thread without stale history.
         case "thread.created":
           yield* projectionThreadMessageRepository.deleteByThreadId({
             threadId: event.payload.threadId,
@@ -1456,9 +1431,6 @@ const makeOrchestrationProjectionPipeline = Effect.fn("makeOrchestrationProjecti
                 threadId: event.payload.threadId,
               });
             }
-            // Leaving the "running" session status is the turn-end signal:
-            // settle still-running turns so their duration reflects the whole
-            // turn rather than the last assistant message.
             const settledTurnState = settledTurnStateForSessionStatus(event.payload.session.status);
             if (settledTurnState === null) {
               return;
@@ -1475,9 +1447,6 @@ const makeOrchestrationProjectionPipeline = Effect.fn("makeOrchestrationProjecti
                       ...turn,
                       turnId: turn.turnId,
                       state: settledTurnState,
-                      // A running turn's completedAt can only hold a mid-turn
-                      // placeholder checkpoint timestamp — the session leaving
-                      // "running" is the authoritative turn end.
                       completedAt: event.payload.session.updatedAt,
                     }),
               { concurrency: 1 },
@@ -1485,9 +1454,6 @@ const makeOrchestrationProjectionPipeline = Effect.fn("makeOrchestrationProjecti
             return;
           }
 
-          // A new active turn supersedes any still-running turn on the same
-          // thread — steering can open a new turn without the provider ever
-          // completing the previous one.
           const otherRunningTurns = yield* projectionTurnRepository.listByThreadId({
             threadId: event.payload.threadId,
           });
@@ -1585,11 +1551,6 @@ const makeOrchestrationProjectionPipeline = Effect.fn("makeOrchestrationProjecti
           if (event.payload.turnId === null || event.payload.role !== "assistant") {
             return;
           }
-          // A completed assistant message only settles the turn once the
-          // session is no longer running it — providers may emit several
-          // assistant messages per turn (commentary between tool calls), and
-          // the turn must stay unsettled until the provider reports turn end
-          // (projected as thread.session-set leaving the "running" status).
           const session = yield* projectionThreadSessionRepository.getByThreadId({
             threadId: event.payload.threadId,
           });
@@ -1678,8 +1639,6 @@ const makeOrchestrationProjectionPipeline = Effect.fn("makeOrchestrationProjecti
         }
 
         case "thread.turn-diff-completed": {
-          // Mid-turn diff updates produce placeholder checkpoints; record the
-          // checkpoint, but don't settle a turn its session is still running.
           const session = yield* projectionThreadSessionRepository.getByThreadId({
             threadId: event.payload.threadId,
           });
@@ -1691,10 +1650,6 @@ const makeOrchestrationProjectionPipeline = Effect.fn("makeOrchestrationProjecti
             threadId: event.payload.threadId,
             turnId: event.payload.turnId,
           });
-          // Do not let a placeholder (status "missing") overwrite a checkpoint
-          // that has already been captured with a real git ref. In-memory
-          // projectEvent already refuses this. SQL did not, so thread detail
-          // and diffs could show missing after a ready capture.
           if (
             Option.isSome(existingTurn) &&
             existingTurn.value.checkpointStatus !== null &&
@@ -1864,9 +1819,6 @@ const makeOrchestrationProjectionPipeline = Effect.fn("makeOrchestrationProjecti
               return;
             }
 
-            // Sending a reply clears the badge before the provider accepts it.
-            // A failed reply must restore the request unless a terminal event
-            // already closed it, including a reply from another client.
             const requestActivities = (yield* projectionThreadActivityRepository.listByThreadId({
               threadId: existingRow.value.threadId,
             })).filter((activity) => extractActivityRequestId(activity.payload) === requestId);
@@ -1900,11 +1852,6 @@ const makeOrchestrationProjectionPipeline = Effect.fn("makeOrchestrationProjecti
             }
             return;
           }
-          // Only approval-requested activities should create pending-approval
-          // rows.  Other activity kinds that happen to carry a requestId
-          // (e.g. user-input.requested / user-input.resolved) must not
-          // pollute this projection — they have their own accounting via
-          // derivePendingUserInputCountFromActivities.
           if (event.payload.activity.kind !== "approval.requested") {
             return;
           }
@@ -2004,7 +1951,6 @@ const makeOrchestrationProjectionPipeline = Effect.fn("makeOrchestrationProjecti
           }
         }
 
-        // Later events in the same transaction can add attachment references.
         const prunedThreadRelativePaths = new Map<string, Set<string>>();
         for (const threadId of sideEffects.prunedThreadRelativePaths.keys()) {
           const messages = yield* projectionThreadMessageRepository.listByThreadId({
@@ -2096,7 +2042,6 @@ const makeOrchestrationProjectionPipeline = Effect.fn("makeOrchestrationProjecti
                 (projector) => projector.apply(event, attachmentSideEffects),
                 { concurrency: 1, discard: true },
               );
-              // Runtime projectors commit together. Bootstrap still advances each cursor separately.
               yield* projectionStateRepository.upsertMany(
                 projectors.map((projector) => ({
                   projector: projector.name,
@@ -2109,8 +2054,6 @@ const makeOrchestrationProjectionPipeline = Effect.fn("makeOrchestrationProjecti
           const hasCleanup =
             attachmentSideEffects.deletedThreadIds.size > 0 ||
             attachmentSideEffects.prunedThreadRelativePaths.size > 0;
-          // Return the cleanup effect so the caller runs it after the outer transaction commits.
-          // Most events have no cleanup, so they skip the call and write no cleanup span.
           // @effect-diagnostics-next-line returnEffectInGen:off
           return hasCleanup
             ? applyAttachmentSideEffects(event, attachmentSideEffects).pipe(Effect.asVoid)
@@ -2140,8 +2083,6 @@ const makeOrchestrationProjectionPipeline = Effect.fn("makeOrchestrationProjecti
         cleanupState?.lastAppliedSequence ?? 0,
         ...projectors.map((projector) => byProjector.get(projector.name)?.lastAppliedSequence ?? 0),
       );
-      // Persist this boundary before replay: a reset projector can encounter an old
-      // revert, then fail after other projectors have committed past that event.
       yield* projectionStateRepository.upsert({
         projector: cleanupProjector,
         lastAppliedSequence: cleanupStart,
@@ -2149,8 +2090,6 @@ const makeOrchestrationProjectionPipeline = Effect.fn("makeOrchestrationProjecti
       });
       yield* Effect.forEach(projectors, bootstrapProjector, { concurrency: 1, discard: true });
 
-      // Cleanup has its own cursor so retries never have to replay committed text.
-      // All message and activity references are current before any files are removed.
       const pendingCleanup = new Map<string, OrchestrationEvent>();
       let lastEvent: OrchestrationEvent | undefined;
       yield* Stream.runForEach(
@@ -2172,7 +2111,6 @@ const makeOrchestrationProjectionPipeline = Effect.fn("makeOrchestrationProjecti
             event.type === "thread.reverted" ? [[threadId, new Set<string>()]] : [],
           ),
         });
-        // Leave the cleanup cursor behind this event so the next bootstrap retries it.
         if (!cleaned) return;
       }
       if (lastEvent) {

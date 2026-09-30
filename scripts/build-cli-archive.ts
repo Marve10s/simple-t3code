@@ -1,19 +1,4 @@
 #!/usr/bin/env node
-/**
- * Packages the server single-executable into a self-contained per-platform
- * archive: the `t3` binary, the web client, the resource monitor, and a
- * production install of the native packages the bundle keeps external. The
- * archive is the unit every runtime installer downloads, so nothing in it may
- * require Node, npm, or a compiler on the machine that unpacks it.
- *
- * Layout inside the archive (a single top-level directory named after the
- * archive stem):
- *
- *   t3 | t3.exe          the single-executable
- *   client/              web app served by the server
- *   resource-monitor/    per-platform Rust helper, same paths as the npm package
- *   node_modules/        runtime externals (node-pty, msgpackr-extract, fff)
- */
 import * as NodeRuntime from "@effect/platform-node/NodeRuntime";
 import * as NodeServices from "@effect/platform-node/NodeServices";
 import * as Config from "effect/Config";
@@ -91,7 +76,6 @@ export class CliArchiveInputMissingError extends Schema.TaggedError<CliArchiveIn
   }
 }
 
-/** Platform/arch pair as it appears in archive names and `process.platform`/`process.arch`. */
 export function cliArchivePlatformKey(platform: BuildPlatform, arch: BuildArch): string {
   const nodePlatform = platform === "mac" ? "darwin" : platform === "win" ? "win32" : "linux";
   return `${nodePlatform}-${arch}`;
@@ -102,12 +86,9 @@ export function cliArchiveStem(version: string, platform: BuildPlatform, arch: B
 }
 
 export function cliArchiveFileName(version: string, platform: BuildPlatform, arch: BuildArch) {
-  // gzip rather than xz: GNU tar needs an external xz binary for -J, which
-  // minimal hosts lack, while every tar (and Node's zlib) handles gzip alone.
   return `${cliArchiveStem(version, platform, arch)}.${platform === "win" ? "zip" : "tar.gz"}`;
 }
 
-/** The bsdtar Windows ships in System32; resolves regardless of which tar is first on PATH. */
 export function windowsSystemTar(): string {
   const systemRoot = process.env.SystemRoot ?? process.env.windir ?? "C:\\Windows";
   return `${systemRoot}\\System32\\tar.exe`;
@@ -118,8 +99,6 @@ const runCommand = Effect.fn("runCommand")(function* (
   label: string,
 ) {
   const spawner = yield* ChildProcessSpawner.ChildProcessSpawner;
-  // Output is inherited so the build log shows what each tool did; a failing
-  // signing or packaging step is otherwise a bare exit code.
   const child = yield* spawner.spawn(
     ChildProcess.isStandardCommand(command)
       ? ChildProcess.make(command.command, command.args, {
@@ -142,11 +121,6 @@ const requireInput = Effect.fn("requireInput")(function* (inputPath: string, hin
   }
 });
 
-/**
- * Installs the runtime-external packages into `stageDir/node_modules` with a
- * hoisted, symlink-free layout. The tree is archived and unpacked on machines
- * without pnpm, so the store layout cannot be relied on to survive the trip.
- */
 const stageRuntimeExternals = Effect.fn("stageRuntimeExternals")(function* (input: {
   readonly repoRoot: string;
   readonly stageDir: string;
@@ -219,9 +193,6 @@ const stageRuntimeExternals = Effect.fn("stageRuntimeExternals")(function* (inpu
     "vp install --prod (cli archive runtime externals)",
   );
 
-  // pnpm's bookkeeping and the manifest only matter to pnpm; the runtime
-  // resolves packages by directory. node-pty ships every platform's prebuilds
-  // in one package (58 MB); only the archive's own platform loads.
   const platformKey = cliArchivePlatformKey(input.platform, input.arch);
   const prebuildsDir = path.join(input.stageDir, "node_modules/node-pty/prebuilds");
   const foreignPrebuilds = (yield* fs
@@ -242,10 +213,6 @@ const stageRuntimeExternals = Effect.fn("stageRuntimeExternals")(function* (inpu
   ]) {
     yield* fs.remove(path.join(input.stageDir, entry), { recursive: true, force: true });
   }
-  // A hoisted install still leaves nested `node_modules/.bin` shim directories
-  // inside packages that declare bins (msgpackr-extract's). They are symlinks
-  // nothing runs, and the npm registry refuses a tarball that contains any
-  // symlink, so strip every `.bin` directory below node_modules.
   yield* removeNestedBinDirectories(fs, path, path.join(input.stageDir, "node_modules"));
 });
 
@@ -269,7 +236,6 @@ const removeNestedBinDirectories = (
     }
   });
 
-/** Copies the web client without its sourcemaps, which nothing serves. */
 const stageWebClient = Effect.fn("stageWebClient")(function* (source: string, target: string) {
   const fs = yield* FileSystem.FileSystem;
   const path = yield* Path.Path;
@@ -289,13 +255,6 @@ const MacSigningConfig = Config.all({
   appleApiIssuer: Config.String("APPLE_API_ISSUER").pipe(Config.option),
 });
 
-/**
- * Apple Silicon refuses to run unsigned Mach-O binaries at all, so the
- * executable is always signed: ad hoc when no identity is configured, or with
- * the Developer ID plus notarization when it is. The hardened runtime that
- * notarization requires only loads signed libraries, so every native addon in
- * the archive is signed with the same identity.
- */
 const signMacArchiveContents = Effect.fn("signMacArchiveContents")(function* (input: {
   readonly repoRoot: string;
   readonly contentDir: string;
@@ -344,8 +303,6 @@ const signMacArchiveContents = Effect.fn("signMacArchiveContents")(function* (in
     );
     return;
   }
-  // notarytool only accepts archives, and a bare executable cannot be stapled,
-  // so notarize a zip of the binary and rely on the online ticket lookup.
   const notarizeZip = path.join(path.dirname(input.executablePath), ".notarize-t3.zip");
   yield* runCommand(
     ChildProcess.make("ditto", ["-c", "-k", "--keepParent", input.executablePath, notarizeZip]),
@@ -377,16 +334,6 @@ const WindowsSigningConfig = Config.all({
   ),
 });
 
-/**
- * Node's --build-sea injects the blob into a copy of node.exe by rebuilding
- * its resource section but, unlike its Mach-O path, leaves node's original
- * Authenticode data-directory entry in the PE header. The file grows, so the
- * entry now points into the middle of the new section at bytes that are not a
- * certificate table. signtool refuses to sign such an image (0x800700C1, "not
- * a valid Win32 application") and cannot `remove /s` it either, since the SIP
- * fails to parse the garbage. Clearing the entry is exactly what a signature
- * strip does, without needing a parser that trusts the broken table.
- */
 const stripStaleAuthenticodeEntry = Effect.fn("stripStaleAuthenticodeEntry")(function* (
   executablePath: string,
 ) {
@@ -402,15 +349,11 @@ const stripStaleAuthenticodeEntry = Effect.fn("stripStaleAuthenticodeEntry")(fun
   }
   const optionalHeader = peOffset + 24;
   const magic = view.getUint16(optionalHeader, true);
-  // Data directories start at +112 (PE32+) or +96 (PE32); the certificate
-  // table is directory index 4, eight bytes (file offset, size).
   const securityEntry = optionalHeader + (magic === 0x20b ? 112 : 96) + 4 * 8;
   const offset = view.getUint32(securityEntry, true);
   const size = view.getUint32(securityEntry + 4, true);
   if (offset === 0 && size === 0) return;
   if (offset + size === bytes.byteLength) {
-    // A certificate table that still ends at EOF is intact; leave it for
-    // signtool to replace rather than second-guessing it here.
     return;
   }
   view.setUint32(securityEntry, 0, true);
@@ -421,7 +364,6 @@ const stripStaleAuthenticodeEntry = Effect.fn("stripStaleAuthenticodeEntry")(fun
   );
 });
 
-/** Signs t3.exe through the same Azure Trusted Signing setup the installer uses. */
 const signWindowsExecutable = Effect.fn("signWindowsExecutable")(function* (
   executablePath: string,
 ) {
@@ -434,9 +376,6 @@ const signWindowsExecutable = Effect.fn("signWindowsExecutable")(function* (
     return;
   }
   yield* stripStaleAuthenticodeEntry(executablePath);
-  // Mirrors electron-builder's invocation for the installer: every value
-  // single-quoted, the file path in Windows form. `$ErrorActionPreference`
-  // makes a signing failure inside the cmdlet surface as a non-zero exit.
   const quote = (value: string) => `'${value.replaceAll("'", "''")}'`;
   const script = [
     "$ErrorActionPreference = 'Stop';",
@@ -468,16 +407,12 @@ const buildCliArchive = Effect.fn("buildCliArchive")(function* (input: {
   const repoRoot = yield* RepoRoot;
   const serverDir = path.join(repoRoot, "apps/server");
   const executableName = input.platform === "win" ? "t3.exe" : "t3";
-  // tsdown suffixes cross-built executables with their target (t3-darwin-x64);
-  // a host build is plain t3. Prefer the exact target when both exist.
   const targetKey = `${input.platform === "mac" ? "darwin" : input.platform}-${input.arch}`;
   const targetExecutable = path.join(
     serverDir,
     "dist-exe",
     `t3-${targetKey}${input.platform === "win" ? ".exe" : ""}`,
   );
-  // The unsuffixed host build is only a valid stand-in when it was built for
-  // this platform and architecture; otherwise a missing target must fail.
   const hostPlatform = yield* HostProcessPlatform;
   const hostKey = `${hostPlatform === "win32" ? "win" : hostPlatform}-${yield* HostProcessArchitecture}`;
   const builtExecutable = (yield* fs.exists(targetExecutable))
@@ -534,19 +469,11 @@ const buildCliArchive = Effect.fn("buildCliArchive")(function* (input: {
   );
   yield* fs.remove(archivePath, { force: true });
   if (input.platform === "win") {
-    // Windows ships bsdtar, which writes zip natively. Name it by path: under
-    // the Git Bash shell CI uses, a bare `tar` is GNU tar, which neither
-    // writes zip nor accepts a drive-letter path.
     yield* runCommand(
       ChildProcess.make(windowsSystemTar(), ["-a", "-c", "-f", archivePath, "-C", stageRoot, stem]),
       "tar (zip)",
     );
   } else {
-    // On Linux, pnpm hard-links identical files out of its store and node-gyp
-    // hard-links build outputs, and GNU tar records those as link entries.
-    // The npm registry rejects a tarball containing any, and the npm platform
-    // packages are re-packed from this archive's contents, so store every
-    // file as a file. macOS's bsdtar has no such flag; pnpm clones there.
     yield* runCommand(
       ChildProcess.make("tar", [
         ...(input.platform === "linux" ? ["--hard-dereference"] : []),

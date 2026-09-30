@@ -16,7 +16,6 @@ import { appAtomRegistry } from "~/rpc/atomRegistry";
 import { attachmentEnvironment } from "~/state/attachments";
 import { readPreparedConnection } from "~/state/session";
 
-/** Sends the finished encoded file once; capture frames never cross the environment connection. */
 export async function uploadBrowserRecording(
   { environmentId, threadId }: ScopedThreadRef,
   artifact: DesktopPreviewRecordingArtifact,
@@ -43,7 +42,6 @@ export async function uploadBrowserRecording(
     },
     transport: (url) => {
       const controller = new AbortController();
-      // Encoding, saving and minting consume the same request budget. Leave time to reply.
       const remainingMs = deadlineMs - Date.now() - 1_000;
       return {
         abort: () => controller.abort(),

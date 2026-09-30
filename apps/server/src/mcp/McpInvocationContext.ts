@@ -24,7 +24,6 @@ export class McpInvocationContext extends Context.Service<
   McpInvocationScope
 >()("t3/mcp/McpInvocationContext") {}
 
-/** The error a missing capability surfaces as; preview keeps its own so the broker can route it. */
 export type McpCapabilityError<C extends McpCapability> = C extends "preview"
   ? PreviewAutomationUnavailableError
   : McpCapabilityUnavailableError;
@@ -50,7 +49,6 @@ export const requireMcpCapability = <const C extends McpCapability>(
   McpInvocationContext.pipe(
     Effect.filterOrFail(
       (invocation) => invocation.capabilities.has(capability),
-      // The conditional type narrows what the literal argument decided at runtime.
       (invocation) => missingCapability(invocation, capability) as McpCapabilityError<C>,
     ),
     Effect.withSpan("mcp.requireCapability"),

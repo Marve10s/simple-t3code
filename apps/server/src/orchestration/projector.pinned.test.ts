@@ -100,7 +100,6 @@ it.effect("projects pin order key lifecycle", () =>
     );
     expect(created.threads[0]?.pinOrderKey ?? null).toBeNull();
 
-    // Fresh pin carries the client's slot in the arranged order.
     const pinned = yield* projectEvent(
       created,
       makeEvent({
@@ -116,8 +115,6 @@ it.effect("projects pin order key lifecycle", () =>
     );
     expect(pinned.threads[0]?.pinOrderKey).toBe("g");
 
-    // Re-pins and events from pre-reorder servers omit the field entirely;
-    // the existing key must survive rather than being nulled out.
     const repinned = yield* projectEvent(
       pinned,
       makeEvent({
@@ -128,7 +125,6 @@ it.effect("projects pin order key lifecycle", () =>
     );
     expect(repinned.threads[0]?.pinOrderKey).toBe("g");
 
-    // A drag persists the new slot.
     const reordered = yield* projectEvent(
       repinned,
       makeEvent({
@@ -139,8 +135,6 @@ it.effect("projects pin order key lifecycle", () =>
     );
     expect(reordered.threads[0]?.pinOrderKey).toBe("m");
 
-    // Unpin clears the slot: re-pinning is "pin again", not "restore an
-    // ancient position".
     const unpinned = yield* projectEvent(
       reordered,
       makeEvent({

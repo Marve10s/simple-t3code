@@ -144,7 +144,6 @@ describe("GitHubCli.layer", () => {
         Effect.succeed(processOutput(input.env?.GH_TOKEN ?? "ambient")),
       );
       const gh = yield* GitHubCli.GitHubCli;
-      // Constructed outside either request, like the PR service's read caches.
       const cache = yield* Cache.make({
         lookup: (host: string) =>
           gh.execute({
@@ -431,9 +430,6 @@ describe("GitHubCli.layer", () => {
   );
 
   it.effect("keeps pull requests from gh versions without headRepository.nameWithOwner", () =>
-    // gh < 2.47 (e.g. Ubuntu-packaged 2.46) exports headRepository as
-    // {id, name} only. These entries must decode instead of being dropped,
-    // with nameWithOwner rebuilt from the owner login.
     Effect.gen(function* () {
       mockRun.mockReturnValueOnce(
         Effect.succeed(

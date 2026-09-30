@@ -57,7 +57,6 @@ function lifecycle(status: unknown, exitCode: unknown) {
   }
 }
 
-/** Map Grok's discriminated tool results, including notifications after the turn ends. */
 export function buildGrokBackgroundTaskEvents(input: {
   readonly tasks: Map<string, GrokBackgroundTaskRecord>;
   readonly toolCallId: string;
@@ -94,7 +93,6 @@ export function buildGrokBackgroundTaskEvents(input: {
         title: description,
         ...(toolUseId ? { toolUseId } : {}),
       },
-      // Polls can rediscover older tasks without establishing their originating turn.
       turnId: toolUseId ? turnId : undefined,
     };
     tasks.set(id, task);

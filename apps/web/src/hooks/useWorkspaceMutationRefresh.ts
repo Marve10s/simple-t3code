@@ -9,11 +9,6 @@ function activityPayload(activity: OrchestrationThreadActivity): Record<string, 
     : null;
 }
 
-/**
- * The latest provider event after which files on disk may have changed.
- * File tools are explicit; completed commands are included because a shell
- * command can mutate the workspace without reporting the paths it touched.
- */
 export function latestWorkspaceMutationId(
   activities: ReadonlyArray<OrchestrationThreadActivity>,
 ): string | null {
@@ -42,10 +37,6 @@ export function workspaceMutationRefreshToken(
   return mutationId === null ? null : `${resourceKey}\u0000${mutationId}`;
 }
 
-/**
- * Refreshes once per mutation and resource. Disabled mutations stay pending,
- * which lets an editable file catch up after its local save finishes.
- */
 export function useWorkspaceMutationRefresh(input: {
   readonly enabled?: boolean;
   readonly mutationId: string | null;

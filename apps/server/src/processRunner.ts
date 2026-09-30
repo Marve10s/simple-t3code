@@ -25,15 +25,10 @@ export interface ProcessRunInput {
   readonly timeout?: Duration.Input | undefined;
   readonly env?: NodeJS.ProcessEnv | undefined;
   readonly stdin?: string | undefined;
-  /** Receives every stdout chunk, including bytes beyond the buffered output limit. */
   readonly onStdoutChunk?: ((chunk: Uint8Array) => void) | undefined;
   readonly maxOutputBytes?: number | undefined;
   readonly outputMode?: "error" | "truncate" | undefined;
   readonly truncatedMarker?: string | undefined;
-  /**
-   * On timeout, return a synthetic timedOut result.
-   * Partial stdout/stderr are not preserved.
-   */
   readonly timeoutBehavior?: "error" | "timedOutResult" | undefined;
 }
 
@@ -171,7 +166,6 @@ export const isWindowsCommandNotFound = Effect.fn("processRunner.isWindowsComman
   },
 );
 
-// Untraced: no attributes, and its time is the runProcessCore span. Errors fail that span.
 const collectText = Effect.fnUntraced(function* (input: {
   readonly command: string;
   readonly args: ReadonlyArray<string>;
@@ -286,7 +280,6 @@ function finalizeRunProcess<R>(
   );
 }
 
-/** The executable name without its directory, recorded as `process.command` on process spans. */
 export const commandName = (command: string) => command.replace(/^.*[\\/]/, "");
 
 const runProcessCore = Effect.fn("processRunner.runProcessCore")(function* (
@@ -409,7 +402,7 @@ const runProcessCore = Effect.fn("processRunner.runProcessCore")(function* (
   } satisfies ProcessRunOutput;
 });
 
-/** @public Service construction is part of the canonical Effect module API. */
+/** @public */
 export const make = Effect.fn("ProcessRunner.make")(function* () {
   const spawner = yield* ChildProcessSpawner.ChildProcessSpawner;
 

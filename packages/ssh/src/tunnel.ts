@@ -57,12 +57,6 @@ const SSH_READY_PROBE_TIMEOUT_MS = 1_000;
 const TUNNEL_SHUTDOWN_TIMEOUT_MS = 2_000;
 const REMOTE_READY_TIMEOUT_MS = 60_000;
 const REMOTE_LAUNCH_TIMEOUT_MS = 90_000;
-// A cold archive launch also downloads and unpacks a ~70 MB release archive
-// and may wait on another installer's lock. The budgets nest: the checksum
-// file is tiny and the archive download is bounded; a waiter outlasts both
-// downloads plus extraction so it can reuse the result; and the SSH command
-// outlasts an install (own or waited-for) plus readiness, with slack for
-// verification and extraction, which have no timeout of their own.
 const REMOTE_ARCHIVE_CHECKSUMS_SECONDS = 30;
 const REMOTE_ARCHIVE_DOWNLOAD_SECONDS = 240;
 const REMOTE_ARCHIVE_LOCK_WAIT_SECONDS = 360;
@@ -70,17 +64,8 @@ const REMOTE_ARCHIVE_LAUNCH_TIMEOUT_MS = 900_000;
 const REMOTE_REUSE_READY_TIMEOUT_MS = 2_000;
 
 export interface RemoteT3RunnerOptions {
-  /**
-   * Dev mode: run `node <path>` on the remote instead of a release archive.
-   * The only mode that needs Node on the remote.
-   */
   readonly nodeScriptPath?: string | null;
   readonly nodeEngineRange?: string | null;
-  /**
-   * Exact version whose self-contained release archive the remote installs
-   * and runs. Required unless `nodeScriptPath` is set; the remote then needs
-   * neither Node nor npm.
-   */
   readonly archiveVersion?: string | null;
   readonly releaseBaseUrl?: string | null;
 }
@@ -248,8 +233,6 @@ function applyScriptPlaceholders(
   return result;
 }
 
-// Re-exported from the shared HTTP readiness module so existing importers
-// (notably tunnel.test.ts) keep resolving it from here.
 export { describeReadinessCause };
 
 export const REMOTE_PICK_PORT_SCRIPT = `const fs = require("node:fs");
@@ -776,9 +759,6 @@ export class SshInvalidArchiveVersionError extends Schema.TaggedError<SshInvalid
   }
 }
 
-// The version becomes a directory name the runner removes and recreates, so
-// it must be one exact SemVer segment: no separators, no `..`, no shell
-// metacharacters beyond what SemVer allows.
 const EXACT_ARCHIVE_VERSION =
   /^(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)(?:-[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?$/u;
 
@@ -800,7 +780,6 @@ export function buildRemoteT3RunnerScript(input?: RemoteT3RunnerOptions): string
   if (archiveVersion !== "" && !EXACT_ARCHIVE_VERSION.test(archiveVersion)) {
     throw new SshInvalidArchiveVersionError({ archiveVersion });
   }
-  // Strip the `/v<version>` the helper appends: the script builds URLs itself.
   const releaseBaseUrl = cliReleaseDownloadBaseUrl("", input?.releaseBaseUrl ?? undefined).replace(
     /\/v$/u,
     "",
@@ -942,8 +921,6 @@ export const issueRemotePairingToken = Effect.fn("ssh/tunnel.issueRemotePairingT
   const result = yield* runSshCommand(target, {
     remoteCommandArgs: ["sh", "-s"],
     stdin: buildRemotePairingScript(target, runner),
-    // Pairing may be the first command on a cold remote, so it can install
-    // the archive on the way.
     ...(isNodeScriptRunner(runner) ? {} : { timeoutMs: REMOTE_ARCHIVE_LAUNCH_TIMEOUT_MS }),
     ...(input?.authSecret === undefined ? {} : { authSecret: input.authSecret }),
     ...(input?.batchMode === undefined ? {} : { batchMode: input.batchMode }),
@@ -1336,7 +1313,6 @@ const makeSshEnvironmentManager = Effect.fn("ssh/tunnel.SshEnvironmentManager.ma
   const targetLocks = new Map<string, Semaphore.Semaphore>();
   const authSecrets = new Map<string, string>();
 
-  // Keep one lock per target so reconnect cannot reuse a server while stop is pending.
   const withTargetLock = Effect.fn("ssh/tunnel.withTargetLock")(function* <A, E, R>(
     key: string,
     effect: Effect.Effect<A, E, R>,
@@ -1738,7 +1714,6 @@ const makeSshEnvironmentManager = Effect.fn("ssh/tunnel.SshEnvironmentManager.ma
           hasTunnel: entry !== null,
         });
         if (entry !== null) {
-          // Explicit disconnect owns the remote stop so its failure reaches the caller.
           yield* Effect.gen(function* () {
             tunnels.delete(key);
             yield* closeTunnelEntry(entry);
@@ -1760,9 +1735,7 @@ const makeSshEnvironmentManager = Effect.fn("ssh/tunnel.SshEnvironmentManager.ma
   return SshEnvironmentManager.of({ ensureEnvironment, disconnectEnvironment });
 });
 
-/**
- * @effect-expect-leaking ChildProcessSpawner | FileSystem | HttpClient | NetService | Path | SshPasswordPrompt
- */
+/** @effect-expect-leaking ChildProcessSpawner | FileSystem | HttpClient | NetService | Path | SshPasswordPrompt */
 export class SshEnvironmentManager extends Context.Service<
   SshEnvironmentManager,
   SshEnvironmentManagerShape

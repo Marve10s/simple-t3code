@@ -15,7 +15,6 @@ import { decideOrchestrationCommand } from "./decider.ts";
 import { projectEvent } from "./projector.ts";
 
 const NOW = "2026-01-01T00:00:00.000Z";
-// The Effect test clock starts at the epoch.
 const BEFORE_NOW = "1969-12-30T00:00:00.000Z";
 const SNOOZED_AT = "1969-12-31T00:00:00.000Z";
 const FUTURE_WAKE = "1970-01-02T00:00:00.000Z";

@@ -18,7 +18,6 @@ vi.mock("@tanstack/react-router", () => ({
   useNavigate: () => vi.fn(),
   Link: ({ children }: { children: ReactNode }) => <a>{children}</a>,
 }));
-// Keep the real chip/editor lifecycle while replacing DOM positioning and floating layers.
 vi.mock("../ui/tooltip", () => ({
   Tooltip: ({ children }: { children: ReactNode }) => <>{children}</>,
   TooltipTrigger: ({ render }: { render: ReactNode }) => render,
@@ -47,7 +46,6 @@ const citation = {
   prefix: "",
   suffix: "",
 };
-// The observer owns DOM access; these identities let us check which anchor survives.
 const sourceAnchor = {
   source: {},
   range: {},

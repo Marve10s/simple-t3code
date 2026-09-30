@@ -16,7 +16,6 @@ import {
   useCodexBackgroundEnabled,
 } from "./codexBackgrounds";
 
-/** Settings → Appearance → New chat background. */
 export function CodexBackgroundSettings() {
   const [enabled, setEnabled] = useCodexBackgroundEnabled();
   const [choice, setChoice] = useCodexBackgroundChoice();

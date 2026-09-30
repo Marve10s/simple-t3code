@@ -103,7 +103,6 @@ export function resolveSnapShotTargetOnce(
   return resolution;
 }
 
-// A capture keeps its destination even after its animation unmounts or the window blurs.
 export function resolveSnapShotDeliveryTarget(
   targets: Map<string, Promise<CaptureTarget | null>>,
   id: string,
@@ -182,8 +181,6 @@ export async function deliverSnapShot(
     throw new Error("The captured window could not be saved to the draft.");
   }
 
-  // Reveal the attachment under the flying capture before the desktop tears the overlay down,
-  // otherwise the tile is missing for the frames between the landing and its first paint.
   if (getPendingSnapShotAnimations().some((animation) => animation.id === capture.id)) {
     await afterNextPaint();
     await waitForSnapShotAnimationDestination(capture.id).catch(() => undefined);
@@ -338,8 +335,6 @@ export function SnapShotCoordinator() {
         case "requested": {
           const current = lastTargetRef.current;
           const target = current ? resolveExistingSnapShotTarget(current, routeThreadRef) : null;
-          // Creating a new draft would navigate the renderer before a self-capture finishes.
-          // Pin existing drafts now; create a destination after acquisition when none exists.
           if (target) {
             void resolveSnapShotDeliveryTarget(captureTargetsRef.current, event.id, () =>
               Promise.resolve(target),

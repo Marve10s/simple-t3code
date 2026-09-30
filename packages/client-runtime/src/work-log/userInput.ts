@@ -27,7 +27,6 @@ function questionFingerprint(
   questions: ReadonlyArray<unknown>,
 ): string | undefined {
   const texts = questions.map((question) => (typeof question === "string" ? question.trim() : ""));
-  // Sort the fresh array in place because Hermes does not provide toSorted.
   return texts.length > 0 && texts.every(Boolean)
     ? JSON.stringify([turnId, texts.sort()])
     : undefined;
@@ -73,7 +72,6 @@ function withoutDuplicateQuestionTools(
   });
 }
 
-/** Keep a question and its answer at the original tool position in the work log. */
 export function foldUserInputActivities(
   activities: ReadonlyArray<OrchestrationThreadActivity>,
 ): ReadonlyArray<OrchestrationThreadActivity> {

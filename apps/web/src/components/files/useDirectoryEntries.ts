@@ -6,7 +6,6 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { appAtomRegistry } from "~/rpc/atomRegistry";
 import { projectEnvironment } from "~/state/projects";
 
-/** Loads only requested directories; collapsing a folder keeps its children cached. */
 export function useDirectoryEntries(environmentId: EnvironmentId, cwd: string) {
   const [directories, setDirectories] = useState(new Map<string, readonly ProjectEntry[]>());
   const [errors, setErrors] = useState(new Map<string, string>());
@@ -113,7 +112,6 @@ export function useDirectoryEntries(environmentId: EnvironmentId, cwd: string) {
   );
 
   const refresh = useCallback(() => {
-    // Refresh folders already visited, preserving the current expansion state.
     const paths = [...requested.current].filter((path) => reachableDirectories.has(path));
     let next = 0;
     const worker = async () => {

@@ -485,8 +485,6 @@ const makeBrowserOtlpPayload = (spanName: string) =>
       ({ close }) => Effect.promise(close),
     );
 
-    // The exporter's batch fiber is forked while the layer builds and ticks on
-    // a wall-clock interval, so the whole tracer runs on the live clock.
     yield* Layer.build(
       OtlpTracer.layer({
         url: collector.url,
@@ -766,8 +764,6 @@ const buildAppUnderTest = (options?: {
     );
 
     const servedRoutesLayer = HttpRouter.serve(
-      // Viewed-file marks for a host that keeps none of its own are rows, so the routes want a
-      // database. Its own, in memory: nothing here shares a table with the auth store.
       makeRoutesLayer.pipe(
         Layer.provide(Layer.mergeAll(serviceLauncherClientLayer, SqlitePersistenceMemory)),
       ),
@@ -1274,7 +1270,6 @@ const wsRpcProtocolLayer = (wsUrl: string, onMessage?: (message: string) => void
   const webSocketConstructorLayer = Layer.succeed(
     Socket.WebSocketConstructor,
     (socketUrl, protocols) => {
-      // Socket.makeWebSocket only ever passes its `protocols` option here.
       const socket = new NodeSocket.NodeWS.WebSocket(
         socketUrl,
         protocols as string | string[] | undefined,
@@ -1708,8 +1703,6 @@ const getWsServerUrl = (
     );
   });
 
-// Mirrors NodeHttpServer.layerTest, which does not expose server options,
-// with the production `websocket: { perMessageDeflate: true }` setting.
 const NodeHttpServerTestWithWsDeflate = HttpServer.layerTestClient.pipe(
   Layer.provide(
     Layer.fresh(FetchHttpClient.layer).pipe(
@@ -2013,7 +2006,6 @@ it.layer(NodeServices.layer)("server router seam", (it) => {
         yield* fileSystem.writeFileString(`${filePath}.next`, replacement);
       }
       if (windowsHost) {
-        // Windows cannot replace an open destination, so model the race with its original handle.
         yield* fileSystem.writeFileString(afterOpenSnapshotPath, original);
       }
       const replaced = new Set<string>();
@@ -2080,7 +2072,6 @@ it.layer(NodeServices.layer)("server router seam", (it) => {
           Effect.gen(function* () {
             if (candidate !== filePath) return yield* fileSystem.open(candidate, options);
             let opened: FileSystem.File | undefined;
-            // Registered first, so this signal runs after the real descriptor-close finalizer.
             yield* Effect.addFinalizer(() =>
               Effect.gen(function* () {
                 if (opened === undefined) return;
@@ -2279,8 +2270,6 @@ it.layer(NodeServices.layer)("server router seam", (it) => {
         "bearer-access-token",
         "dpop-access-token",
       ]);
-      // Desktop, so port-scoped: instances scan for a free port and share
-      // 127.0.0.1, and cookies are not scoped by port.
       assert.isTrue(body.auth.sessionCookieName.startsWith("t3_session_"));
     }).pipe(Effect.provide(NodeHttpServer.layerTest)),
   );
@@ -2670,7 +2659,6 @@ it.layer(NodeServices.layer)("server router seam", (it) => {
       const credential = (yield* credentialResponse.json) as { readonly credential: string };
       const tokenUrl = yield* getHttpServerUrl("/oauth/token");
       const acceptedAt = yield* DateTime.now;
-      // The longest-lived proof: `iat` at the 5 s future skew the verifier allows.
       const dpop = makeDpopProof({
         method: "POST",
         url: tokenUrl,
@@ -2682,9 +2670,7 @@ it.layer(NodeServices.layer)("server router seam", (it) => {
       });
 
       assert.equal((yield* exchange).response.status, 200);
-      // While the proof is fresh, only the replay marker rejects it.
       assert.equal((yield* exchange).body.dpopFailureReason, "replay");
-      // Once the marker can be pruned, the time check rejects the proof by itself.
       yield* TestClock.setTime(
         acceptedAt.epochMilliseconds + Duration.toMillis(REPLAY_MARKER_MAX_AGE),
       );
@@ -2826,7 +2812,6 @@ it.layer(NodeServices.layer)("server router seam", (it) => {
             wsBaseUrl: linkProofUrl
               .replace("http://", "ws://")
               .replace("/api/connect/link-proof", "/ws"),
-            // "manual" and "cloudflare_tunnel" are supported; "t3_relay" is not.
             providerKind: "t3_relay",
           },
           origin: {
@@ -3383,7 +3368,6 @@ it.layer(NodeServices.layer)("server router seam", (it) => {
       assert.equal(relayConfigResponse.status, 503);
       assert.equal(relayConfigBody._tag, "EnvironmentCloudEndpointUnavailableError");
       assert.equal(relayConfigBody.endpointRuntimeStatus?.status, "unsupported");
-      // The connector is never touched for a rejected runtime.
       assert.deepEqual(appliedRuntimeConfigs, []);
       assert.equal(linkStateResponse.status, 200);
       assert.equal(linkStateBody.linked, false);
@@ -3834,8 +3818,6 @@ it.layer(NodeServices.layer)("server router seam", (it) => {
       assert.equal(relayConfigResponse.status, 200);
 
       const acceptedAt = yield* DateTime.now;
-      // The longest-lived proofs: `iat` at the 60 s future skew the handlers
-      // allow, and the 5 minute maximum lifetime.
       const issuedAt = DateTime.add(acceptedAt, { minutes: 1 });
       const proofTimes = {
         issuedAt: DateTime.formatIso(issuedAt),
@@ -3874,9 +3856,7 @@ it.layer(NodeServices.layer)("server router seam", (it) => {
       );
 
       assert.deepStrictEqual(yield* postAll, [200, 200]);
-      // While the proofs are fresh, only the replay markers reject them (409).
       assert.deepStrictEqual(yield* postAll, [409, 409]);
-      // Once the markers can be pruned, the time checks reject the proofs by themselves (401).
       yield* TestClock.setTime(
         acceptedAt.epochMilliseconds + Duration.toMillis(REPLAY_MARKER_MAX_AGE),
       );
@@ -4519,8 +4499,6 @@ it.layer(NodeServices.layer)("server router seam", (it) => {
         );
 
       const compressed = yield* openSocket(true);
-      // The ws client records the negotiated extension only when the server's
-      // 101 response accepted the offer.
       assert.include(compressed.extensions, "permessage-deflate");
 
       const plain = yield* openSocket(false);
@@ -4968,7 +4946,6 @@ it.layer(NodeServices.layer)("server router seam", (it) => {
               snapshot?.payload.pairingLinks.some((link) => link.id === initialLink.id),
             );
             assert.equal(update?.payload.id, liveLink.id);
-            // Inspect the wire frames so client schema decoding cannot hide a leak.
             assert.notInclude(frames.join(""), '"credential"');
             assert.notInclude(frames.join(""), initialLink.credential);
             assert.notInclude(frames.join(""), liveLink.credential);
@@ -5294,10 +5271,6 @@ it.layer(NodeServices.layer)("server router seam", (it) => {
 
   it.effect("allows reusing the desktop bootstrap credential", () =>
     Effect.gen(function* () {
-      // The desktop-bootstrap grant is delivered over trusted IPC at
-      // backend launch and needs to stay claimable after a renderer
-      // refresh, so it's intentionally reusable (unlike user-facing
-      // one-time pairing credentials).
       yield* buildAppUnderTest();
 
       const first = yield* bootstrapBrowserSession();
@@ -5636,9 +5609,6 @@ it.layer(NodeServices.layer)("server router seam", (it) => {
         readonly contentType: string | null;
       }> = [];
       const localTraceRecords: Array<unknown> = [];
-      // Produced by effect's own tracer, so enum fields are numeric and the
-      // protobuf encoder accepts them. The hand-written payload in the JSON
-      // test uses enum names, which only the JSON path tolerates.
       const payload = yield* makeBrowserOtlpPayload("client.protobuf.test");
 
       const collector = yield* Effect.acquireRelease(
@@ -5716,7 +5686,6 @@ it.layer(NodeServices.layer)("server router seam", (it) => {
       });
 
       assert.equal(response.status, 204);
-      // The local collector still decodes the browser's JSON before forwarding.
       assert.equal(localTraceRecords.length, 1);
       assert.equal(upstreamRequests.length, 1);
       const forwarded = upstreamRequests[0];
@@ -5725,8 +5694,6 @@ it.layer(NodeServices.layer)("server router seam", (it) => {
         return;
       }
       assert.equal(forwarded.contentType, "application/x-protobuf");
-      // Protobuf strings are raw UTF-8, so the span and service names survive
-      // the stub's utf8 decode even though the surrounding bytes don't.
       assert.notEqual(forwarded.body[0], "{");
       assert.include(forwarded.body, "client.protobuf.test");
       assert.include(forwarded.body, "t3code-web");
@@ -5863,7 +5830,6 @@ it.layer(NodeServices.layer)("server router seam", (it) => {
       const cookie = yield* getAuthenticatedSessionCookieHeader();
       spanNames.length = 0;
 
-      // The query string must not bring back the HTTP server span.
       for (const url of ["/api/observability/v1/traces", "/api/observability/v1/traces?x=1"]) {
         const response = yield* HttpClient.post(url, {
           headers: { cookie, "content-type": "application/json" },
@@ -5878,7 +5844,6 @@ it.layer(NodeServices.layer)("server router seam", (it) => {
       ]);
       assert.deepEqual(spanNames, []);
 
-      // Other routes keep their HTTP server span.
       const session = yield* HttpClient.get("/api/auth/session", { headers: { cookie } });
       assert.equal(session.status, 200);
       assert.include(spanNames, "http.server GET");
@@ -6204,8 +6169,6 @@ it.layer(NodeServices.layer)("server router seam", (it) => {
             );
             assert.isTrue(yield* fileSystem.exists(uploadedFilePath));
 
-            // A mint that carries the attachment's display name and mime
-            // serves a real download filename and Content-Type.
             const download = yield* client[WS_METHODS.assetsCreateUrl]({
               resource: {
                 _tag: "attachment",
@@ -6222,7 +6185,6 @@ it.layer(NodeServices.layer)("server router seam", (it) => {
             );
             assert.equal(downloadResponse.headers["content-type"], "application/pdf");
 
-            // Old clients mint without name or mime and still get a download.
             const bareDownload = yield* client[WS_METHODS.assetsCreateUrl]({
               resource: { _tag: "attachment", attachmentId: uploadedFile.attachmentId },
             });
@@ -7003,9 +6965,6 @@ it.layer(NodeServices.layer)("server router seam", (it) => {
     }).pipe(Effect.provide(NodeHttpServer.layerTest)),
   );
 
-  // An already-shipped client decodes this stream against an event union
-  // without environmentThemesUpdated, so an ungated emit would kill its whole
-  // config subscription. Opting in is the only way to receive them.
   it.effect("subscribeServerConfig sends published themes to an opt-in subscriber", () =>
     Effect.gen(function* () {
       const themes = [
@@ -7039,8 +6998,6 @@ it.layer(NodeServices.layer)("server router seam", (it) => {
 
       const [first, second] = Array.from(events);
       assert.equal(first?.type, "snapshot");
-      // Not in the snapshot as well, or every opt-in client receives the same
-      // array twice on every connect.
       if (first?.type === "snapshot") assert.equal(first.config.environmentThemes, undefined);
       assert.equal(second?.type, "environmentThemesUpdated");
     }).pipe(Effect.provide(NodeHttpServer.layerTest)),
@@ -7260,14 +7217,12 @@ it.layer(NodeServices.layer)("server router seam", (it) => {
               loadConfigState: Effect.succeed({ keybindings: [], issues: [] }),
               streamChanges: Stream.empty,
             },
-            // The registry emits no change: only the source refresh can carry it.
             providerRegistry: {
               getProviders: Effect.succeed([codex]),
               streamChanges: Stream.empty,
             },
             usageLimitSources: {
               current: Effect.succeed([]),
-              // Replay the empty snapshot, then a later refresh, as the live stream does.
               streamChanges: Stream.concat(Stream.make([]), Stream.make([hub])),
             },
           },
@@ -7830,7 +7785,6 @@ it.layer(NodeServices.layer)("server router seam", (it) => {
               destinationPath,
             });
             assert.equal(started.cwd, destinationPath);
-            // The project exists before the clone finishes.
             assert.deepEqual(dispatched, ["project.create"]);
 
             const blocked = yield* Effect.flip(
@@ -7862,8 +7816,6 @@ it.layer(NodeServices.layer)("server router seam", (it) => {
             yield* Deferred.succeed(cloneGate, undefined);
             const lists = yield* Fiber.join(snapshots);
             assert.equal(lists.at(-1)?.[0]?.phase, "done");
-            // The finished clone refreshes the project so its repository
-            // identity updates. That hook runs after the done snapshot.
             yield* Deferred.await(metaUpdateDispatched);
             assert.deepEqual(dispatched, ["project.create", "project.meta.update"]);
           }),
@@ -9669,7 +9621,6 @@ it.layer(NodeServices.layer)("server router seam", (it) => {
         );
 
         const [first, second] = Array.from(items);
-        // Never truncate a thread's replay at the event limit.
         assert.equal(first?.kind, "snapshot");
         if (first?.kind === "snapshot") {
           assert.equal(first.snapshot.thread.id, defaultThreadId);
@@ -9803,8 +9754,6 @@ it.layer(NodeServices.layer)("server router seam", (it) => {
               headSequence = 4;
               yield* PubSub.publishAll(liveEvents, events.slice(1));
 
-              // This must finish while the server is still waiting for the first
-              // batch's ACK. A failed output queue alone would leave PubSub live.
               yield* Deferred.await(detached);
               assert.equal(yield* PubSub.size(liveEvents), 0);
               assert.deepEqual(received, [1]);
@@ -10292,7 +10241,6 @@ it.layer(NodeServices.layer)("server router seam", (it) => {
       yield* buildAppUnderTest({
         layers: {
           orchestrationEngine: {
-            // Head is far ahead of the client's afterSequence (gap > 1000).
             latestSequence: Effect.succeed(100_000),
             readEvents: () =>
               Stream.sync(() => {
@@ -10335,7 +10283,6 @@ it.layer(NodeServices.layer)("server router seam", (it) => {
       );
 
       const [first, second] = Array.from(items);
-      // Large gap => fresh snapshot, and the unbounded replay is never started.
       assert.equal(first?.kind, "snapshot");
       if (first?.kind === "snapshot") {
         assert.equal(first.snapshot.threads[0]?.id, snapshotThreadId);
@@ -10502,8 +10449,6 @@ it.layer(NodeServices.layer)("server router seam", (it) => {
         layers: {
           orchestrationEngine: {
             latestSequence: Effect.succeed(50),
-            // A burst of message-sent deltas for the busy thread, plus one
-            // thread.created for a different thread, all within one batch.
             readEvents: (_afterSequence, limit) => {
               replayLimit = limit;
               return Stream.fromIterable([
@@ -10536,8 +10481,6 @@ it.layer(NodeServices.layer)("server router seam", (it) => {
       const upsertedIds = collected.flatMap((item) =>
         item.kind === "thread-upserted" ? [item.thread.id] : [],
       );
-      // Both threads surface, and the busy thread's 20-event burst collapses to
-      // a single shell refetch (not 20). The new thread is not stuck behind it.
       assert.include(upsertedIds, busyThreadId);
       assert.include(upsertedIds, newThreadId);
       assert.equal(collected[2]?.kind, "synchronized");
@@ -10674,10 +10617,6 @@ it.layer(NodeServices.layer)("server router seam", (it) => {
         layers: {
           orchestrationEngine: {
             latestSequence: Effect.succeed(2),
-            // A thread.deleted followed, within the same coalescing window, by a
-            // later refetchable event for the same thread. The later event wins
-            // coalescing; its shell refetch returns none (the row is gone), which
-            // must still surface a removal rather than be swallowed.
             readEvents: () =>
               Stream.fromIterable([
                 makeThreadEvent(1, "thread.deleted"),
@@ -11497,8 +11436,6 @@ it.layer(NodeServices.layer)("server router seam", (it) => {
             "thread.activity.append",
           ],
         );
-        // The checkout can take minutes, so the thread reads as working from
-        // the moment setup starts rather than only once the turn is dispatched.
         const preparingCommand = dispatchedCommands[3];
         assertTrue(preparingCommand?.type === "thread.session.set");
         if (preparingCommand?.type === "thread.session.set") {
@@ -11553,7 +11490,6 @@ it.layer(NodeServices.layer)("server router seam", (it) => {
             worktreePath: "/tmp/bootstrap-worktree",
           },
         );
-        // Worktree bootstraps observe script completion so the setup card can show the exit code.
         assert.isDefined(runForThreadInput?.observeCompletion);
         assert.deepEqual(refreshStatus.mock.calls[0]?.[0], "/tmp/bootstrap-worktree");
 
@@ -11565,9 +11501,6 @@ it.layer(NodeServices.layer)("server router seam", (it) => {
           setupActivities.map((command) => command.activity.kind),
           ["worktree-setup", "setup-script.requested", "setup-script.started", "worktree-setup"],
         );
-        // The setup record is upserted under one id: running once the thread
-        // exists, settled at the end, so a late client renders the outcome
-        // without the in-memory tracker.
         const runningActivity = setupActivities[0]?.activity;
         const settledActivity = setupActivities.at(-1)?.activity;
         assert.equal(runningActivity?.id, settledActivity?.id);
@@ -12363,7 +12296,6 @@ it.layer(NodeServices.layer)("server router seam", (it) => {
         snapshot.stages.find((stage) => stage.id === id)?.status;
 
       if (async) {
-        // The turn is dispatched while the script is still running.
         const started = yield* snapshotWhere(
           (snapshot) => stageStatus(snapshot, "agent") === "done",
         );
@@ -12379,7 +12311,6 @@ it.layer(NodeServices.layer)("server router seam", (it) => {
         return;
       }
 
-      // The script is running and the turn has not been dispatched yet.
       const running = yield* snapshotWhere(
         (snapshot) => stageStatus(snapshot, "setup-script") === "running",
       );
@@ -12406,10 +12337,6 @@ it.layer(NodeServices.layer)("server router seam", (it) => {
         return;
       }
 
-      // The client that sent the message goes away mid-setup (a reload or a
-      // dropped socket). The bootstrap belongs to the server, not the
-      // connection: the thread already exists for every client, so it must
-      // finish and start the turn regardless.
       yield* Fiber.interrupt(dispatchFiber);
       assert.isFalse(turnStarted());
 
@@ -12542,10 +12469,6 @@ it.layer(NodeServices.layer)("server router seam", (it) => {
 
   it.effect("drains deletion cleanup through the re-created thread event", () =>
     Effect.gen(function* () {
-      // A draft retry reuses the thread id its failed bootstrap deleted. The
-      // deletion reactor stops sessions and closes terminals by that id, so
-      // both thread.create paths use the created event as a fence, then drain
-      // cleanup before handing the new incarnation to resource-owning work.
       const trace: Array<string> = [];
       const drainRequested = yield* Deferred.make<void>();
       const cleanupDone = yield* Deferred.make<void>();
@@ -12601,8 +12524,6 @@ it.layer(NodeServices.layer)("server router seam", (it) => {
       );
       assert.deepEqual(trace, ["thread.create", "drain:1"]);
 
-      // Cleanup is already released; the bootstrap path must still drain
-      // between creating the thread and starting its turn.
       trace.length = 0;
       yield* Effect.scoped(
         withWsRpcClient(wsUrl, (client) =>
@@ -12741,8 +12662,6 @@ it.layer(NodeServices.layer)("server router seam", (it) => {
           "thread.session.set",
         ],
       );
-      // The surviving thread must not keep its preparing session, or it would
-      // read as working forever.
       const failedSession = dispatchedCommands[6];
       assertTrue(failedSession?.type === "thread.session.set");
       if (failedSession?.type === "thread.session.set") {
@@ -12890,8 +12809,6 @@ it.live(
       const runs = yield* Effect.forEach(
         providers,
         (provider) => {
-          // One counter for the orchestration runtime and the HTTP/WS handlers,
-          // so reactor writes and subscription reads land in the same total.
           const sqlCounter = makeSqlStatementCounter();
           return Effect.acquireUseRelease(
             makeOrchestrationIntegrationHarness({ provider, tracer: sqlCounter.tracer }),
@@ -12934,9 +12851,6 @@ it.live(
                     );
                     assert.equal(decodedShell.threads.length, 1);
 
-                    // Three sockets, the way real installs look: the capped
-                    // thread-only client, a shell-only socket that isolates the
-                    // sidebar cost, and a second device holding both.
                     const threadClient = yield* openMeasuredWsClient({ url: wsUrl, cookie });
                     const shellClient = yield* openMeasuredWsClient({ url: wsUrl, cookie });
                     const secondClient = yield* openMeasuredWsClient({ url: wsUrl, cookie });
@@ -13035,9 +12949,6 @@ it.live(
 
                     const reachedFinalThreadEvent = (item: OrchestrationThreadStreamItem) =>
                       item.kind === "event" && item.event.sequence === finalThreadSequence;
-                    // Shell items carry the sequence of the latest coalesced
-                    // event for the thread, so the last one lands at or past
-                    // the final thread event.
                     const reachedFinalShellEvent = (item: OrchestrationShellStreamItem) =>
                       item.kind === "thread-upserted" && item.sequence >= finalSequences.aggregate;
                     yield* collectQueueUntil(
@@ -13074,9 +12985,6 @@ it.live(
                     );
                     const measuredTurnSqlStatements = sqlCounter.count() - turnStartSqlStatements;
 
-                    // The second device drops and comes back with the cursors it
-                    // held before the turn, one subscription at a time so the
-                    // catch-up bytes stay separable.
                     yield* secondClient.close;
                     const reconnectSqlStart = sqlCounter.count();
                     const reconnected = yield* openMeasuredWsClient({ url: wsUrl, cookie });

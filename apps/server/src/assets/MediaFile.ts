@@ -1,5 +1,4 @@
 // @effect-diagnostics nodeBuiltinImport:off - FileSystem does not expose no-follow
-// or non-blocking open flags, and the response must keep the validated descriptor.
 import * as NodeFS from "node:fs";
 import * as NodeFSP from "node:fs/promises";
 
@@ -34,7 +33,6 @@ class MediaFileStatError extends Schema.TaggedError<MediaFileStatError>()("Media
   }
 }
 
-/** Holds the file identity and descriptor for one HTTP request, never a copy of its bytes. */
 export interface OpenMediaFile {
   readonly handle: NodeFSP.FileHandle;
   readonly info: NodeFS.BigIntStats;
@@ -45,7 +43,6 @@ const realpathLikeFileSystem = (filePath: string) =>
     NodeFS.realpath(filePath, (error, resolved) => (error ? reject(error) : resolve(resolved)));
   });
 
-/** Opens a canonical media path once. Replacements cannot change the response's source. */
 export const openMediaFile = Effect.fn("openMediaFile")(function* (
   filePath: string,
   identity?: { readonly device: string; readonly inode: string },
@@ -62,7 +59,6 @@ export const openMediaFile = Effect.fn("openMediaFile")(function* (
           return null;
         }
 
-        // Windows lacks these flags; the descriptor/path identity checks still apply.
         const handle = await NodeFSP.open(
           filePath,
           NodeFS.constants.O_RDONLY |
@@ -79,10 +75,6 @@ export const openMediaFile = Effect.fn("openMediaFile")(function* (
           ) {
             return null;
           }
-          // Callers canonicalise with Effect's FileSystem.realPath, which is
-          // Node's JS realpath. fs/promises.realpath is the native binding and
-          // on Windows also expands 8.3 short names, so a path that is already
-          // canonical by the caller's rules would still look swapped here.
           if ((await realpathLikeFileSystem(filePath)) !== filePath) return null;
           const after = await NodeFSP.lstat(filePath, { bigint: true });
           if (!after.isFile() || info.dev !== after.dev || info.ino !== after.ino) return null;
@@ -98,7 +90,6 @@ export const openMediaFile = Effect.fn("openMediaFile")(function* (
   );
 });
 
-/** Reads the leading bytes of an already-validated media file, never past the end. */
 export const readMediaFileHeader = (filePath: string, file: OpenMediaFile, byteCount: number) =>
   Effect.tryPromise({
     try: async () => {

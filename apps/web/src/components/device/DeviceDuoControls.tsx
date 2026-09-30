@@ -8,7 +8,6 @@ import { DeviceDuoGlyph } from "./DeviceDuoGlyph";
 import { Button } from "~/components/ui/button";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "~/components/ui/tooltip";
 
-/** Physical presets live beside the device. Pinching supplies continuous hinge control. */
 export function DeviceDuoControls(props: {
   screen: DeviceScreenSize;
   state: DuoControlState;

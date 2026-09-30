@@ -69,8 +69,6 @@ describe("fetchEnvironmentPullRequestDiff", () => {
           : init.body instanceof Uint8Array
             ? new TextDecoder().decode(init.body)
             : "";
-      // The assertion deliberately inspects the serialized wire body rather than decoding a
-      // domain value for use in application code.
       // @effect-diagnostics-next-line preferSchemaOverJson:off
       expect(JSON.parse(body)).toEqual({
         projectId: "project-1",

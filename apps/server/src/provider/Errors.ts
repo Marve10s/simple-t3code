@@ -2,9 +2,6 @@ import * as Schema from "effect/Schema";
 
 import type { CheckpointServiceError } from "../checkpointing/Errors.ts";
 
-/**
- * ProviderAdapterValidationError - Invalid adapter API input.
- */
 export class ProviderAdapterValidationError extends Schema.TaggedError<ProviderAdapterValidationError>()(
   "ProviderAdapterValidationError",
   {
@@ -19,9 +16,6 @@ export class ProviderAdapterValidationError extends Schema.TaggedError<ProviderA
   }
 }
 
-/**
- * ProviderAdapterSessionNotFoundError - Adapter-owned session id is unknown.
- */
 export class ProviderAdapterSessionNotFoundError extends Schema.TaggedError<ProviderAdapterSessionNotFoundError>()(
   "ProviderAdapterSessionNotFoundError",
   {
@@ -35,9 +29,6 @@ export class ProviderAdapterSessionNotFoundError extends Schema.TaggedError<Prov
   }
 }
 
-/**
- * ProviderAdapterSessionClosedError - Adapter session exists but is closed.
- */
 export class ProviderAdapterSessionClosedError extends Schema.TaggedError<ProviderAdapterSessionClosedError>()(
   "ProviderAdapterSessionClosedError",
   {
@@ -51,9 +42,6 @@ export class ProviderAdapterSessionClosedError extends Schema.TaggedError<Provid
   }
 }
 
-/**
- * ProviderAdapterRequestError - Provider protocol request failed or timed out.
- */
 export class ProviderAdapterRequestError extends Schema.TaggedError<ProviderAdapterRequestError>()(
   "ProviderAdapterRequestError",
   {
@@ -68,9 +56,6 @@ export class ProviderAdapterRequestError extends Schema.TaggedError<ProviderAdap
   }
 }
 
-/**
- * ProviderAdapterProcessError - Provider process lifecycle failure.
- */
 export class ProviderAdapterProcessError extends Schema.TaggedError<ProviderAdapterProcessError>()(
   "ProviderAdapterProcessError",
   {
@@ -85,10 +70,6 @@ export class ProviderAdapterProcessError extends Schema.TaggedError<ProviderAdap
   }
 }
 
-/**
- * ProviderWorkspaceMissingError - The session's working directory no longer
- * exists on disk, so no provider process can start in it.
- */
 export class ProviderWorkspaceMissingError extends Schema.TaggedError<ProviderWorkspaceMissingError>()(
   "ProviderWorkspaceMissingError",
   {
@@ -101,9 +82,6 @@ export class ProviderWorkspaceMissingError extends Schema.TaggedError<ProviderWo
   }
 }
 
-/**
- * ProviderValidationError - Invalid provider API input.
- */
 export class ProviderValidationError extends Schema.TaggedError<ProviderValidationError>()(
   "ProviderValidationError",
   {
@@ -117,9 +95,6 @@ export class ProviderValidationError extends Schema.TaggedError<ProviderValidati
   }
 }
 
-/**
- * ProviderUnsupportedError - Requested provider is not implemented.
- */
 export class ProviderUnsupportedError extends Schema.TaggedError<ProviderUnsupportedError>()(
   "ProviderUnsupportedError",
   {
@@ -132,15 +107,6 @@ export class ProviderUnsupportedError extends Schema.TaggedError<ProviderUnsuppo
   }
 }
 
-/**
- * ProviderInstanceNotFoundError - Lookup against the instance registry failed.
- *
- * Distinct from `ProviderUnsupportedError`: the driver is registered, but no
- * instance with the requested id has been bootstrapped — typically because
- * the persisted instance id refers to an instance the user removed from
- * settings, or because routing is asked for an instance before the registry
- * has finished its first reload.
- */
 export class ProviderInstanceNotFoundError extends Schema.TaggedError<ProviderInstanceNotFoundError>()(
   "ProviderInstanceNotFoundError",
   {
@@ -153,11 +119,6 @@ export class ProviderInstanceNotFoundError extends Schema.TaggedError<ProviderIn
   }
 }
 
-/**
- * ProviderDriverError - A driver `create` call failed before producing an
- * instance. Surfaced to the registry, which marks the offending entry as
- * an "unavailable" shadow snapshot rather than crashing the server.
- */
 export class ProviderDriverError extends Schema.TaggedError<ProviderDriverError>()(
   "ProviderDriverError",
   {
@@ -172,9 +133,6 @@ export class ProviderDriverError extends Schema.TaggedError<ProviderDriverError>
   }
 }
 
-/**
- * ProviderSessionNotFoundError - Provider-facing session not found.
- */
 export class ProviderSessionNotFoundError extends Schema.TaggedError<ProviderSessionNotFoundError>()(
   "ProviderSessionNotFoundError",
   {
@@ -187,9 +145,6 @@ export class ProviderSessionNotFoundError extends Schema.TaggedError<ProviderSes
   }
 }
 
-/**
- * ProviderSessionDirectoryPersistenceError - Session directory persistence failure.
- */
 export class ProviderSessionDirectoryPersistenceError extends Schema.TaggedError<ProviderSessionDirectoryPersistenceError>()(
   "ProviderSessionDirectoryPersistenceError",
   {

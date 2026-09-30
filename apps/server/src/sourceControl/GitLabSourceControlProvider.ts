@@ -153,7 +153,6 @@ export const make = Effect.gen(function* () {
   return SourceControlProvider.SourceControlProvider.of({
     kind: "gitlab",
     resolveLink: (input) => {
-      // Automatic enrichment must not send ambient CLI credentials to a host from message text.
       if (input.url.host !== "gitlab.com") return undefined;
       const match = /^\/(.+)\/-\/(merge_requests|issues)\/([1-9]\d*)(?:\/.*)?$/.exec(
         input.url.pathname,

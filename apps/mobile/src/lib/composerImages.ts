@@ -27,9 +27,7 @@ import { writeFileAtomically } from "./atomic-file";
 export interface DraftComposerImageAttachment extends Omit<UploadChatImageAttachment, "dataUrl"> {
   readonly id: string;
   readonly previewUri: string;
-  /** Owned image bytes from a file-backed draft. Current writers still use inline bytes. */
   readonly fileUri?: string;
-  /** Inline bytes from current writers and older drafts. */
   readonly dataUrl?: string;
   readonly uploadedAttachmentId?: string;
   readonly uploadEnvironmentId?: EnvironmentId;
@@ -78,18 +76,6 @@ export async function createPastedTextComposerAttachment(input: {
 
 export type DraftComposerAttachment = DraftComposerImageAttachment | DraftComposerFileAttachment;
 
-/**
- * What the strip above the composer shows: media, and nothing else. A thumbnail is the only
- * way to see a picture or a video, so those always preview there. Everything else reads as
- * its inline chip, which carries the name, the type and the size in the line of prose the
- * file belongs to — a square tile showing a generic document glyph says strictly less.
- *
- * The chip is not optional for a non-media file. Every path that attaches one also writes
- * its reference, so a file with no chip means the draft lost it rather than that the strip
- * should stand in. Which attachments carry a chip is therefore not consulted at all; surfaces
- * whose attachments never get chips (a question answer) pass them to the strip directly
- * instead of through this filter.
- */
 export function composerStripAttachments(
   attachments: ReadonlyArray<DraftComposerAttachment>,
 ): ReadonlyArray<DraftComposerAttachment> {
@@ -98,32 +84,20 @@ export function composerStripAttachments(
   );
 }
 
-/**
- * Whether a draft attachment is a picture. The document picker types every pick as a plain
- * file, so the answer comes from the attachment itself rather than from which picker made it.
- */
 export function isComposerImageAttachment(
   attachment: DraftComposerAttachment,
 ): attachment is DraftComposerImageAttachment {
   return attachment.type === "image" || imageMimeType(attachment) !== null;
 }
 
-/** Any composer attachment whose bytes live in the app-owned attachment directory. */
 export type FileBackedComposerAttachment = DraftComposerAttachment & { readonly fileUri: string };
 
-/** Files have a local copy. Images can have one after a file-backed draft is restored. */
 export function isFileBackedComposerAttachment(
   attachment: DraftComposerAttachment,
 ): attachment is FileBackedComposerAttachment {
   return attachment.fileUri !== undefined;
 }
 
-/**
- * The bytes a draft attachment can be previewed from without the server. A picture taken from
- * the photo library or the clipboard owns no file and carries its bytes inline, and its
- * `attachmentId` is a local draft id the server has never seen — so falling back to a remote
- * asset for one only ever fails. Returns undefined when the attachment really is remote-only.
- */
 export function composerAttachmentInlineUri(
   attachment: DraftComposerAttachment | undefined,
 ): string | undefined {
@@ -194,8 +168,6 @@ export async function persistComposerAttachmentFile(
   try {
     await source.copy(destination);
   } catch (error) {
-    // A failed copy can leave a partial destination file behind with no URI
-    // returned to release it later; delete it before surfacing the failure.
     try {
       if (destination.exists) {
         destination.delete();
@@ -205,9 +177,6 @@ export async function persistComposerAttachmentFile(
     }
     throw error;
   }
-  // An Android content: stream can deliver more bytes than the size it
-  // reported before the copy. Validate the persisted copy so an oversized
-  // file is never retained under a stale recorded size.
   const copiedSize = destination.size;
   if (maxBytes !== undefined && copiedSize !== null && copiedSize > maxBytes) {
     try {
@@ -291,8 +260,6 @@ export async function pickComposerFiles(input: {
   const endHandoff = beginForegroundHandoff();
   let result: DocumentPickerResult;
   try {
-    // File providers may expose a URI that FileSystem cannot read directly.
-    // Import a readable cache copy before persisting the draft's owned file.
     result = await getDocumentAsync({ multiple: true, copyToCacheDirectory: true });
   } catch (cause) {
     return {
@@ -317,9 +284,6 @@ export async function pickComposerFiles(input: {
       exceededAttachmentLimit = true;
       break;
     }
-    // A SAF/document picker can hand back a blank display name; the wire
-    // contract rejects empty names at send time, so fall back before the name
-    // reaches storage, errors, or the attachment itself.
     const name = file.name.trim().length > 0 ? file.name : "file";
     try {
       attachments.push(
@@ -341,18 +305,9 @@ export async function pickComposerFiles(input: {
   return { files: attachments, error };
 }
 
-/**
- * Longest edge kept when a photo has to be re-encoded. Matches the web composer's
- * MAX_DIMENSION so every client hands providers the same resolution.
- */
 const PHOTO_MAX_EDGE = 2048;
 const PHOTO_JPEG_QUALITY = 0.85;
 
-/**
- * Renders a photo-library pick to a provider-readable JPEG. Decode, downscale, and encode run
- * natively; only the bounded result crosses the bridge. Camera photos are 12-48 MP HEIC files,
- * so a full-size conversion is both slow to transfer and far more than a model can use.
- */
 async function renderPhotoAsJpeg(uri: string): Promise<{ base64: string; uri: string }> {
   const { ImageManipulator, SaveFormat } = await import("expo-image-manipulator");
   let image = await ImageManipulator.manipulate(uri).renderAsync();
@@ -408,7 +363,6 @@ export async function pickComposerImages(input: { readonly existingCount: number
   };
 }
 
-/** Videos use file uploads; omit maxVideoBytes for image-only destinations. */
 export async function pickComposerMedia(input: {
   readonly existingCount: number;
   readonly maxVideoBytes?: number;
@@ -434,8 +388,6 @@ export async function pickComposerMedia(input: {
     };
   }
 
-  // The picker covers the Android activity, which reports the app as
-  // backgrounded; the guard keeps background-triggered restarts away mid-pick.
   const endHandoff = beginForegroundHandoff();
   let result: Awaited<ReturnType<typeof imagePicker.launchImageLibraryAsync>>;
   try {
@@ -443,9 +395,6 @@ export async function pickComposerMedia(input: {
       mediaTypes: input.maxVideoBytes === undefined ? ["images"] : ["images", "videos"],
       allowsMultipleSelection: true,
       selectionLimit: remainingSlots,
-      // Bytes stay in the picker's file until we know how much of them we need. Asking for
-      // base64 here made iOS decode and re-encode every camera photo at full resolution and
-      // hand JS a 10 MB+ string, which stalled the composer for seconds.
       base64: false,
       quality: 1,
       shouldDownloadFromNetwork: true,
@@ -504,9 +453,6 @@ export async function pickComposerMedia(input: {
     }
 
     const name = asset.fileName?.trim() || "image";
-    // The picker's reported size is a hint, not a measurement: Android content streams can
-    // deliver more bytes than they advertise. Only a size read from the file itself decides
-    // whether the original bytes are safe to load into JS.
     let sourceBytes: number | null = null;
     try {
       const { File } = await import("expo-file-system");
@@ -514,9 +460,6 @@ export async function pickComposerMedia(input: {
     } catch {
       sourceBytes = null;
     }
-    // Originals the provider can read and that fit the cap pass through byte for byte so
-    // transparency and animation survive. Everything else (HEIC/HEIF, oversized JPEGs,
-    // unmeasurable sources) is rendered to a bounded JPEG off the JS thread.
     const originalMimeType =
       mimeType !== undefined &&
       isProviderSendTurnSupportedImageMimeType(mimeType) &&
@@ -573,7 +516,6 @@ export async function pickComposerMedia(input: {
   };
 }
 
-/** Clipboard images take priority over their alternate text representation. */
 export async function pasteComposerClipboard(input: { readonly existingCount: number }): Promise<
   | {
       readonly images: ReadonlyArray<DraftComposerImageAttachment>;

@@ -173,9 +173,6 @@ export function SettingsEnvironmentsRouteScreen() {
           onUpdate={handleUpdateEnvironment}
         />
 
-        {/* Always mounted: already-connected relay environments must stay
-            visible (and removable) even when cloud config is missing or the
-            user is signed out — the component gates discovery itself. */}
         <CloudEnvironmentRows
           connectedCloudEnvironments={connectedCloudEnvironments}
           onOpenEnvironment={openEnvironment}

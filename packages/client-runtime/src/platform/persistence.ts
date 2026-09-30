@@ -45,7 +45,6 @@ export class ConnectionTargetStore extends Context.Service<
   ConnectionTargetStore,
   {
     readonly list: Effect.Effect<ReadonlyArray<ConnectionTarget>, ConnectionPersistenceError>;
-    /** Saved environments the user switched off. See `ConnectionRegistrationStore.setEnabled`. */
     readonly listDisabled: Effect.Effect<ReadonlyArray<EnvironmentId>, ConnectionPersistenceError>;
   }
 >()("@t3tools/client-runtime/platform/persistence/ConnectionTargetStore") {}
@@ -89,10 +88,6 @@ export class EnvironmentCacheStore extends Context.Service<
       environmentId: EnvironmentId,
       threadId: ThreadId,
     ) => Effect.Effect<void, ConnectionPersistenceError>;
-    /**
-     * The last complete server configuration. This deliberately includes provider
-     * metadata so offline task creation can still offer the models a user last saw.
-     */
     readonly loadServerConfig: (
       environmentId: EnvironmentId,
     ) => Effect.Effect<Option.Option<ServerConfig>, ConnectionPersistenceError>;
@@ -100,10 +95,6 @@ export class EnvironmentCacheStore extends Context.Service<
       environmentId: EnvironmentId,
       config: ServerConfig,
     ) => Effect.Effect<void, ConnectionPersistenceError>;
-    /**
-     * The unfiltered branch list for a workspace. Query-specific lists are not
-     * cached because they are incomplete and unsafe to present as a full picker.
-     */
     readonly loadVcsRefs: (
       environmentId: EnvironmentId,
       cwd: string,
@@ -117,11 +108,6 @@ export class EnvironmentCacheStore extends Context.Service<
       environmentId: EnvironmentId,
       cwd: string,
     ) => Effect.Effect<void, ConnectionPersistenceError>;
-    /**
-     * Removes every persisted branch-list snapshot for an environment. Git ref
-     * mutations are repository-wide, and linked worktrees may have cached the
-     * same refs under different working-directory keys.
-     */
     readonly clearVcsRefs: (
       environmentId: EnvironmentId,
     ) => Effect.Effect<void, ConnectionPersistenceError>;
@@ -133,13 +119,6 @@ export class EnvironmentCacheStore extends Context.Service<
 
 const encodeProjectShells = Schema.encodeEffect(Schema.Array(OrchestrationProjectShell));
 
-/**
- * Encodes a shell snapshot for `EnvironmentCacheStore.saveShell`. The result
- * equals `Schema.encode(OrchestrationShellSnapshot)`, so the cache format does
- * not change. Walking thousands of threads through Schema blocks the UI
- * thread, and a decoded thread shell is already in its encoded form, so only
- * the projects go through Schema: their icon has a real encode transform.
- */
 export const encodeShellSnapshotForCache = (snapshot: OrchestrationShellSnapshot) =>
   Effect.map(
     encodeProjectShells(snapshot.projects),

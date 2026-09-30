@@ -93,7 +93,6 @@ const defaultTools = {
   },
 };
 
-/** The renderer can apply only the exact proposal retained by the desktop process. */
 export class CaptureShortcutConfig {
   private pending:
     | { preview: DesktopCaptureConfigPreview; target: Target; files: Snapshot[]; missing: string[] }
@@ -264,7 +263,6 @@ export class CaptureShortcutConfig {
       staged = true;
       await NodeFSP.chmod(temporary, root.stat.mode & 0o777);
       if (desktop === "niri") {
-        // Niri resolves includes against the selected path, not a dotfile symlink's target.
         const validationPath = NodePath.join(
           NodePath.dirname(root.path),
           NodePath.basename(temporary),

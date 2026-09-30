@@ -101,11 +101,6 @@ export const makeApnsJwt = Effect.fn("relay.apns.make_jwt")(function* (input: Ap
 
   return yield* Effect.try({
     try: () => {
-      // Deterministic ES256 (RFC 6979 via noble) instead of node's randomized
-      // signer: identical (key, iat) yields the byte-identical JWT on every
-      // worker isolate, so the fleet presents one stable provider token to
-      // APNs without any shared storage. Node crypto only converts the PEM to
-      // the raw scalar noble signs with.
       const scalar = apnsSigningScalar(privateKey);
       const signature = p256
         .sign(sha256(new TextEncoder().encode(signingInput)), scalar, { prehash: false })
@@ -122,8 +117,6 @@ export const makeApnsJwt = Effect.fn("relay.apns.make_jwt")(function* (input: Ap
   });
 });
 
-// PEM parsing is pure and the key set is static per deployment; memoize the
-// extracted P-256 scalar so signing never re-parses the PKCS8 document.
 const signingScalarCache = new Map<string, Uint8Array>();
 
 function apnsSigningScalar(privateKeyPem: string): Uint8Array {
@@ -145,8 +138,6 @@ function apnsSigningScalar(privateKeyPem: string): Uint8Array {
   return scalar;
 }
 
-// Fingerprint the key material so rotated credentials never reuse a JWT
-// signed by the previous key.
 export function apnsProviderTokenCacheKey(input: {
   readonly teamId: string;
   readonly keyId: string;

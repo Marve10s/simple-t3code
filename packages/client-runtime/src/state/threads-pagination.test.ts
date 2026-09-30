@@ -70,9 +70,6 @@ function message(id: string, turnId: string, createdAt: string): OrchestrationMe
 const OLDER_MESSAGE = message("message-old", "turn-1", "2026-04-01T00:00:00.000Z");
 const RECENT_MESSAGE = message("message-recent", "turn-2", "2026-04-01T01:00:00.000Z");
 
-// Reverts retain turns via checkpoints with checkpointTurnCount <= the revert's
-// turnCount, so both fixture turns carry one: reverting to turnCount 1 keeps
-// turn-1 (the older page's turn) and discards turn-2 (the loaded window's).
 function checkpoint(turnId: string, turnCount: number): OrchestrationThread["checkpoints"][number] {
   return {
     turnId: TurnId.make(turnId),
@@ -135,7 +132,6 @@ const makeHarness = Effect.fn("TestThreadPagination.makeHarness")(function* (opt
   readonly paginationCapability?: boolean;
   readonly reasoningCapability?: boolean;
   readonly initialResponse?: LoaderResponse;
-  /** Cached snapshot returned by the cache store (simulates a warm cache). */
   readonly cached?: OrchestrationThreadDetailSnapshot;
 }) {
   const inputs = yield* Queue.unbounded<OrchestrationThreadStreamItem>();
@@ -144,8 +140,6 @@ const makeHarness = Effect.fn("TestThreadPagination.makeHarness")(function* (opt
   const loaderReasoning = yield* Ref.make<ReadonlyArray<boolean | undefined>>([]);
   const lastSubscribeInput = yield* Ref.make<Record<string, unknown> | undefined>(undefined);
   const savedThreads = yield* Ref.make<ReadonlyArray<OrchestrationThreadDetailSnapshot>>([]);
-  // Older-page responses resolve through deferreds so tests can interleave
-  // live events with an in-flight page fetch.
   const pendingPageResponses = yield* Queue.unbounded<Deferred.Deferred<LoaderResponse>>();
   const supervisorState = yield* SubscriptionRef.make<SupervisorConnectionState>(
     AVAILABLE_CONNECTION_STATE,
@@ -269,8 +263,6 @@ const titleEvent = (title: string, sequence: number): OrchestrationThreadStreamI
   },
 });
 
-// Reverting to turnCount 1 retains only turns whose checkpoint count is <= 1:
-// turn-1 survives, turn-2 (the loaded window's newest turn) is discarded.
 const revertEvent = (sequence: number): OrchestrationThreadStreamItem => ({
   kind: "event",
   event: {
@@ -362,7 +354,6 @@ describe("thread pagination state", () => {
 
       const state = yield* harness.awaitState((value) => hasMessage(value, "message-old"));
       const thread = Option.getOrThrow(state.data);
-      // Older rows land before the loaded window's rows.
       expect(thread.messages.map((entry) => entry.id)).toEqual(["message-old", "message-recent"]);
       expect(Option.getOrThrow(state.page)).toEqual({
         beforeCursor: null,
@@ -381,7 +372,6 @@ describe("thread pagination state", () => {
       yield* harness.awaitState((value) =>
         Option.match(value.page, { onNone: () => false, onSome: (page) => page.loadingOlder }),
       );
-      // Revert lands while the page fetch is in flight and removes turn-2.
       yield* Queue.offer(harness.inputs, revertEvent(11));
       yield* harness.awaitState((value) => !hasMessage(value, "message-recent"));
       yield* harness.resolveNextPage(Option.some(OLDER_PAGE));
@@ -389,7 +379,6 @@ describe("thread pagination state", () => {
       const state = yield* harness.awaitState((value) =>
         Option.match(value.page, { onNone: () => false, onSome: (page) => !page.loadingOlder }),
       );
-      // The stale page was dropped: no resurrected rows, cursor unchanged.
       expect(hasMessage(state, "message-old")).toBe(false);
       expect(Option.getOrThrow(state.page).beforeCursor).toBe("cursor-1");
     }),
@@ -424,7 +413,6 @@ describe("thread pagination state", () => {
         Option.match(value.page, { onNone: () => false, onSome: (page) => !page.loadingOlder }),
       );
       expect(hasMessage(state, "message-old")).toBe(false);
-      // The replacement snapshot's cursor wins over the discarded page's.
       expect(Option.getOrThrow(state.page).beforeCursor).toBe("cursor-2");
     }),
   );
@@ -516,8 +504,6 @@ describe("thread pagination state", () => {
       yield* harness.awaitState((value) =>
         Option.match(value.page, { onNone: () => false, onSome: (page) => page.loadingOlder }),
       );
-      // The page was captured at a newer projection sequence (12) than the
-      // loaded state (10); merging it must not swallow events 11-12.
       yield* harness.resolveNextPage(
         Option.some({
           ...OLDER_PAGE,
@@ -527,10 +513,6 @@ describe("thread pagination state", () => {
       );
       yield* harness.awaitState((value) => hasMessage(value, "message-old"));
 
-      // Event at sequence 11 must still apply after the merge: the revert
-      // discards turn-2, so the loaded window's row disappears while the
-      // merged older turn-1 row survives. If the merge had advanced the
-      // dedupe sequence to the page's 12, this event would be swallowed.
       yield* Queue.offer(harness.inputs, revertEvent(11));
       const state = yield* harness.awaitState(
         (value) => !hasMessage(value, "message-recent") && hasMessage(value, "message-old"),
@@ -541,11 +523,6 @@ describe("thread pagination state", () => {
 
   it.effect("parks a page read ahead of the live state until events catch up", () =>
     Effect.gen(function* () {
-      // A page whose thread watermark is ahead of the loaded state may
-      // contain streaming content the subscription has not delivered yet
-      // (e.g. an out-of-window subagent turn mid-stream); merging it
-      // immediately and then replaying those deltas would duplicate text.
-      // The page parks until the live state reaches the watermark.
       const harness = yield* makeHarness({ initialResponse: Option.some(WINDOWED_SNAPSHOT) });
       yield* harness.awaitState((value) => Option.isSome(value.page));
 
@@ -553,7 +530,6 @@ describe("thread pagination state", () => {
       yield* harness.awaitState((value) =>
         Option.match(value.page, { onNone: () => false, onSome: (page) => page.loadingOlder }),
       );
-      // Page watermark 11 > loaded sequence 10: must park, not merge.
       yield* harness.resolveNextPage(
         Option.some({
           ...OLDER_PAGE,
@@ -562,7 +538,6 @@ describe("thread pagination state", () => {
         }),
       );
 
-      // A live event at sequence 11 arrives; only then does the page merge.
       yield* Queue.offerAll(harness.inputs, [
         titleEvent("Advanced past watermark", 11),
         {
@@ -601,10 +576,6 @@ describe("thread pagination state", () => {
 
   it.effect("a revert keeps the page cursor and triggers no refresh fetch", () =>
     Effect.gen(function* () {
-      // Cursors are an (anchor, turnId) keyset derived from event content, so
-      // they survive the revert projector's row rewrite: the machine keeps
-      // the stored cursor and performs no snapshot re-fetch. The revert
-      // reducer's turn filtering alone handles loaded history.
       const harness = yield* makeHarness({ initialResponse: Option.some(WINDOWED_SNAPSHOT) });
       yield* harness.awaitState((value) => Option.isSome(value.page));
 
@@ -613,16 +584,12 @@ describe("thread pagination state", () => {
 
       expect(Option.getOrThrow(state.page).beforeCursor).toBe("cursor-1");
       const windows = yield* Ref.get(harness.loaderWindows);
-      // Only the initial load hit the loader — no post-revert refresh fetch.
       expect(windows.length).toBe(1);
     }),
   );
 
   it.effect("drops a windowed cache when the server lacks the pagination capability", () =>
     Effect.gen(function* () {
-      // Resuming a windowed cache via afterSequence against a pre-pagination
-      // server would render only the window forever with no way to load the
-      // rest: the machine must discard the cache and take a full snapshot.
       const fullSnapshot: OrchestrationThreadDetailSnapshot = {
         snapshotSequence: 20,
         thread: { ...BASE_THREAD, title: "Full reload" },
@@ -640,8 +607,6 @@ describe("thread pagination state", () => {
         }),
       );
       expect(Option.isNone(state.page)).toBe(true);
-      // The subscription resumed from the fresh full snapshot, not the
-      // discarded windowed cache's watermark, and sent no window fields.
       const subscribeInput = yield* Ref.get(harness.lastSubscribeInput);
       expect(subscribeInput?.turnLimit).toBeUndefined();
       expect(subscribeInput?.afterSequence).toBe(20);
@@ -653,8 +618,6 @@ describe("thread pagination state", () => {
       const harness = yield* makeHarness({ cached: WINDOWED_SNAPSHOT });
       const state = yield* harness.awaitState((value) => Option.isSome(value.page));
       expect(Option.getOrThrow(state.page).beforeCursor).toBe("cursor-1");
-      // Wait for the subscription (recorded when the WS method is invoked)
-      // before asserting its input.
       const subscribeInput = yield* Ref.get(harness.lastSubscribeInput).pipe(
         Effect.repeat({ until: (input) => input !== undefined }),
       );

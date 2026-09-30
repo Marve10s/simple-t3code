@@ -10,7 +10,6 @@ type Deferred = {
   readonly resolve: (tokens: HighlightedCode) => void;
 };
 
-/** One colored line per newline-separated line, so a line's color proves where it came from. */
 function tokensFor(code: string, color: string): HighlightedCode {
   return code.split("\n").map((content) => [{ content, color, fontStyle: 0 }]);
 }
@@ -72,7 +71,6 @@ async function resolveAsync(index: number, color: string) {
 }
 
 beforeEach(async () => {
-  // The probe has no DOM output, but ReactDOM needs an event target.
   const document = {
     nodeType: 9,
     addEventListener() {},
@@ -103,8 +101,6 @@ afterEach(async () => {
   vi.unstubAllGlobals();
 });
 
-// Every test uses a distinct language so the module-level token cache from an
-// earlier test can never satisfy a later one.
 describe("useHighlightedCode", () => {
   it("keeps colors from the latest synchronous read when a later read misses", async () => {
     const language = "sync-baseline";
@@ -119,14 +115,12 @@ describe("useHighlightedCode", () => {
     await render({ code: "a\nb", language });
     await render({ code: "a\nb\nc", language });
     expect(lineColors(result)).toEqual(["sync-2", "sync-2", "sync-2"]);
-    // A synchronous hit is one render per append: no state update, no highlighter call.
     expect(renders - rendersBeforeAppends).toBe(2);
     expect(highlightCode).toHaveBeenCalledTimes(1);
 
     await render({ code: "a\nb\nc\nd", language });
     expect(highlightCode).toHaveBeenCalledTimes(2);
     expect(lineText(result)).toBe("a\nb\nc\nd");
-    // Lines before the previous code's final newline are the completed ones.
     expect(lineColors(result)).toEqual(["sync-2", "sync-2", null, null]);
 
     await resolveAsync(1, "async-2");
@@ -178,7 +172,6 @@ describe("useHighlightedCode", () => {
     expect(deferred).toHaveLength(3);
     expect(lineColors(result)).toEqual(["sync", "sync", "sync", null, null]);
 
-    // The older request finishes after newer synchronous results exist.
     await resolveAsync(1, "stale");
     expect(lineText(result)).toBe("a\nb\nc\nd\ne");
     expect(lineColors(result)).toEqual(["sync", "sync", "sync", null, null]);

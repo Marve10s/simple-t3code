@@ -73,7 +73,6 @@ export function MaterialFloatingActionButton(props: {
           </Component>
         </Host>
       </View>
-      {/* The RN icon stays outside Compose so it cannot intercept native button taps. */}
       <View
         pointerEvents="none"
         className="absolute inset-y-0 justify-center"

@@ -43,7 +43,6 @@ function mergeRequests(count: number, firstNumber: number): string {
   );
 }
 
-/** A page of `/diffs` as GitLab serves it, a full one unless the count says otherwise. */
 function diffPage(firstIndex: number, count = 100): string {
   return JSON.stringify(
     Array.from({ length: count }, (_, index) => ({
@@ -54,7 +53,6 @@ function diffPage(firstIndex: number, count = 100): string {
   );
 }
 
-/** A page of merge request notes, which is what the flat conversation is read from. */
 function notes(count: number, firstId: number): string {
   return JSON.stringify(
     Array.from({ length: count }, (_, index) => ({
@@ -66,11 +64,9 @@ function notes(count: number, firstId: number): string {
   );
 }
 
-/** Who opened the merge request, and somebody already reviewing it. */
 const author = { id: 1, username: "bilal" };
 const reviewer = { id: 5, username: "octocat" };
 
-/** One merge request as `/merge_requests/:iid` answers with it. */
 function mergeRequestJson(overrides: Record<string, unknown>): string {
   return JSON.stringify({
     iid: 7,
@@ -85,12 +81,10 @@ function mergeRequestJson(overrides: Record<string, unknown>): string {
   });
 }
 
-/** The endpoint or subcommand of the nth glab invocation. */
 function argsOfCall(index: number): ReadonlyArray<string> {
   return callAt(index).args;
 }
 
-/** The whole nth invocation, so a request body can be asserted alongside its path. */
 function callAt(index: number) {
   const call = mockedExecute.mock.calls[index];
   assert.isDefined(call);
@@ -167,7 +161,6 @@ layer("GitLabPullRequestCli.layer", (it) => {
         query: "page",
       });
 
-      // GitLab matches `search` against title and description, which is more than the row shows.
       expect(argsOfCall(0)[1]).toContain("search=page");
     }),
   );
@@ -187,8 +180,6 @@ layer("GitLabPullRequestCli.layer", (it) => {
         cursor: { updatedBefore: "2026-07-02T00:00:00Z", delivered: 10 },
       });
 
-      // GitLab's timestamp filter has no tie-breaker, so an offset is what advances through a
-      // boundary shared by more rows than one page can hold.
       const path = argsOfCall(0)[1] ?? "";
       expect(path).not.toContain("updated_before=");
       expect(path).toContain("order_by=updated_at");
@@ -266,7 +257,6 @@ layer("GitLabPullRequestCli.layer", (it) => {
 
       const path = argsOfCall(0)[1] ?? "";
       expect(path).toContain("search=-a%26per_page%3D1%20%22b%22");
-      // The page size the walk fixed is still the only one in the query.
       assert.strictEqual(path.match(/per_page=/g)?.length, 1);
     }),
   );
@@ -312,8 +302,6 @@ layer("GitLabPullRequestCli.layer", (it) => {
 
   it.effect("stops walking when every row on a page fails to decode", () =>
     Effect.gen(function* () {
-      // Full pages of unusable rows: nothing is collected, so the collected-count bound never
-      // trips and only the page bound can end the walk.
       // @effect-diagnostics-next-line preferSchemaOverJson:off
       const unusable = JSON.stringify(Array.from({ length: 100 }, () => ({ iid: "nope" })));
       mockedExecute.mockReturnValue(Effect.succeed(output(unusable)));
@@ -329,7 +317,6 @@ layer("GitLabPullRequestCli.layer", (it) => {
       });
 
       assert.strictEqual(batch.items.length, 0);
-      // ceil((150 + 1) / 100) pages, not one request per page forever.
       assert.strictEqual(mockedExecute.mock.calls.length, 2);
     }),
   );
@@ -517,7 +504,6 @@ layer("GitLabPullRequestCli.layer", (it) => {
         "--header",
         "Content-Type: application/json",
       ]);
-      // A JSON body, so a comment reading as a literal `true` stays text.
       expect(call[0].stdin).toBe('{"body":"true"}');
     }),
   );
@@ -533,10 +519,8 @@ layer("GitLabPullRequestCli.layer", (it) => {
         number: 7,
       });
 
-      // One page per call: the reader asks for the rest, the walk does not run on by itself.
       assert.strictEqual(mockedExecute.mock.calls.length, 1);
       assert.isNotNull(diff.nextCursor);
-      // A full page means more files, not a slice with something missing from it.
       assert.isFalse(diff.truncated);
       expect(argsOfCall(0)[1]).toContain("merge_requests/7/diffs?per_page=100&page=1");
     }),
@@ -555,7 +539,6 @@ layer("GitLabPullRequestCli.layer", (it) => {
       const second = yield* cli.getMergeRequestDiff({ ...target, cursor: first.nextCursor });
 
       expect(argsOfCall(1)[1]).toContain("page=2");
-      // A short page is the end of the change set, so there is nothing to carry on from.
       assert.isNull(second.nextCursor);
       expect(second.patch).toContain("diff --git a/src/100.ts b/src/100.ts");
     }),
@@ -599,8 +582,6 @@ layer("GitLabPullRequestCli.layer", (it) => {
       const commitPath =
         "projects/acme%2Fweb/repository/commits/a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0/diff";
       expect(argsOfCall(0)[1]).toBe(`${commitPath}?per_page=100&page=1`);
-      // The whole path, not just the page: a cursor branch that dropped the commit would still
-      // ask for page 2, of the merge request's own diff.
       expect(argsOfCall(1)[1]).toBe(`${commitPath}?per_page=100&page=2`);
       assert.isNull(second.nextCursor);
     }),
@@ -805,7 +786,6 @@ layer("GitLabPullRequestCli.layer", (it) => {
   it.effect("fails a diff page cut off mid-JSON rather than calling the diff whole", () =>
     Effect.gen(function* () {
       mockedExecute.mockReturnValueOnce(
-        // A byte-truncated prefix: valid JSON never survives the cut.
         Effect.succeed({ ...output('[{"old_path":"src/x.ts","new_p'), stdoutTruncated: true }),
       );
       const cli = yield* GitLabPullRequestCli.GitLabPullRequestCli;
@@ -814,8 +794,6 @@ layer("GitLabPullRequestCli.layer", (it) => {
         cli.getMergeRequestDiff({ cwd: "/w", repository: "acme/web", number: 7 }),
       );
 
-      // An empty slice with no cursor would report every file from this page on as already
-      // read, which is the one answer that loses a change without saying so.
       assert.strictEqual(error._tag, "GitLabMergeRequestReadError");
     }),
   );
@@ -915,7 +893,6 @@ layer("GitLabPullRequestCli.layer", (it) => {
 
   it.effect("stops the note walk at its bound and says the conversation was cut short", () =>
     Effect.gen(function* () {
-      // GitLab that never answers short: the walk has to end itself.
       mockedExecute.mockReturnValue(Effect.succeed(output(notes(100, 1))));
       const cli = yield* GitLabPullRequestCli.GitLabPullRequestCli;
 
@@ -963,7 +940,6 @@ layer("GitLabPullRequestCli.layer", (it) => {
                   },
                 ],
               },
-              // A plain note is the timeline's business, not the diff's.
               { id: "def456", notes: [{ id: 3, body: "ship it", created_at: "2026-07-01Z" }] },
             ]),
           ),
@@ -1027,7 +1003,6 @@ layer("GitLabPullRequestCli.layer", (it) => {
         ],
       });
 
-      // The diff revisions first, because a positioned comment cannot be placed without them.
       expect(argsOfCall(0)[1]).toContain("merge_requests/7");
       expect(argsOfCall(1)[1]).toContain("/discussions");
       // @effect-diagnostics-next-line preferSchemaOverJson:off
@@ -1038,15 +1013,12 @@ layer("GitLabPullRequestCli.layer", (it) => {
           head_sha: "head",
           start_sha: "start",
           position_type: "text",
-          // A renamed file is the only case the two differ, and GitLab cannot place a
-          // position that names the same path on both sides of the rename.
           old_path: "src/a.ts",
           new_path: "src/b.ts",
           old_line: 4,
         },
       });
       expect(argsOfCall(2)[1]).toContain("/notes");
-      // The verdict goes last, so a review that failed part-way is never an approval.
       expect(argsOfCall(3)[1]).toContain("/approve");
     }),
   );
@@ -1169,7 +1141,6 @@ layer("GitLabPullRequestCli.layer", (it) => {
         reacted: false,
       });
 
-      // Nothing to delete: the reaction the caller asked to take back is already gone.
       assert.strictEqual(mockedExecute.mock.calls.length, 2);
     }),
   );
@@ -1206,8 +1177,6 @@ layer("GitLabPullRequestCli.layer", (it) => {
         }),
       );
 
-      // Nothing failed to decode: GitLab answered, and the answer has nowhere to put a
-      // positioned comment.
       assert.strictEqual(error._tag, "GitLabDiffRefsUnavailableError");
     }),
   );
@@ -1231,7 +1200,6 @@ layer("GitLabPullRequestCli.layer", (it) => {
       });
 
       expect(argsOfCall(1)[1]).toBe("projects/acme%2Fweb/users?per_page=100");
-      // The author is left out, and whoever GitLab already has as a reviewer is marked.
       expect(list.candidates.map((candidate) => [candidate.id, candidate.isRequested])).toEqual([
         ["5", true],
         ["9", false],
@@ -1255,8 +1223,6 @@ layer("GitLabPullRequestCli.layer", (it) => {
         requested: true,
       });
 
-      // GitLab replaces the whole set, so the reviewer already on the merge request has to be
-      // sent back with the new one or the request would take them off it.
       expect(argsOfCall(1)).toContain("PUT");
       // @effect-diagnostics-next-line preferSchemaOverJson:off
       expect(JSON.parse(callAt(1).stdin ?? "")).toEqual({ reviewer_ids: [5, 9] });
@@ -1302,7 +1268,6 @@ layer("GitLabPullRequestCli.layer", (it) => {
         requested: true,
       });
 
-      // Sending it as a number would rewrite the reviewer set around something nobody chose.
       // @effect-diagnostics-next-line preferSchemaOverJson:off
       expect(JSON.parse(callAt(1).stdin ?? "")).toEqual({ reviewer_ids: [5] });
     }),
@@ -1347,7 +1312,6 @@ layer("GitLabPullRequestCli.layer", (it) => {
         description: "What this changes.",
       });
 
-      // A title sent as an empty string would wipe the one the merge request already has.
       // @effect-diagnostics-next-line preferSchemaOverJson:off
       expect(JSON.parse(callAt(0).stdin ?? "")).toEqual({ description: "What this changes." });
     }),
@@ -1398,7 +1362,6 @@ layer("GitLabPullRequestCli.layer", (it) => {
         "--header",
         "Content-Type: application/json",
       ]);
-      // A JSON body, so a note rewritten to a literal `true` stays text.
       expect(callAt(0).stdin).toBe('{"body":"true"}');
     }),
   );
@@ -1442,13 +1405,10 @@ layer("GitLabPullRequestCli.layer", (it) => {
         paths: ["src/a.ts", "src/gone.ts"],
       });
 
-      // Every path was looked for at the head, so one the head does not have is one the merge
-      // request removed: said as the empty version, which a mark on it was stamped with too.
       expect([...revisions]).toEqual([
         ["src/a.ts", "aaa"],
         ["src/gone.ts", ""],
       ]);
-      // The head the reader is looking at, not whatever the source branch has moved on to.
       // @effect-diagnostics-next-line preferSchemaOverJson:off
       const body: unknown = JSON.parse(callAt(1).stdin ?? "{}");
       expect(body).toMatchObject({
@@ -1476,9 +1436,6 @@ layer("GitLabPullRequestCli.layer", (it) => {
           ),
         ),
       );
-      // What GitLab says of a project the token cannot see. It is not the head having none of
-      // these files, and reading it that way would report every file the reader has cleared as
-      // changed on nothing worse than a permission.
       mockedExecute.mockReturnValueOnce(
         Effect.succeed(
           // @effect-diagnostics-next-line preferSchemaOverJson:off
@@ -1565,7 +1522,6 @@ layer("GitLabPullRequestCli.layer", (it) => {
 
       assert.strictEqual(revisions.size, 150);
       assert.strictEqual(revisions.get("src/149.ts"), "oid-src/149.ts");
-      // The diff refs, then two batches: a hundred paths and the fifty left over.
       assert.strictEqual(mockedExecute.mock.calls.length, 3);
     }),
   );

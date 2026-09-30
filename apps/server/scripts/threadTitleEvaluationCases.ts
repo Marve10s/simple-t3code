@@ -1,6 +1,5 @@
 import type { ThreadTitleMessage } from "../src/textGeneration/ThreadTitleContext.ts";
 
-// Public PR subjects and existing title scenarios. Repeated text adds context pressure.
 export const threadTitleEvaluationCases = [
   {
     id: "linked-reset-credits",

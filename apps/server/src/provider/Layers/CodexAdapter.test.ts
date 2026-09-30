@@ -49,7 +49,6 @@ import {
 import { makeCodexAdapter } from "./CodexAdapter.ts";
 const decodeCodexSettings = Schema.decodeSync(CodexSettings);
 
-// Test-local service tag so the rest of the file can keep using `yield* CodexAdapter`.
 class CodexAdapter extends Context.Service<CodexAdapter, CodexAdapterShape>()(
   "t3/provider/Layers/CodexAdapter.test/CodexAdapter",
 ) {}
@@ -739,7 +738,6 @@ lifecycleLayer("CodexAdapterLive lifecycle", (it) => {
           reasoningTokens: 8,
         }),
       );
-      // Codex can repeat both notifications without new work.
       yield* runtime.emit(codexTurnEvent("turn/started", "turn-usage"));
       yield* runtime.emit(
         codexTokenUsageEvent({
@@ -820,7 +818,6 @@ lifecycleLayer("CodexAdapterLive lifecycle", (it) => {
       );
       yield* runtime.emit(codexTurnEvent("turn/completed", "turn-first"));
       yield* runtime.emit(codexTurnEvent("turn/started", "turn-second"));
-      // A late update for the finished turn lands after the next turn starts.
       yield* runtime.emit(
         codexTokenUsageEvent({
           id: "evt-late-2",
@@ -931,8 +928,6 @@ lifecycleLayer("CodexAdapterLive lifecycle", (it) => {
           },
         }),
       );
-      // Codex restarted its cumulative total. The new total is smaller than
-      // the previous one, so only `last` is counted for this update.
       yield* runtime.emit(
         codexTokenUsageEvent({
           id: "evt-reset-2",
@@ -981,8 +976,6 @@ lifecycleLayer("CodexAdapterLive lifecycle", (it) => {
         Effect.forkChild,
       );
 
-      // Resumed thread: the cumulative total already holds old history, so the
-      // first update must count only `last`.
       yield* runtime.emit(codexTurnEvent("turn/started", "turn-resumed"));
       yield* runtime.emit(
         codexTokenUsageEvent({
@@ -1026,8 +1019,6 @@ lifecycleLayer("CodexAdapterLive lifecycle", (it) => {
         Stream.runHead,
         Effect.forkChild,
       );
-      // Rollback drops the baseline and Codex shrinks its total, so the first
-      // update after it counts only `last` again.
       yield* runtime.emit(codexTurnEvent("turn/started", "turn-after-rollback"));
       yield* runtime.emit(
         codexTokenUsageEvent({
@@ -2576,14 +2567,6 @@ lifecycleLayer("CodexAdapterLive lifecycle", (it) => {
     }),
   );
 
-  // Production calls startSession from a request fiber that finishes as soon as
-  // the session exists. `Effect.forkChild` made the runtime event consumer a
-  // child of that fiber, and Effect interrupts a fiber's children when it
-  // completes, so the consumer died on return and every event the session
-  // emitted afterwards was dropped. The other tests here start the session from
-  // the test fiber, which never completes, so the consumer survived and the bug
-  // stayed invisible. Starting it in a fiber that finishes reproduces
-  // production.
   it.effect("keeps consuming runtime events after the startSession fiber completes", () =>
     Effect.gen(function* () {
       const adapter = yield* CodexAdapter;
@@ -2627,9 +2610,6 @@ lifecycleLayer("CodexAdapterLive lifecycle", (it) => {
         return;
       }
       NodeAssert.equal(firstEvent.value.type, "item.completed");
-      // Live clock so the timeout above is real: under the default test clock it
-      // waits on virtual time that never advances, and a regression would hang
-      // until the suite timeout instead of failing here.
     }).pipe(TestClock.withLive),
   );
 });
@@ -2936,7 +2916,6 @@ usageLimitLayer("CodexAdapterLive usage limits", (it) => {
         }),
       );
       yield* runtime.emit(codexUsageLimitTurnFailed("evt-limit-turn"));
-      // A second turn stopping on the same limit says as much as the first.
       yield* runtime.emit(codexUsageLimitTurnFailed("evt-limit-turn-2", "turn-limit-2"));
 
       const events = Array.from(yield* Fiber.join(eventsFiber));
@@ -3007,8 +2986,6 @@ usageLimitLayer("CodexAdapterLive usage limits", (it) => {
         Effect.forkChild,
       );
 
-      // The window arrives long before the stop, and the update that reports the
-      // limit as reached carries no windows of its own.
       yield* runtime.emit(
         codexRateLimitsNotification({
           id: "evt-early-rate-limits",

@@ -131,8 +131,6 @@ export const detectPrTemplate = Effect.fn("detectPrTemplate")(function* (
   executeGit: ExecuteGit,
 ) {
   return yield* Effect.gen(function* () {
-    // Worktree paths can be replaced between validation and open. Read regular blobs from the
-    // committed base tree so repository-controlled symlinks and path races never reach the host filesystem.
     const result = yield* executeGit({
       operation: "PrTemplateDetection.listTemplates",
       cwd,

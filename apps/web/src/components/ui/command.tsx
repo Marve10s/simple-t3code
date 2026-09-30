@@ -152,9 +152,6 @@ function CommandCollection({ ...props }: React.ComponentProps<typeof Autocomplet
   return <AutocompleteCollection data-slot="command-collection" {...props} />;
 }
 
-// Pass `active` when the palette tracks the highlighted row itself; the
-// primitive's hover and keyboard highlight are then ignored so the two never
-// disagree, and the row shows the active surface instead.
 function CommandItem({
   className,
   active,

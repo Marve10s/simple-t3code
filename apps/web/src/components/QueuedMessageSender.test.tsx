@@ -152,7 +152,6 @@ describe("QueuedMessageSender", () => {
     await render();
     expect(commandsRun()).toEqual(["start"]);
 
-    // The first message started a turn; the second waits for its next tool call.
     io.thread = thread("running", { userMessageIds: ["first"] });
     await render();
     expect(commandsRun()).toEqual(["start"]);

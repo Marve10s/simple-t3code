@@ -14,7 +14,6 @@ import { showDesktopUpdateDownloadedToast } from "./desktopUpdate.toast";
 
 type ClickableElement = ReactElement<{ readonly onClick?: () => void }>;
 
-/** Walks the rendered description, invoking function components, to find the link button. */
 function findReleaseNotesLink(node: ReactNode): ClickableElement | null {
   if (Array.isArray(node)) {
     for (const child of node) {
@@ -82,7 +81,6 @@ describe("showDesktopUpdateDownloadedToast", () => {
   it("falls back to the version the download was started for", async () => {
     const openExternal = vi.fn().mockResolvedValue(true);
 
-    // The `update-downloaded` event can land after the download RPC resolves.
     showDesktopUpdateDownloadedToast(
       { openExternal },
       downloadedState({ downloadedVersion: null }),

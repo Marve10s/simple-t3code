@@ -6,26 +6,8 @@ import { splitPromptIntoComposerSegments } from "~/composer-editor-mentions";
 import { parseInlineMarkdown, RICH_TEXT_DELIMITERS, type RichTextMark } from "~/composer-rich-text";
 import { collectInlineContextIds } from "~/lib/composerContextReferences";
 
-/**
- * Pure document model for the rich text (Tiptap) composer.
- *
- * The stored prompt stays markdown (`**bold**`, `@file` chips as canonical
- * links). The Tiptap document holds styled text plus inline atom chips, so
- * this module translates both ways and maps cursor offsets between the three
- * coordinate spaces the composer speaks:
- *
- * - flat document offsets (styled markers excluded, chips count 1),
- * - collapsed cursor offsets (markers literal, chips count 1 — the coordinate
- *   the draft store and mention detection use),
- * - markdown offsets (markers literal, chips expand to their source).
- *
- * DOM-free on purpose: unit tests build a real ProseMirror document from the
- * JSON this produces and assert the round trip without a browser.
- */
-
 export type SkillMeta = { label: string; description: string | null };
 
-/** Outermost mark first, so closers mirror openers when nested. */
 const MARK_NESTING_ORDER: RichTextMark[] = ["strike", "bold", "italic", "code"];
 
 const MARK_TO_TIPTAP: Record<RichTextMark, string> = {
@@ -42,18 +24,8 @@ const TIPTAP_TO_MARK: Record<string, RichTextMark> = {
   code: "code",
 };
 
-/**
- * Tiptap's code mark excludes every other mark, which rejects the `bold+code`
- * spans markdown like `**\`x\`**` parses into and drops the whole insert.
- * Code nests inside emphasis here, so it only excludes itself like the rest.
- */
 export const ComposerCodeExtension = Code.extend({ excludes: "code" });
 
-/**
- * Task list items keep their exact source indent in an attribute so nesting
- * round-trips byte-identically. Checkbox case (`[X]`) normalizes to `[x]` —
- * the same fixed-point deal as `__bold__` becoming `**bold**`.
- */
 export const ComposerTaskItemExtension = TaskItem.extend({
   addAttributes() {
     return {
@@ -177,8 +149,6 @@ export function buildTiptapContent(
   options?: { styling?: boolean },
 ): Record<string, unknown>[] {
   const styling = options?.styling ?? true;
-  // Hide token source from the markdown parser, then restore the atoms with
-  // the marks of their surrounding text. Choose a sentinel absent from input.
   let sentinel = "\uFFFC";
   for (let codePoint = 0xe000; value.includes(sentinel); codePoint += 1) {
     sentinel = String.fromCodePoint(codePoint);
@@ -209,8 +179,6 @@ export function buildTiptapContent(
     return { task: parsed?.prefix ?? null, inline };
   });
 
-  // Pass 2: consecutive task lines group into (possibly nested) task lists
-  // by indent prefix; everything else stays a paragraph.
   const blocks: Record<string, unknown>[] = [];
   let stack: { indent: string; items: PendingTaskItem[] }[] = [];
   const flushTasks = () => {
@@ -233,7 +201,6 @@ export function buildTiptapContent(
     for (;;) {
       const top = stack[stack.length - 1];
       if (!top) {
-        // A leading indented item with no parent flattens but keeps indent.
         stack.push({ indent: item.indent, items: [] });
         continue;
       }
@@ -274,17 +241,12 @@ export function buildDocJson(
 
 export interface RichRun {
   kind: "text" | "token" | "break" | "prefix";
-  /** Flat document offset (atoms count 1, markers excluded). */
   flatStart: number;
   docLen: number;
-  /** Collapsed cursor length (markers literal, tokens count 1). */
   collapsedLen: number;
-  /** Markdown length (tokens expand to their source). */
   mdLen: number;
-  /** Marker layout inside text runs. */
   openLen: number;
   closeLen: number;
-  /** ProseMirror position of the run start. */
   pmPos: number;
   mdStart: number;
   collapsedStart: number;
@@ -325,7 +287,6 @@ interface RichAccumulator {
 function pushBreakRun(acc: RichAccumulator, position?: number): void {
   const previous = acc.runs[acc.runs.length - 1];
   const pmPos = position ?? (previous ? previous.pmPos + previous.docLen : 1);
-  // Block boundary: one newline in every coordinate space.
   acc.runs.push({
     kind: "break",
     flatStart: acc.flat,
@@ -355,8 +316,6 @@ function appendInlineRuns(
       children.push(child);
       return;
     }
-    // Separate boundary whitespace so delimiters can move past it without
-    // changing the document offsets or marks on the visible text.
     const text = child.text!;
     const start = text.length - text.trimStart().length;
     const end = Math.max(start, text.trimEnd().length);
@@ -366,8 +325,6 @@ function appendInlineRuns(
       offset = boundary;
     }
   });
-  // Emphasis cannot open or close next to whitespace. Retain a whitespace
-  // mark only when its range has visible content on both sides.
   for (const mark of MARK_NESTING_ORDER) {
     if (mark === "code") continue;
     for (const direction of [1, -1]) {
@@ -396,8 +353,6 @@ function appendInlineRuns(
       }
     }
   }
-  // Longer shared marks surround shorter ones. This keeps both nested
-  // formatting and formatting across chips inside a single delimiter pair.
   const markEnds = new Map<RichTextMark, number>();
   const orderedMarks: RichTextMark[][] = [];
   for (let index = children.length - 1; index >= 0; index -= 1) {
@@ -472,7 +427,6 @@ function appendInlineRuns(
     acc.collapsed += collapsedLen;
     acc.md += mdText.length;
   });
-  // Empty paragraphs have an editable position even though they emit no text.
   if (children.length === 0) {
     acc.runs.push({
       kind: "text",
@@ -493,7 +447,6 @@ function walkTaskList(list: ProseMirrorNode, listStart: number, acc: RichAccumul
   let itemPos = listStart + 1;
   let firstItem = true;
   list.content.forEach((item) => {
-    // Sibling items are separated by one newline in every coordinate space.
     if (!firstItem) pushBreakRun(acc);
     firstItem = false;
     const itemContentStart = itemPos + 1;
@@ -509,8 +462,6 @@ function walkTaskList(list: ProseMirrorNode, listStart: number, acc: RichAccumul
           ? ""
           : " ";
     const prefix = `${indent}-${markerSpace}[${attrs.checked === true ? "x" : " "}]${contentSpace}`;
-    // The checkbox owns no document characters; every prefix offset clamps
-    // to the start of the item text, exactly like style markers.
     acc.runs.push({
       kind: "prefix",
       flatStart: acc.flat,
@@ -605,12 +556,9 @@ export function flatToMarkdown(map: RichDocMap, flatOffset: number): number {
 export function collapsedToFlat(map: RichDocMap, collapsedOffset: number): number {
   for (const run of map.runs) {
     if (collapsedOffset < run.collapsedStart + run.collapsedLen) {
-      // Checkbox prefixes and style markers are shown, never edited: every
-      // offset inside them clamps to the adjacent document position.
       if (run.kind === "prefix") return run.flatStart;
       if (run.kind === "text" || run.kind === "token") {
         const within = collapsedOffset - run.collapsedStart;
-        // Marker characters clamp to the styled edge: they are shown, never edited.
         if (within <= run.openLen) return run.flatStart;
         if (within >= run.openLen + run.docLen) return run.flatStart + run.docLen;
         return run.flatStart + (within - run.openLen);
@@ -636,14 +584,12 @@ export function flatToPm(map: RichDocMap, flatOffset: number): number {
 export function pmToFlat(map: RichDocMap, pmPos: number): number {
   for (const run of map.runs) {
     if (pmPos >= run.pmPos && pmPos <= run.pmPos + run.docLen) {
-      // A position on a chip's trailing edge belongs after the chip.
       if (run.kind === "token" && pmPos === run.pmPos + run.docLen) {
         return run.flatStart + run.docLen;
       }
       return run.flatStart + Math.min(pmPos - run.pmPos, run.docLen);
     }
   }
-  // A paragraph boundary position belongs to the newline between paragraphs.
   let best = 0;
   for (const run of map.runs) {
     if (run.pmPos <= pmPos) best = run.flatStart + run.docLen;

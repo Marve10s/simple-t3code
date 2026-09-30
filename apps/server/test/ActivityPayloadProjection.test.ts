@@ -272,8 +272,6 @@ describe("projectActivityPayload", () => {
         continue;
       }
       if (activity === fixtures[4]) {
-        // MCP is the one deliberate difference: the expanded row's toolData
-        // loses result bulk but keeps the rendered identity fields.
         const [entry] = deriveWorkLogEntries([projected]);
         expect(entry?.toolData).toEqual({
           server: "repository",
@@ -414,7 +412,6 @@ describe("superseded tool.updated snapshot dedup", () => {
       toolCallId: "call-a",
     });
 
-    // Same itemType/title, different call: only call-a's update is superseded.
     expect(projectedIds([otherCall, update, completed])).toEqual([otherCall.id, completed.id]);
   });
 
@@ -429,12 +426,6 @@ describe("superseded tool.updated snapshot dedup", () => {
   });
 
   it("drops interleaved superseded updates even when a parallel call separates them", () => {
-    // Deliberate divergence from the clients' adjacency-based collapse: a
-    // superseded update separated from its completion by an interleaved
-    // parallel call renders as its own in-flight row on full history, and the
-    // snapshot omits it. Its final state still shows via the retained
-    // completion (1.5% of dropped rows on real data; see the projection's doc
-    // comment).
     const updateA = makeToolLifecycleActivity("upd-a", "tool.updated", { toolCallId: "call-a" });
     const updateB = makeToolLifecycleActivity("upd-b", "tool.updated", { toolCallId: "call-b" });
     const completedA = makeToolLifecycleActivity("done-a", "tool.completed", {
@@ -451,8 +442,6 @@ describe("superseded tool.updated snapshot dedup", () => {
   });
 
   it("keeps an update whose completion lives in another turn", () => {
-    // A live thread.reverted can discard the completing turn while keeping
-    // the updating one, which would leave the call unrepresented.
     const update = makeToolLifecycleActivity("upd-kept", "tool.updated", { turn: "turn-kept" });
     const completed = makeToolLifecycleActivity("done-later", "tool.completed", {
       turn: "turn-reverted",
@@ -462,7 +451,6 @@ describe("superseded tool.updated snapshot dedup", () => {
   });
 
   it("keeps an update that follows its completion", () => {
-    // A later update under the same identity is the next call, still in flight.
     const completed = makeToolLifecycleActivity("done-first", "tool.completed");
     const nextCall = makeToolLifecycleActivity("upd-next", "tool.updated");
 
@@ -539,14 +527,10 @@ describe("context-window snapshot dedup", () => {
       latestA.id,
       latestB.id,
     ]);
-    // The retained rows keep their payloads untouched — the tool-data
-    // projection only rewrites payloads with a `data` record.
     expect(projected.thread.activities[2]?.payload).toEqual(latestB.payload);
   });
 
   it("still resolves a meter value after the client reverts the newest turn", () => {
-    // A live thread.reverted makes the client drop all activities from
-    // discarded turns; each surviving turn must keep a usable row.
     const olderTurn = makeContextWindowActivity("ctx-old", 1_500, "turn-kept");
     const revertedTurn = makeContextWindowActivity("ctx-new", 9_000, "turn-reverted");
 
@@ -590,8 +574,6 @@ describe("context-window snapshot dedup", () => {
       thread: makeThread([valid, malformed]),
     });
 
-    // The malformed row passes through, the valid row survives, and the
-    // client's backward walk resolves the same value as with full history.
     expect(projected.thread.activities.map((activity) => activity.id)).toEqual([
       valid.id,
       malformed.id,

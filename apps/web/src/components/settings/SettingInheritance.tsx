@@ -34,7 +34,6 @@ const WRITING_STYLE_LABELS: Record<string, string> = {
   custom: "Custom instructions",
 };
 
-/** Human labels for the values the chain can show; falls back to a type summary. */
 function formatValue(key: keyof ServerSettings, value: unknown): string {
   if (value === null || value === undefined) {
     return key === "pullRequestMergeMethod"
@@ -79,12 +78,6 @@ function formatValue(key: keyof ServerSettings, value: unknown): string {
   return "Custom";
 }
 
-/**
- * The layers a setting resolves through for one target, top-down: the
- * project override when the target is a project, the environment's value,
- * the checkout's t3.json for file-backed keys, and the built-in default. The
- * first layer that is set wins. Same order as `resolveProjectSettings`.
- */
 export function settingInheritanceLayers(
   target: ScopedSettingsTarget,
   environmentSettings: ServerSettings,
@@ -120,8 +113,6 @@ export function settingInheritanceLayers(
       set: source === "t3.json",
     });
   }
-  // For a file-backed key the built-in is what the resolver produced with
-  // nothing set, not the null the schema decodes to.
   const builtIn = fileBacked
     ? PROJECT_FILE_BACKED_SETTINGS[key].builtIn
     : DEFAULT_SERVER_SETTINGS[key];
@@ -148,14 +139,8 @@ export type SettingInheritanceState =
   | "overridden"
   | "mixed";
 
-/**
- * A small indicator beside a row's title that opens a top-down view of where
- * the setting's value comes from on each selected target. It sits inline so
- * narrowing to a project does not add a caption line to every row.
- */
 export interface SettingOverridingProject extends ProjectOverrideEntry {
   readonly label: string;
-  /** Jumps the breadcrumb to this project so its override can be edited. */
   readonly open: () => void;
 }
 
@@ -173,7 +158,6 @@ export function SettingInheritance({
   targets: readonly ScopedSettingsTarget[];
   environments: readonly Pick<EnvironmentPresentation, "environmentId" | "serverConfig">[];
   keys: readonly (keyof ServerSettings)[];
-  /** At environment scope: projects whose own value hides the environment's. */
   overridingProjects?: readonly SettingOverridingProject[];
   onClearOverrides?: (entries: readonly ProjectOverrideEntry[]) => void;
 }) {

@@ -1500,7 +1500,6 @@ it.effect(
               const url = input.args[2];
               assert.isDefined(url);
               fetched.push(url!);
-              // Only SSH transport is substituted; both paths fetch the real pull ref.
               return git.run({
                 ...input,
                 args: input.args.map((arg) =>

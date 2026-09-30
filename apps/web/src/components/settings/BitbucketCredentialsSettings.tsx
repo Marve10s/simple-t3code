@@ -43,7 +43,6 @@ function savedMethod(saved: BitbucketSettings): CredentialMethod | null {
   return null;
 }
 
-/** A write-only token field. It never shows the saved token; typing a new one replaces it. */
 function TokenInput({
   id,
   isSaved,
@@ -68,11 +67,6 @@ function TokenInput({
   );
 }
 
-/**
- * Bitbucket credentials for one environment: an access token or an Atlassian
- * account email + API token, never both. Tokens are write-only: the server
- * keeps them in its secret store and only reports whether each one is set.
- */
 export function BitbucketCredentialsSettings({
   environmentId,
   onSaved,
@@ -97,15 +91,13 @@ export function BitbucketCredentialsSettings({
   const newApiToken = apiToken.trim();
   const info = METHODS[method];
 
-  // Saving one method clears the other, so a hidden credential never wins over the visible one.
   const patch: BitbucketSettings | null =
     method === "access-token"
       ? newAccessToken
         ? { accessToken: newAccessToken, email: "", apiToken: "" }
         : null
       : email && (newApiToken || saved.apiToken)
-        ? // Resending the saved token's redacted value keeps it.
-          { accessToken: "", email, apiToken: newApiToken || saved.apiToken }
+        ? { accessToken: "", email, apiToken: newApiToken || saved.apiToken }
         : null;
   const canSave =
     patch !== null &&
@@ -137,7 +129,6 @@ export function BitbucketCredentialsSettings({
         if (canSave && patch) void save(patch);
       }}
     >
-      {/* Locked while saving: a successful save clears the drafts, which would drop edits made mid-request. */}
       <fieldset disabled={saving} className="contents">
         <ToggleGroup
           aria-label="Bitbucket sign-in method"

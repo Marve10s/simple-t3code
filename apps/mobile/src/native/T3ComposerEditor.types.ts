@@ -43,14 +43,12 @@ export interface ComposerEditorProps {
   readonly placeholder?: string;
   readonly autoFocus?: boolean;
   readonly editable?: boolean;
-  /** Blocks user edits while preserving focus, selection, and the software keyboard. */
   readonly readOnly?: boolean;
   readonly scrollEnabled?: boolean;
   readonly autoCorrect?: boolean;
   readonly spellCheck?: boolean;
   readonly multiline?: boolean;
   readonly contentInsetVertical?: number;
-  /** Android: center a single line vertically (collapsed pill); no-op on iOS. */
   readonly singleLineCentered?: boolean;
   readonly style?: StyleProp<ViewStyle>;
   readonly textStyle?: StyleProp<TextStyle>;
@@ -65,11 +63,6 @@ export interface ComposerEditorProps {
   readonly onPasteText?: (paste: ComposerTextPaste) => void;
   readonly onFocus?: () => void;
   readonly onBlur?: () => void;
-  /**
-   * Hardware-keyboard Return behavior on iOS. No-op on Android, which has no
-   * hardware Return handling.
-   */
   readonly enterBehavior?: ComposerEnterBehavior;
-  /** Hardware keyboard submission: Command-Return, or Return when `enterBehavior` is "send". */
   readonly onSubmit?: () => void;
 }

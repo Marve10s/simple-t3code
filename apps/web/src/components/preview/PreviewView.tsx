@@ -93,10 +93,6 @@ function previewProfileName(
 
 const localApi = typeof window === "undefined" ? null : ensureLocalApi();
 
-/**
- * Single-tab preview surface: chrome row on top, one webview below, empty
- * state when no session exists for the thread.
- */
 export function PreviewView({
   threadRef,
   tabId: requestedTabId,
@@ -109,8 +105,6 @@ export function PreviewView({
   const activeRecordingTabIds = useActiveBrowserRecordingTabIds();
   const pickActiveRef = useRef(false);
   const isMountedRef = useRef(true);
-  // Kept in sync so the title effect can depend on the stable thread key
-  // instead of the thread object, which is recreated on every update.
   const threadRefRef = useRef(threadRef);
   threadRefRef.current = threadRef;
   const previewState = useThreadPreviewState(threadRef);
@@ -162,12 +156,6 @@ export function PreviewView({
   const controller = desktopOverlay?.controller ?? "none";
   const viewport = snapshot?.viewport ?? FILL_PREVIEW_VIEWPORT;
   const browserDefaults = useBrowserDefaults();
-  // A tab created before profiles existed carries no profile of its own. It
-  // runs in the built-in `default` partition — the scope the browser used
-  // before profiles — not in whatever profile is configured as the default
-  // now, so that is what its label names and its clear actions target.
-  // Passing the snapshot's raw `undefined` through would reach the IPC layer
-  // as "every profile".
   const activeProfileId = snapshot?.profileId ?? DEFAULT_BROWSER_PROFILE_ID;
   const activeProfileName = previewProfileName(browserDefaults.profiles, activeProfileId);
   const panelRect = useBrowserSurfaceStore((state) =>
@@ -180,15 +168,12 @@ export function PreviewView({
   const threadKey = scopedThreadKey(threadRef);
   useEffect(() => {
     if (!navUrl || !navTitle || !latestHistoryUrl) return;
-    // Agent-driven pages only enrich an existing requested URL.
     setTitleForThreadUrl(threadRefRef.current, navUrl, navTitle, environmentHostname);
-    // threadKey stands in for threadRef, whose identity churns on every thread update.
   }, [environmentHostname, latestHistoryUrl, navTitle, navUrl, threadKey]);
 
   const navigateToResolvedUrl = useCallback(
     async (resolvedUrl: string) => {
       if (runtimeTabId && previewBridge) {
-        // The bridge mirrors the resolved URL back to the server.
         await previewBridge.navigate(runtimeTabId, resolvedUrl);
         rememberPreviewUrl(threadRef, resolvedUrl);
         return true;
@@ -216,9 +201,7 @@ export function PreviewView({
         if (await navigateToResolvedUrl(normalized)) {
           recordVisitForThread(threadRef, normalized);
         }
-      } catch {
-        // Server-side `failed` event renders the unreachable view.
-      }
+      } catch {}
     },
     [navigateToResolvedUrl, threadRef],
   );
@@ -230,9 +213,7 @@ export function PreviewView({
         if (await navigateToResolvedUrl(resolved)) {
           recordVisitForThread(threadRef, next);
         }
-      } catch {
-        // Server-side `failed` event renders the unreachable view.
-      }
+      } catch {}
     },
     [navigateToResolvedUrl, threadRef],
   );
@@ -584,11 +565,6 @@ export function PreviewView({
       void previewBridge.cancelPickElement(runtimeTabId).catch(() => undefined);
       return;
     }
-    // Snapshot whatever the user was focused on (typically the chat
-    // composer textarea or the chrome-row pick button) BEFORE main steals
-    // focus into the guest webContents. We restore it when the pick
-    // resolves so the user's typing context isn't lost — otherwise after
-    // every pick they'd have to click back into the textarea.
     const previouslyFocused =
       typeof document !== "undefined" ? (document.activeElement as HTMLElement | null) : null;
     pickActiveRef.current = true;
@@ -598,14 +574,7 @@ export function PreviewView({
         const result = await previewBridge.pickElement(runtimeTabId);
         if (!result) return;
         const { annotation: picked, submission, screenshotFailed = false } = result;
-        // The structured annotation is still sendable when its optional crop
-        // stalls or fails, so tell the user what they lost and keep going
-        // instead of holding the composer for an attachment that never lands.
-        // The stored copy drops the screenshot on failure, otherwise the prompt
-        // would tell the agent a crop is attached when none was sent.
         const capture = capturePreviewAnnotationScreenshot(picked);
-        // Main reports a crop that failed or timed out on its side; the local
-        // conversion can fail too. Either way the user should hear about it.
         const cropDropped = screenshotFailed || capture.status === "failed";
         const annotation = capture.status === "failed" ? { ...picked, screenshot: null } : picked;
         addPreviewAnnotation(threadRef, annotation);
@@ -614,8 +583,6 @@ export function PreviewView({
             stackedThreadToast({
               type: "error",
               title: "Could not capture the picked element",
-              // The send path reports its own outcome, so only say what this
-              // handler knows: the crop was dropped.
               description: "The annotation was kept without the screenshot.",
             }),
           );
@@ -640,15 +607,9 @@ export function PreviewView({
           onSendAnnotation?.(annotation, image);
         }
       } catch {
-        // Picker failed (e.g. webview navigated). Treat as silent cancel.
       } finally {
         pickActiveRef.current = false;
-        // Avoid `setState on unmounted component` if the panel/thread closed
-        // while the pick was in flight.
         if (isMountedRef.current) setPickActive(false);
-        // Best-effort: restore focus to whatever the user had before the
-        // pick stole it into the guest webContents. Skip if the previously-
-        // focused element was unmounted or is no longer focusable.
         if (
           previouslyFocused &&
           previouslyFocused.isConnected &&
@@ -656,17 +617,12 @@ export function PreviewView({
         ) {
           try {
             previouslyFocused.focus({ preventScroll: true });
-          } catch {
-            // Some elements throw on .focus() (detached iframes, etc.).
-          }
+          } catch {}
         }
       }
     })();
   }, [addImage, addPreviewAnnotation, onSendAnnotation, runtimeTabId, threadRef]);
 
-  // If the active tab changes mid-pick (close, thread switch, hot restart),
-  // tell main to tear down the in-flight session AND reset our local toggle
-  // state so the button doesn't get stuck pressed against a stale tab id.
   useEffect(() => {
     return () => {
       if (!pickActiveRef.current) return;
@@ -678,8 +634,6 @@ export function PreviewView({
     };
   }, [runtimeTabId]);
 
-  // Subscribe only while visible; `toggle-panel` is owned by ChatView's
-  // URL-aware handler regardless of whether the panel is currently mounted.
   useEffect(() => {
     if (!visible) return;
     return subscribePreviewAction((action) => {
@@ -730,25 +684,12 @@ export function PreviewView({
         pictureInPictureDisabled={!desktopOverlay?.hasWebContents || isUnreachable}
         onPickElement={previewBridge && tabId ? handlePickElement : undefined}
         pickActive={pickActive}
-        // Disable when there's no tab (nothing to pick on) OR the page
-        // failed to load (a React overlay covers the webview, so the
-        // user wouldn't be able to actually click anything underneath).
         pickDisabled={!tabId || isUnreachable}
         pickDisabledReason={
           isUnreachable ? "Page didn't load — pick unavailable until the page renders" : undefined
         }
         leadingActions={
-          // Only when it differs from the default: labelling every tab
-          // "Default" would be noise on the common case, while a tab in
-          // another profile is exactly what needs calling out.
           activeProfileId !== browserDefaults.profileId ? (
-            // Capped: profile names run to 48 characters, and an unbounded
-            // badge in this row takes its width from the URL input, the only
-            // flexible element in the compact chrome. The cap sits on the
-            // badge and the truncation on an inner span, because `Badge` is an
-            // `inline-flex` with `whitespace-nowrap` — `text-overflow` never
-            // reaches a bare text node inside it, so the name would be cut off
-            // at both ends with no ellipsis.
             <Tooltip>
               <TooltipTrigger render={<Badge variant="outline" className="max-w-28 shrink-0" />}>
                 <span className="truncate">{activeProfileName}</span>

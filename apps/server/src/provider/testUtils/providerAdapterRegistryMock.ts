@@ -1,9 +1,3 @@
-/**
- * Test helpers for constructing a `ProviderAdapterRegistryShape` mock from a
- * kind-keyed adapter map.
- *
- * @module provider/testUtils/providerAdapterRegistryMock
- */
 import {
   defaultInstanceIdForDriver,
   ProviderDriverKind,
@@ -20,11 +14,6 @@ export type KindAdapterMap = Partial<
   Record<ProviderDriverKind, ProviderAdapterShape<ProviderAdapterError>>
 >;
 
-/**
- * Build a `ProviderAdapterRegistryShape` from a kind-keyed adapter map.
- * Every adapter present in the map is addressable through its default
- * provider instance id.
- */
 export const makeAdapterRegistryMock = (adapters: KindAdapterMap): ProviderAdapterRegistryShape => {
   const byInstanceId = new Map<ProviderInstanceId, ProviderAdapterShape<ProviderAdapterError>>();
   for (const [kind, adapter] of Object.entries(adapters)) {

@@ -382,7 +382,6 @@ describe("applyThreadDetailEvent", () => {
         expect(result.thread.title).toBe("Updated Title");
         expect(result.thread.branch).toBe("feature/demo");
         expect(result.thread.activeOrderKey).toBe("m");
-        // Model selection should be unchanged since it wasn't in the payload
         expect(result.thread.modelSelection).toEqual(baseThread.modelSelection);
       }
     });
@@ -1250,9 +1249,6 @@ describe("applyThreadDetailEvent", () => {
         ...(sequence === null ? {} : { sequence }),
         createdAt: "2026-04-01T11:00:00.000Z",
       });
-      // Snapshot loads deliver null-sequence rows first (DB order), which
-      // activityOrder sorts last; an in-order live append must not freeze
-      // that prefix.
       const result = applyThreadDetailEvent(
         {
           ...baseThread,
@@ -1392,8 +1388,6 @@ describe("applyThreadDetailEvent", () => {
       const existingActivities = [
         contextWindowActivity("activity-cw-1", 1, 1_000),
         { ...otherTurnActivity, turnId: TurnId.make("turn-0") },
-        // Malformed row (no usedTokens): must survive, and must not be
-        // treated as the latest value by consumers.
         contextWindowActivity("activity-cw-malformed", 3, undefined),
         contextWindowActivity("activity-cw-2", 4, 2_000),
       ];
@@ -1417,8 +1411,6 @@ describe("applyThreadDetailEvent", () => {
       expect(result.kind).toBe("updated");
       if (result.kind === "updated") {
         const ids = result.thread.activities.map((activity) => activity.id);
-        // Same-turn resolvable rows collapse to the newest; the other turn's
-        // row and the malformed row are untouched.
         expect(ids).toEqual(["activity-other-turn", "activity-cw-malformed", "activity-cw-3"]);
       }
     });
@@ -1458,8 +1450,6 @@ describe("applyThreadDetailEvent", () => {
 
       expect(result.kind).toBe("updated");
       if (result.kind === "updated") {
-        // The resolvable row must survive so consumers can still derive a
-        // usage value by walking backwards past the malformed row.
         const ids = result.thread.activities.map((activity) => activity.id);
         expect(ids).toEqual(["activity-cw-resolvable", "activity-cw-broken"]);
       }
@@ -1679,10 +1669,8 @@ describe("applyThreadDetailEvent", () => {
 
       expect(result.kind).toBe("updated");
       if (result.kind === "updated") {
-        // turn-2 checkpoint is filtered out (turnCount 2 > revert target 1)
         expect(result.thread.checkpoints).toHaveLength(1);
         expect(result.thread.checkpoints[0]?.turnId).toBe("turn-1");
-        // msg-3 (turn-2) is filtered, msg-1 (no turn) and msg-2 (turn-1) remain
         expect(result.thread.messages).toHaveLength(2);
         expect(result.thread.latestTurn?.turnId).toBe("turn-1");
       }

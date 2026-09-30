@@ -1,18 +1,8 @@
-/**
- * Pure URL helpers shared between the preview server, desktop main process,
- * and web renderer. Centralising these guarantees the four call sites agree
- * on what counts as "loopback" and how to normalise a free-form URL string.
- */
-
 import * as Schema from "effect/Schema";
 
 const TAB_ID_PREFIX = "tab_";
 let nextPreviewTabSequence = 0;
 
-/**
- * Generate a fresh preview tab id. Lives in shared (not contracts) because
- * the contracts package is schema-only — runtime helpers belong here.
- */
 export function newPreviewTabId(): string {
   nextPreviewTabSequence += 1;
   return `${TAB_ID_PREFIX}${nextPreviewTabSequence.toString(36)}`;
@@ -20,7 +10,6 @@ export function newPreviewTabId(): string {
 
 const LOOPBACK_HOSTS: ReadonlySet<string> = new Set(["localhost", "127.0.0.1", "0.0.0.0", "::1"]);
 
-/** Internal — used by `lsof` parsing where the host string is wire-formatted. */
 export const LSOF_LOCAL_HOST_TOKENS: ReadonlySet<string> = new Set([
   ...LOOPBACK_HOSTS,
   "*",
@@ -57,16 +46,6 @@ function previewUrlProtocol(rawUrl: string): string | undefined {
   return /^([A-Za-z][A-Za-z\d+.-]*):/.exec(rawUrl)?.[1]?.toLowerCase().concat(":");
 }
 
-/**
- * Normalise a free-form URL string into a fully-qualified `http(s)://` URL.
- *
- * - Bare loopback hosts (`localhost`, `localhost:5173`) become `http://...`.
- * - Bare public hosts (`example.com`) become `https://...`.
- * - Already-qualified URLs are validated and returned as `URL.href`.
- *
- * Throws `PreviewUrlNormalizationError` for empty, unparseable, or
- * unsupported-protocol inputs.
- */
 export function normalizePreviewUrl(rawUrl: string): string {
   const trimmed = rawUrl.trim();
   if (trimmed.length === 0) {

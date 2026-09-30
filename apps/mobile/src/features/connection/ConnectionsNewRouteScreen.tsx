@@ -37,8 +37,6 @@ export function ConnectionsNewRouteScreen({
   const navigation = useNavigation();
   const routeName = useRoute().name;
   const params = route.params ?? {};
-  // Deep-link prefill exists for development automation only. A production
-  // link must not arrive with attacker-chosen host and token already filled.
   const routePairingUrl = __DEV__ ? (params.pairingUrl?.trim() ?? "") : "";
   const shouldAutoConnect =
     __DEV__ &&

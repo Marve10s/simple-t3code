@@ -31,8 +31,6 @@ export const MOBILE_THEME_OPTIONS: ReadonlyArray<{
   ...BUILT_IN_THEMES.map((theme) => ({ id: theme.id as MobileThemeId, label: theme.label })),
 ];
 
-// Closed set: every key `createMobileThemeVariables` writes. Reads of a
-// misspelled variable then fail to compile instead of yielding undefined.
 export type MobileThemeVariable = keyof ReturnType<typeof createMobileThemeVariables>;
 export type MobileThemeVariables = Readonly<Record<MobileThemeVariable, string>>;
 
@@ -77,7 +75,6 @@ export function createMobileThemeSelectionPatch(
   return {
     lightThemeId: nextThemeIds.light,
     darkThemeId: nextThemeIds.dark,
-    // Keep older OTA bundles on the theme for the appearance currently in use.
     themeId: nextThemeIds[activeAppearance],
   };
 }
@@ -97,7 +94,6 @@ function linearToSrgb(value: number): number {
   return Math.round(Math.min(1, Math.max(0, converted)) * 255);
 }
 
-/** React Native does not accept OKLCH ColorValues, so palettes cross the app boundary as sRGB. */
 export function themeColorToNativeColor(value: string): string {
   const match = OKLCH_PATTERN.exec(value);
   if (!match) return value;
@@ -145,11 +141,6 @@ function rgbChannels(color: string): readonly [number, number, number] | null {
   return [Number.parseInt(red, 16), Number.parseInt(green, 16), Number.parseInt(blue, 16)];
 }
 
-/**
- * An opaque form of a theme colour, composited over the surface behind it. Native chip drawing
- * parses only opaque hex — an `rgba()` string falls back to a default that is nothing like the
- * colour asked for — so a translucent role like `--color-border` has to be flattened first.
- */
 export function flattenThemeColor(color: string, surface: string): string {
   const alphaHex = /^#([\da-f]{6})([\da-f]{2})$/i.exec(color);
   if (alphaHex) {
@@ -191,7 +182,6 @@ function contrastRatio(
   );
 }
 
-/** Preserve the color's hue while giving text 4.5:1 contrast on every supplied surface. */
 function readableTextColor(accent: string, surface: string | ReadonlyArray<string>): string {
   const accentChannels = rgbChannels(accent);
   const surfaceChannels = (typeof surface === "string" ? [surface] : surface)
@@ -367,8 +357,6 @@ export function getMobileThemeVariables(
   overrides: Partial<MobileThemeVariables> | null = null,
 ): MobileThemeVariables {
   const colors = getMobileThemeColors(themeId, appearance);
-  // Mobile settings groups and fallback materials use tonal fills where desktop
-  // uses outlined cards. Regular cards retain their shared desktop surface.
   const groupedCard =
     themeId === DEFAULT_MOBILE_THEME_ID
       ? appearance === "light"
@@ -390,7 +378,6 @@ export function getMobileThemeVariables(
       : colors;
   const baseVariables = createMobileThemeVariables(mobileColors, appearance, groupedCard);
 
-  // The complete base record guarantees that optional overrides cannot leave a token undefined.
   return overrides ? ({ ...baseVariables, ...overrides } as MobileThemeVariables) : baseVariables;
 }
 

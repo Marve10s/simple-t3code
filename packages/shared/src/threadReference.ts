@@ -12,7 +12,6 @@ export interface ThreadReferenceCopyTarget {
 
 export function resolveThreadReferenceCopyTarget(input: {
   readonly threadId: string;
-  /** Undefined means no PR panel; null means its URL is not available yet. */
   readonly openPanelPullRequestUrl?: string | null | undefined;
   readonly pullRequests?: ReadonlyArray<ThreadPullRequestLink> | undefined;
   readonly linkedPullRequestUrl?: string | null;

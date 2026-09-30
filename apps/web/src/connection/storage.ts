@@ -60,14 +60,6 @@ const StoredShellSnapshot = Schema.Struct({
   snapshot: OrchestrationShellSnapshot,
 });
 const StoredShellSnapshotJson = Schema.fromJsonString(StoredShellSnapshot);
-// v2 stores the snapshot sequence alongside the thread so a warm cache can
-// resume via `afterSequence` instead of re-downloading the full thread body.
-// v3 adds windowed (paginated) snapshots carrying `page` metadata. The bump
-// exists for rollback safety: a pre-pagination client would decode a windowed
-// v2 record, silently drop the unknown `page` field, and treat the partial
-// thread as complete forever. Older entries fail to decode → cold cache.
-// v4 reloads pre-thinking caches: their fallback system roles cannot recover
-// settled reasoning messages by resuming afterSequence.
 const StoredThreadSnapshot = Schema.Struct({
   schemaVersion: Schema.Literal(4),
   environmentId: EnvironmentId,
@@ -188,8 +180,6 @@ function writeDatabaseValue(
 ) {
   return Effect.callback<void, ConnectionTransientError>((resume) => {
     const transaction = database.transaction(storeName, "readwrite");
-    // Every failed write fires "abort". A failed commit, such as
-    // QuotaExceededError, fires only "abort" and no "error".
     transaction.addEventListener("abort", () => {
       resume(
         Effect.fail(catalogError("write", transaction.error ?? "Unknown IndexedDB write error")),
@@ -386,7 +376,6 @@ const encodeStoredGitHubRoutingPermission = Schema.encodeSync(
   Schema.fromJsonString(StoredGitHubRoutingPermission),
 );
 
-/** Each grant has its own key so stale tabs and unrelated catalog saves cannot restore trust. */
 export function makeBrowserGitHubRoutingPermissions(
   browser: Pick<Window, "localStorage"> & EventTarget = window,
 ) {

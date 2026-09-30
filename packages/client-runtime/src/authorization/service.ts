@@ -236,7 +236,6 @@ export const make = Effect.gen(function* () {
     }
   });
 
-  // Called under tokenLock so a late rejection cannot remove a newer credential.
   const removeRejectedToken = Effect.fnUntraced(function* (
     environmentId: EnvironmentId,
     accessToken: string,
@@ -431,7 +430,6 @@ export const make = Effect.gen(function* () {
               }),
             ),
           ),
-          // One caller's timeout must not cancel renewal for other HTTP requests.
           Effect.forkIn(serviceScope),
         );
         const token = Fiber.join(fiber);

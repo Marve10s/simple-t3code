@@ -42,10 +42,6 @@ export function isAgentActivityPublishingEnabledValue(value: string | null): boo
   return value === "true";
 }
 
-/** Whether agent-activity publishes currently leave this environment: the
-    publish opt-in secret is enabled and the relay link credentials exist.
-    Mirrors the per-publish gate in AgentAwarenessRelay, so the descriptor
-    capability never advertises publishing that the publisher would skip. */
 export const readAgentActivityPublishingActive = (
   secrets: ServerSecretStore.ServerSecretStore["Service"],
 ): Effect.Effect<boolean> =>
@@ -63,8 +59,6 @@ export const readAgentActivityPublishingActive = (
       readSecretString(RELAY_URL_SECRET),
       readSecretString(RELAY_ENVIRONMENT_CREDENTIAL_SECRET),
     ]);
-    // Empty strings are as unconfigured as missing files: the publisher's
-    // truthiness gate skips them, so the capability must too.
     return (
       isAgentActivityPublishingEnabledValue(enabled) &&
       url !== null &&

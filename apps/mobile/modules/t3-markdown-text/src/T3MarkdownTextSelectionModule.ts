@@ -7,9 +7,7 @@ interface T3MarkdownTextSelectionNativeModule {
     readonly uri: string;
     readonly width: number;
     readonly height: number;
-    /** Inline box height: the paragraph font's ascent, so the line box never grows. */
     readonly boxHeight: number;
-    /** Bitmap top relative to the box top; negative when the chip overhangs the box. */
     readonly offsetY: number;
   } | null;
 }

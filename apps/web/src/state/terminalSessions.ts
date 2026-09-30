@@ -27,8 +27,6 @@ interface TerminalMetadataIndex {
 
 const metadataIndexes = new WeakMap<ReadonlyArray<TerminalSummary>, TerminalMetadataIndex>();
 const sessionsBySummary = new WeakMap<TerminalSummary, Map<EnvironmentId, KnownTerminalSession>>();
-// Reuse groups a consumer still holds without keeping old group members alive
-// merely because their first summary remains in a newer metadata snapshot.
 const groupsByAnchor = new WeakMap<
   TerminalSummary,
   Map<
@@ -80,7 +78,6 @@ function terminalMetadataIndex(metadata: ReadonlyArray<TerminalSummary>): Termin
   return index;
 }
 
-/** Share one ordered index per immutable snapshot without changing metadata subscriptions. */
 export function selectKnownTerminalSessions(
   metadata: ReadonlyArray<TerminalSummary> | null,
   environmentId: EnvironmentId | null,

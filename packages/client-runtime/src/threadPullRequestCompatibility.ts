@@ -11,7 +11,6 @@ type LinkingCapabilities = Pick<
   "threadPullRequests" | "threadPullRequestLinking"
 >;
 
-/** Capability negotiation keeps both single-link and multi-link environments usable. */
 export function threadPullRequestLinkMode(capabilities: LinkingCapabilities | null | undefined) {
   return capabilities?.threadPullRequests === true
     ? "multiple"
@@ -31,9 +30,7 @@ export function planThreadPullRequestMutation({
   capabilities: LinkingCapabilities | null | undefined;
   threadId: ThreadId;
   reference: ThreadPullRequestKey & { readonly url: string };
-  /** Older servers need the exact repository checkout; same-host routing is not available. */
   legacyProjectId: ProjectId | null;
-  /** Provider selector for legacy APIs, which omit Azure organization and project paths. */
   legacyRepository?: string | undefined;
   linked: boolean;
 }) {

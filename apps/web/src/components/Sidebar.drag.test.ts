@@ -199,7 +199,6 @@ describe("sidebar collision detection", () => {
       expect(at(330)).toBe("active");
       expect(at(317)).toBe("active");
       expect(at(316)).toBe("pinned");
-      // The preview moves the divider; a stationary pointer must not undo the drop target.
       boundaryTop = 400;
       expect(at(316)).toBe("pinned");
       expect(at(399)).toBe("pinned");
@@ -304,7 +303,6 @@ describe("sidebar drag projection", () => {
       settledExpanded: true,
     });
     const args = layout(pinned, active, over);
-    // dnd-kit moves the lifted row by the pointer delta, so only peers matter.
     for (let index = 0; index < pinned.length; index += 1) {
       if (index === args.activeIndex) continue;
       expect(strategy({ ...args, index })).toEqual(verticalListSortingStrategy({ ...args, index }));
@@ -403,8 +401,6 @@ describe("sidebar drag projection", () => {
       settledHeader,
       thread("s", "settled"),
     ];
-    // Reorder inside active: the header gap shifts every row, the divider
-    // gap shifts the active rows and the shelf below by a second label.
     const result = preview(
       { items, settledOrder: [], settledExpanded: true, boundaryLabelHeight: 16 },
       "a2",

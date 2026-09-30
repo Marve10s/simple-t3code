@@ -27,7 +27,6 @@ function renderMenuItems(items: ReadonlyArray<ScreenHeaderMenuItem>) {
   );
 }
 
-/** Returns direct native items for toolbar serialization, including nested menu data. */
 export function createNativeHeaderMenu(menu: ScreenHeaderMenu) {
   return (
     <NativeHeaderToolbar.Menu

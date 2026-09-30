@@ -34,15 +34,12 @@ import { execScriptSource, writeFakeCli } from "../../testUtils/fakeCli.ts";
 import { HostProcessPlatform } from "@t3tools/shared/hostProcess";
 const decodeCursorSettings = Schema.decodeSync(CursorSettings);
 
-// Test-local service tag so the rest of the file can keep using `yield* CursorAdapter`.
 class CursorAdapter extends Context.Service<CursorAdapter, CursorAdapterShape>()(
   "t3/provider/Layers/CursorAdapter.test/CursorAdapter",
 ) {}
 
 const __dirname = NodePath.dirname(NodeURL.fileURLToPath(import.meta.url));
 const mockAgentPath = NodePath.join(__dirname, "../../../scripts/acp-mock-agent.ts");
-// Stopping a session kills the agent with SIGTERM; Windows terminates the
-// process instead, so the mock never sees a signal to log.
 const windowsHost = HostProcessPlatform.defaultValue() === "win32";
 async function makeMockAgentWrapper(
   extraEnv?: Record<string, string>,
@@ -124,14 +121,6 @@ function waitForJsonLogMatch(
   });
 }
 
-// Tests mutate `ServerSettingsService` mid-flight (e.g. setting
-// `providers.cursor.binaryPath` to a mock ACP wrapper). The adapter
-// captures `cursorSettings` once at construction, so without a resolver
-// the mutation is invisible — sessions would spawn the constructor's
-// (empty) binary path. Wiring `resolveSettings` through
-// `ServerSettingsService.getSettings` makes each session read the latest
-// snapshot, matching the old "always read live" behavior that these
-// tests assumed.
 const makeResolveCursorSettings = Effect.gen(function* () {
   const serverSettings = yield* ServerSettingsService;
   return yield* Effect.succeed(
@@ -373,7 +362,6 @@ cursorAdapterTestLayer("CursorAdapterLive", (it) => {
       const settings = yield* ServerSettingsService;
       const threadId = ThreadId.make("cursor-steer-thread");
 
-      // Keep the first prompt in flight long enough for the steer to land.
       const wrapperPath = yield* Effect.promise(() =>
         makeMockAgentWrapper({ T3_ACP_PROMPT_DELAY_MS: "1500" }),
       );
@@ -402,10 +390,6 @@ cursorAdapterTestLayer("CursorAdapterLive", (it) => {
         })
         .pipe(Effect.forkChild);
 
-      // Poll until the first prompt is in flight — sendTurn binds the active
-      // turn id before prompting. The mock agent runs on the real clock, so
-      // each TestClock.adjust just provides the scheduler hops for its stdio
-      // responses to land.
       yield* Effect.gen(function* () {
         for (let attempt = 0; attempt < 200; attempt += 1) {
           const sessions = yield* adapter.listSessions();
@@ -418,8 +402,6 @@ cursorAdapterTestLayer("CursorAdapterLive", (it) => {
         throw new Error("Timed out waiting for the first prompt to be in flight.");
       });
 
-      // Steer: a second sendTurn while the first prompt is still in flight
-      // continues the same turn.
       const steeredTurn = yield* adapter.sendTurn({
         threadId,
         input: "actually run 15",
@@ -432,8 +414,6 @@ cursorAdapterTestLayer("CursorAdapterLive", (it) => {
       const turnStartedEvents = runtimeEvents.filter((event) => event.type === "turn.started");
       const turnCompletedEvents = runtimeEvents.filter((event) => event.type === "turn.completed");
 
-      // One turn boundary for the whole run: the superseded first prompt
-      // resolving must not settle the merged turn.
       assert.equal(turnStartedEvents.length, 1);
       assert.equal(String(turnStartedEvents[0]?.turnId), String(firstTurn.turnId));
       assert.equal(turnCompletedEvents.length, 1);
@@ -800,8 +780,6 @@ cursorAdapterTestLayer("CursorAdapterLive", (it) => {
             (event) => String(event.turnId) === String(turn.turnId),
           );
           const toolUpdates = turnEvents.filter((event) => event.type === "item.updated");
-          // ACP updates can arrive either as distinct pending + in-progress events
-          // or as a single coalesced in-progress update before approval resolves.
           assert.isAtLeast(toolUpdates.length, 1);
           for (const toolUpdate of toolUpdates) {
             if (toolUpdate.type !== "item.updated") {
@@ -1508,12 +1486,6 @@ cursorAdapterTestLayer("CursorAdapterLive", (it) => {
     "applies fast mode on the first turn when modelSelection uses a non-default instance id",
     () => {
       const customInstanceId = ProviderInstanceId.make("cursor_secondary");
-      // Custom-instance cases can't share the suite-level `CursorAdapter`
-      // layer because that one binds `instanceId: "cursor"`. We build a
-      // fresh layer graph — including a fresh `ServerSettingsService` — so
-      // mid-test `updateSettings` calls target the same service instance the
-      // adapter's `resolveSettings` reads from, and so the outer
-      // `yield* ServerSettingsService` sees the same snapshot as well.
       const customAdapterLayer = Layer.effect(
         CursorAdapter,
         Effect.gen(function* () {
@@ -1593,15 +1565,6 @@ cursorAdapterTestLayer("CursorAdapterLive", (it) => {
     },
   );
 
-  // Production calls startSession from a request fiber that finishes as soon as
-  // the session exists. `Effect.forkChild` made the notification consumer a
-  // child of that fiber, and Effect interrupts a fiber's children when it
-  // completes, so the consumer died on return and every later session/update
-  // was dropped: the thread sat on "Working" forever while the provider
-  // streamed its whole turn. The other tests here call startSession directly
-  // from the test fiber, which never completes, so the consumer survived and
-  // the bug stayed invisible. Running it in a fiber that finishes is what
-  // reproduces production.
   it.effect("keeps consuming notifications after the startSession fiber completes", () =>
     Effect.gen(function* () {
       const adapter = yield* CursorAdapter;
@@ -1636,9 +1599,6 @@ cursorAdapterTestLayer("CursorAdapterLive", (it) => {
         .pipe(Effect.forkChild);
       yield* Fiber.join(startSessionFiber).pipe(Effect.timeout("10 seconds"));
 
-      // Forked, and the assertion waits on the projected event rather than on
-      // sendTurn: with the consumer dead the turn never settles, so awaiting it
-      // directly would hang until the suite timeout instead of failing here.
       const sendTurnFiber = yield* adapter
         .sendTurn({ threadId, input: "hello mock", attachments: [] })
         .pipe(Effect.forkChild);
@@ -1655,9 +1615,6 @@ cursorAdapterTestLayer("CursorAdapterLive", (it) => {
 
       yield* Fiber.interrupt(runtimeEventsFiber);
       yield* adapter.stopSession(threadId);
-      // Live clock so the timeouts above are real: under the default test clock
-      // they wait on virtual time that never advances, and a regression would
-      // hang until the suite timeout instead of failing here.
     }).pipe(TestClock.withLive),
   );
 });

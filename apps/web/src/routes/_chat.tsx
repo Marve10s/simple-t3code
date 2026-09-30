@@ -52,9 +52,6 @@ function ChatRouteGlobalShortcuts() {
       ? selectThreadTerminalUiState(state.terminalUiStateByThreadKey, routeThreadRef).terminalOpen
       : false,
   );
-  // The `previewOpen` shortcut-context flag here uses the store-only value;
-  // the URL-aware arbitration lives inside ChatView's `onTogglePreview`,
-  // which we invoke via the action bus to avoid duplicating the rule.
   const previewOpen = useRightPanelStore((state) =>
     routeThreadRef
       ? selectActiveRightPanel(state.byThreadKey, routeThreadRef) === "preview"
@@ -108,9 +105,6 @@ function ChatRouteGlobalShortcuts() {
       if (command === "chat.new") {
         event.preventDefault();
         event.stopPropagation();
-        // The default sidebar routes creation through the command palette
-        // whenever there is a real choice to make; the legacy sidebar (and
-        // single-project setups) keep the immediate contextual create.
         if (!legacySidebarEnabled && projectGroupCount > 1) {
           openCommandPalette({ open: "new-thread-in" });
           return;
@@ -142,9 +136,6 @@ function ChatRouteGlobalShortcuts() {
         return;
       }
 
-      // The remaining preview commands only fire when the panel is the
-      // currently-focused tenant. The `when: previewFocus` rule already
-      // gates this, but defend against the keybinding being misconfigured.
       if (
         command === "preview.refresh" ||
         command === "preview.focusUrl" ||
@@ -191,8 +182,6 @@ function ChatRouteGlobalShortcuts() {
 }
 
 function ChatRouteLayout() {
-  // Both thread routes render here, not in their own leaf components, so the
-  // draft-to-thread promotion keeps one ChatView mounted across the swap.
   const threadTarget = useParams({
     strict: false,
     select: (params) => resolveThreadRouteTarget(params),

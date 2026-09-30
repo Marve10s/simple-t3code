@@ -107,23 +107,16 @@ function isUnsettled(thread: ProjectionSnapshotQuery.ProjectionThreadPullRequest
   return thread.settledOverride !== "settled" && thread.settledAt === null;
 }
 
-/**
- * Keeps every thread ↔ pull request link's host snapshot current. One sweep a minute reads
- * only the active threads that have links, groups visible links by pull request so the host
- * is asked once per PR no matter how many threads share it, and writes back only what
- * changed. Native stacks the host reports are auto-linked to the thread as `source: "stack"`.
- */
 export class PullRequestSyncReactor extends Context.Service<
   PullRequestSyncReactor,
   {
     readonly start: () => Effect.Effect<void, never, Scope.Scope>;
     readonly drain: Effect.Effect<void>;
-    /** Force the next sweep to re-read this pull request, even when its snapshot is terminal. */
     readonly requestSync: (key: ThreadPullRequestKey) => Effect.Effect<void>;
   }
 >()("t3/orchestration/PullRequestSyncReactor") {}
 
-/** @public Service construction is part of the canonical Effect module API. */
+/** @public */
 export const make = Effect.gen(function* () {
   const engine = yield* OrchestrationEngine.OrchestrationEngineService;
   const snapshots = yield* ProjectionSnapshotQuery.ProjectionSnapshotQuery;
@@ -141,7 +134,6 @@ export const make = Effect.gen(function* () {
     if (entries.every((entry) => entry.link.snapshot?.state === "merged")) return false;
     if (entries.some((entry) => entry.link.snapshot?.state === "open" && isUnsettled(entry.thread)))
       return true;
-    // Closed requests can reopen on the host, including after the thread settles.
     const last = lastSyncedAt.get(key);
     return last === undefined || nowMs - last >= SLOW_SYNC_INTERVAL_MS;
   };
@@ -171,8 +163,6 @@ export const make = Effect.gen(function* () {
     for (const key of retryStacks) if (!groups.has(key)) retryStacks.delete(key);
     for (const key of requested.keys()) if (!groups.has(key)) requested.delete(key);
 
-    // Layers auto-linked this sweep, so two links of one thread that share a
-    // stack do not both try to add the same sibling.
     const linkedThisSweep = new Set<string>();
     const persistence = yield* Semaphore.make(1);
 
@@ -187,7 +177,6 @@ export const make = Effect.gen(function* () {
         link.snapshot === null ||
         !snapshotFieldsEqual(link.snapshot, fields) ||
         !stacksEqual(link.stack, nextStack);
-      // Persist discovered siblings before a terminal snapshot can trigger settlement.
       for (const layer of fetchedStack?.stack?.layers ?? []) {
         const layerKey = {
           host: normalizeThreadPullRequestKey(link).host,
@@ -196,7 +185,6 @@ export const make = Effect.gen(function* () {
         };
         const dedupeKey = `${thread.id}:${threadPullRequestKeyOf(layerKey)}`;
         if (linkedThisSweep.has(dedupeKey)) continue;
-        // Tombstones count as present: a dismissed layer is never re-added.
         if (
           thread.pullRequests.some((existing) => threadPullRequestKeysEqual(existing, layerKey))
         ) {
@@ -273,9 +261,7 @@ export const make = Effect.gen(function* () {
         }
         retryStacks.delete(key);
       }
-      // The host answered, so the cadence clock ticks even if a dispatch below is rejected.
       lastSyncedAt.set(key, nowMs);
-      // A refresh requested while the host read was in flight belongs to the next sweep.
       if (requested.get(key) === generation) requested.delete(key);
       yield* Effect.forEach(
         entries,
@@ -301,8 +287,6 @@ export const make = Effect.gen(function* () {
               Effect.catchCause(logSkipped("pull request sync skipped", { key })),
             )
           : Effect.void,
-      // As wide as one batched summary read, so the sweep's reads on a host arrive together and
-      // GitHub answers them in one request rather than one `gh pr view` apiece.
       { concurrency: 25, discard: true },
     );
   });

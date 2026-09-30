@@ -1,6 +1,4 @@
 // @effect-diagnostics nodeBuiltinImport:off - resume coverage writes, appends
-// to, and truncates real transcript files byte-exactly, mirroring the reader's
-// own deliberate node:fs usage.
 import * as NodeFSP from "node:fs/promises";
 import * as NodeOS from "node:os";
 import * as NodePath from "node:path";
@@ -103,7 +101,6 @@ describe("readTranscriptRecords resume", () => {
     assert.strictEqual(second.records.length, 1);
     assert.strictEqual(second.records[0]?.totals.outputTokens, 11);
 
-    // The stitched result matches a from-scratch parse of the whole file.
     const full = await readTranscriptRecords(path, "claude");
     assert.isNotNull(full);
     assert.deepStrictEqual([...first.records, ...second.records], [...full.records]);
@@ -116,8 +113,6 @@ describe("readTranscriptRecords resume", () => {
     assert.isNotNull(first);
     assert.strictEqual(first.records.length, 0);
 
-    // The appended usage event has no turn_context or session_meta of its own;
-    // model and session must come from the state captured before the boundary.
     await NodeFSP.appendFile(path, codexUsageLine(9, 5));
     const second = await readTranscriptRecords(path, "codex", first.position);
     assert.isNotNull(second);
@@ -137,8 +132,6 @@ describe("readTranscriptRecords resume", () => {
     assert.isNotNull(first);
     assert.strictEqual(first.records.length, 1);
 
-    // Codex re-emits an unchanged token_count on stream boundaries; the copy
-    // lands after the resume point and must still be dropped.
     await NodeFSP.appendFile(path, codexUsageLine(9, 5) + codexUsageLine(21, 8));
     const second = await readTranscriptRecords(path, "codex", first.position);
     assert.isNotNull(second);
@@ -159,8 +152,6 @@ describe("readTranscriptRecords resume", () => {
     assert.strictEqual(first.tailRecords.length, 1);
     assert.strictEqual(first.tailRecords[0]?.totals.outputTokens, 7);
 
-    // Completing the line and appending another re-reads from the resume
-    // point, so the once-tail record arrives exactly once as a line record.
     await NodeFSP.appendFile(path, `\n${claudeLine(3, 11)}`);
     const second = await readTranscriptRecords(path, "claude", first.position);
     assert.isNotNull(second);
@@ -178,7 +169,6 @@ describe("readTranscriptRecords resume", () => {
     const first = await readTranscriptRecords(path, "claude");
     assert.isNotNull(first);
 
-    // Same path, larger size, different content: a replaced file, not growth.
     await NodeFSP.writeFile(path, claudeLine(4, 13) + claudeLine(5, 17));
     const second = await readTranscriptRecords(path, "claude", first.position);
     assert.isNotNull(second);
@@ -206,8 +196,6 @@ describe("readTranscriptRecords resume", () => {
   });
 
   it("parses a line larger than one stream chunk", async () => {
-    // Tool-heavy transcripts carry multi-megabyte single lines; they arrive
-    // split across many chunks and must reassemble into one record.
     const path = NodePath.join(dir, "claude.jsonl");
     const bigLine = `${JSON.stringify({
       type: "assistant",

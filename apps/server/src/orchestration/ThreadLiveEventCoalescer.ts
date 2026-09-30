@@ -48,11 +48,6 @@ function stableToolCallIdentity(event: OrchestrationEvent): string | null {
   return asTrimmedString(payload.toolCallId) ?? asTrimmedString(data?.toolCallId);
 }
 
-/**
- * Retain only the latest in-flight update for each stable tool-call id in a
- * live run. Anonymous calls pass through because labels are not unique when
- * tools execute in parallel. Survivors remain in sequence order.
- */
 export function coalesceLiveToolUpdatedEvents(
   events: ReadonlyArray<OrchestrationEvent>,
 ): ReadonlyArray<OrchestrationEvent> {
@@ -155,8 +150,6 @@ export const makeThreadLiveEventCoalescer = Effect.fn("makeThreadLiveEventCoales
         Effect.catchTags({ OrchestrationGetSnapshotError: () => Effect.void }),
       );
 
-    // Keep each source batch together so a synchronization marker cannot pass
-    // events already pulled from PubSub but still being coalesced.
     const offerAll = Effect.fn("ThreadLiveEventCoalescer.offerAll")(function* (
       inputs: ReadonlyArray<ThreadLiveInput>,
     ) {
@@ -167,7 +160,6 @@ export const makeThreadLiveEventCoalescer = Effect.fn("makeThreadLiveEventCoales
             Effect.gen(function* () {
               yield* budget.check;
               if (input.kind === "event") {
-                // Retain only the client payload, not full persisted tool output.
                 yield* budget.retain(projectActivityEvent(input.event)).pipe(
                   Effect.tap((item) => Effect.sync(() => pendingUpdates.push(item))),
                   Effect.uninterruptible,
@@ -188,8 +180,6 @@ export const makeThreadLiveEventCoalescer = Effect.fn("makeThreadLiveEventCoales
 
               yield* cancelWindow();
               windowGeneration += 1;
-              // A non-update event closes the run immediately. The coalescer keeps
-              // that boundary after the final update from the run.
               yield* flushPending();
               if (input.kind === "synchronized") {
                 yield* budget.retain({ kind: "synchronized" as const }).pipe(

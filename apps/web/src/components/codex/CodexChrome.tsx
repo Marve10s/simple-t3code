@@ -69,9 +69,6 @@ function ChromeButton({
   );
 }
 
-// The window's top strip: history arrows, the sidebar toggle (positioned into
-// its slot by simple-codex.css), notifications and search. In the tabs view the
-// toggle gives way to the open chats.
 export function CodexChromeBar() {
   const [view] = useCodexView();
   const onSettings = useLocation({
@@ -126,7 +123,6 @@ export function CodexChromeBar() {
   );
 }
 
-// With Motion on, the selected background is one element that glides between items.
 function RailActiveIndicator({ active }: { active: boolean }) {
   const [animationStyle] = useCodexAnimationStyle();
   if (!active || animationStyle !== "motion") return null;

@@ -1,11 +1,3 @@
-/**
- * Shared prompt builders for text generation providers.
- *
- * Extracts the prompt construction logic that is identical across
- * Codex, Claude, and any future CLI-based text generation backends.
- *
- * @module textGenerationPrompts
- */
 import * as Schema from "effect/Schema";
 import * as Effect from "effect/Effect";
 import { limitTitleMessage } from "./ThreadTitleContext.ts";
@@ -20,10 +12,6 @@ function policyInstruction(instruction: string | undefined): ReadonlyArray<strin
   const trimmed = instruction?.trim();
   return trimmed ? ["", "Additional instructions:", limitSection(trimmed, 20_000)] : [];
 }
-
-// ---------------------------------------------------------------------------
-// Commit message
-// ---------------------------------------------------------------------------
 
 export interface CommitMessagePromptInput {
   branch: string | null;
@@ -78,10 +66,6 @@ export function buildCommitMessagePrompt(input: CommitMessagePromptInput) {
     }),
   };
 }
-
-// ---------------------------------------------------------------------------
-// Change request content
-// ---------------------------------------------------------------------------
 
 export interface PrContentPromptInput {
   baseBranch: string;
@@ -138,10 +122,6 @@ export function buildPrContentPrompt(input: PrContentPromptInput) {
 
   return { prompt, outputSchema };
 }
-
-// ---------------------------------------------------------------------------
-// Branch name
-// ---------------------------------------------------------------------------
 
 export interface BranchNamePromptInput {
   message: string;
@@ -205,10 +185,6 @@ export function buildBranchNamePrompt(input: BranchNamePromptInput) {
   return { prompt, outputSchema };
 }
 
-// ---------------------------------------------------------------------------
-// Thread title
-// ---------------------------------------------------------------------------
-
 export interface ThreadTitlePromptInput {
   linkedContext?: string | undefined;
   message: string;
@@ -217,8 +193,6 @@ export interface ThreadTitlePromptInput {
   policy?: TextGenerationPolicy | undefined;
 }
 
-// Keep shared editorial rules in these two prompts in sync. Regeneration
-// intentionally adds guidance for thread history and the previous title.
 const INITIAL_THREAD_TITLE_PROMPT = `Generate a title that will help the user recognize this T3 Code thread weeks later.
 Return JSON with keys title and needsRefinement.
 Set needsRefinement to true only if the subject is still unknown, such as an unresolved link, "fix this", or an unexplained attachment. Otherwise set it to false.

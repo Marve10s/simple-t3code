@@ -1,4 +1,3 @@
-// node:sqlite reads live conversation databases while Node fs discovers them.
 // @effect-diagnostics nodeBuiltinImport:off
 import * as NodeFSP from "node:fs/promises";
 import * as NodePath from "node:path";
@@ -10,7 +9,6 @@ import type { UsageRecord } from "./usageTranscripts.ts";
 type FieldValue = number | bigint | Uint8Array;
 type Fields = Map<number, FieldValue[]>;
 
-/** Antigravity stores usage metadata as protobuf, independently of conversation text. */
 function fields(bytes: Uint8Array): Fields {
   let offset = 0;
   const result: Fields = new Map();
@@ -257,7 +255,6 @@ async function readDatabase(path: string, fallbackTimestamp: number): Promise<Us
   }
 }
 
-/** Reads and merges aliases across every configured Antigravity store before date filtering. */
 export async function readAntigravityUsage(
   conversationsDirectories: string | readonly string[],
   sinceMs: number,

@@ -90,7 +90,6 @@ export function useReviewFilePatches({
       if (changed || cached) registry.refresh(query);
     }
   }, [scope, revision, queries, registry]);
-  // Derived atoms parse each query result once, even when another file finishes loading.
   const parsedQuery = useMemo(
     () =>
       Atom.family((query: ReturnType<typeof reviewEnvironment.diffFilePatch>) =>

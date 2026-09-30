@@ -127,9 +127,6 @@ export const ApiLive = Api.make(
     Effect.orDie,
   ),
   Effect.gen(function* () {
-    //
-    // 1. Provision Infrastructure for the Worker to use
-    //
     const { relayPublicOrigin, stage } = yield* RelayDeploymentConfig;
     const apnsDeliveryQueue = yield* RelayApnsDeliveryQueue;
     const apnsDeliveryDeadLetterQueue = yield* RelayApnsDeliveryDeadLetterQueue;
@@ -141,9 +138,6 @@ export const ApiLive = Api.make(
     const randomApnsDeliveryJobSigningSecret = yield* ApnsDeliveryJobSigningSecret;
     const observability = yield* RelayObservability;
 
-    //
-    // 2. Create bindings
-    //
     const apnsEnabled = yield* Config.Boolean("APNS_ENABLED").pipe(Config.withDefault(true));
     const apnsCredentials = apnsEnabled
       ? {
@@ -178,15 +172,11 @@ export const ApiLive = Api.make(
     const db = yield* Drizzle.Postgres(hyperdrive.connectionString);
 
     const managedEndpointTunnelBinding = yield* Cloudflare.Tunnel.ReadWriteTunnel();
-    // Keep Worker custom-domain reconciliation ordered after API zone provisioning.
     yield* yield* relayApiZone.zoneId;
     const managedEndpointDnsBinding = yield* Cloudflare.DNS.ReadWriteDns(managedEndpointZone);
     const managedEndpointZoneName = yield* managedEndpointZone.name;
     const managedEndpointCleanupMode = yield* RelayConfiguration.managedEndpointCleanupModeConfig;
 
-    //
-    // 3. Runtime layers and app construction
-    //
     const alchemyRuntimeContext: Alchemy.BaseRuntimeContext = yield* Cloudflare.Worker;
 
     const loadSettings = Effect.gen(function* () {
@@ -327,7 +317,6 @@ export const ApiLive = Api.make(
         [
           DpopProofs.DpopProofReplay.pipe(
             Effect.flatMap((dpopProofs) => dpopProofs.pruneExpired),
-            // Keep completed thread rows long enough to show their final state.
             Effect.andThen(
               Effect.all([AgentActivityRows.AgentActivityRows, DateTime.now]).pipe(
                 Effect.flatMap(([activityRows, now]) =>
@@ -360,7 +349,6 @@ export const ApiLive = Api.make(
         { concurrency: 2, discard: true },
       ).pipe(
         Effect.withSpan("relay.cron.prune_expired_state"),
-        // Export cron spans to Axiom like HTTP spans; the scope flushes them before the run ends.
         Effect.provide(Layer.merge(runtimeLayer, relayTraceLayer)),
       ),
     );

@@ -15,7 +15,6 @@ const encodeEndpoint = Schema.encodeEffect(
 const key = (value: string) =>
   NodeCrypto.createHash("sha256").update(value).digest("hex").slice(0, 24);
 
-/** A stable file per host lets forwarded endpoints change without retargeting other commands. */
 export const agentDeviceConfigPath = (stateDir: string, hostId: string, path: Path.Path) =>
   path.join(stateDir, "device", "hosts", `${key(hostId)}.json`);
 

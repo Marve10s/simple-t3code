@@ -10,8 +10,6 @@ import { GhosttyRuntime, loadGhosttyRuntime } from "./runtime";
 const GHOSTTY_SUCCESS = 0;
 const GHOSTTY_OUT_OF_SPACE = -3;
 const MAX_SCROLLBACK_ROWS = 10_000;
-// wasm32 C ABI layout for GhosttyTerminalSelectionFormatOptions at the
-// libghostty-vt revision pinned alongside this module.
 const SELECTION_FORMAT_OPTIONS_SIZE = 16;
 
 const RENDER_DATA = {
@@ -68,7 +66,6 @@ export interface GhosttyTheme {
   readonly foreground: GhosttyColor;
   readonly background: GhosttyColor;
   readonly cursor: GhosttyColor;
-  /** CSS color the renderer overlays on selected cells; not sent to Ghostty. */
   readonly selectionBackground?: string;
 }
 
@@ -90,7 +87,6 @@ export interface GhosttyRow {
   readonly cells: readonly GhosttyCell[];
   readonly text: string;
   readonly isWrapContinuation: boolean;
-  /** Whether this row soft-wraps onto the next row. */
   readonly wrapsToNext: boolean;
 }
 
@@ -126,7 +122,6 @@ export interface GhosttyScrollbar {
   readonly len: number;
 }
 
-/** Grid position tagged with its Ghostty coordinate space: 1 viewport, 2 screen. */
 export interface GhosttyPointInput {
   readonly x: number;
   readonly y: number;
@@ -166,13 +161,6 @@ function sameColor(left: GhosttyColor, right: GhosttyColor): boolean {
   return left.r === right.r && left.g === right.g && left.b === right.b;
 }
 
-/**
- * A terminal program can print one base character followed by a huge run of
- * combining marks, packing hundreds of thousands of codepoints into a single
- * cell that still fits the scrollback buffer. Engines cap spread-call
- * arguments far below that, so convert in bounded chunks instead of spreading
- * every codepoint into String.fromCodePoint at once.
- */
 export function ghosttyCellText(codepointView: DataView, graphemeLength: number): string {
   if (graphemeLength === 1) return String.fromCodePoint(codepointView.getUint32(0, true));
   const CHUNK_SIZE = 4_096;
@@ -328,8 +316,6 @@ export class GhosttyTerminalCore {
   resetAndWrite(data: string): void {
     this.ensureActive();
     this.runtime.call("ghostty_terminal_reset", this.terminal);
-    // RIS returns the cursor to Ghostty's built-in steady default, so the
-    // embedder default has to be applied again before the replay runs.
     this.applyDefaultCursorBlink();
     this.rows = [];
     if (data.length === 0) return;
@@ -362,13 +348,6 @@ export class GhosttyTerminalCore {
     );
   }
 
-  /**
-   * Ghostty's built-in default cursor is steady, while the xterm.js renderer
-   * this replaced ran with `cursorBlink: true`. Option 23 is the embedder's
-   * default blink, which is the state a session starts in and returns to on
-   * DECSCUSR reset (CSI 0 q), so programs that ask for a specific cursor
-   * through DECSCUSR or DEC mode 12 still win.
-   */
   private applyDefaultCursorBlink(): void {
     const blink = this.runtime.alloc(1);
     this.runtime.bytes(blink, 1)[0] = 1;
@@ -983,8 +962,6 @@ export class GhosttyTerminalCore {
             this.graphemes,
           ) === GHOSTTY_SUCCESS
         ) {
-          // Read through a DataView: the byte-array allocator guarantees no
-          // 4-byte alignment, which a Uint32Array view would require.
           const codepointView = this.runtime.view(this.graphemes, bufferSize);
           text = ghosttyCellText(codepointView, graphemeLength);
         }
@@ -1009,7 +986,6 @@ export class GhosttyTerminalCore {
         wide = this.runtime.view(this.scratch + 8, 4).getUint32(0, true);
       }
       const selected = this.getCellBool(cellsIterator, CELL_DATA.selected);
-      // Read the style after allocation and ABI calls, which can grow WASM memory.
       const styleView = this.runtime.view(this.style, styleSize);
       if (styleView.getUint8(styleFields.inverse!.offset) !== 0) {
         [foreground, background] = [background, foreground];

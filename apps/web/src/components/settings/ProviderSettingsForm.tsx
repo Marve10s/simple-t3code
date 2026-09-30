@@ -27,7 +27,6 @@ export interface ProviderSettingsFieldModel {
   readonly placeholder?: string | undefined;
   readonly clearWhenEmpty: "omit" | "persist";
   readonly defaultBooleanValue?: boolean | undefined;
-  /** Choices for a `select` control. The first entry is the default. */
   readonly options?: ReadonlyArray<ProviderSettingsFormOption> | undefined;
 }
 
@@ -162,15 +161,10 @@ interface ProviderSettingsFormProps {
   readonly definition: ProviderClientDefinition;
   readonly value: unknown;
   readonly idPrefix: string;
-  /**
-   * `card` stacks label over control, `dialog` is the compact wizard layout,
-   * and `settings` renders the shared settings row treatment.
-   */
   readonly variant: "card" | "dialog" | "settings";
   readonly onChange: (nextConfig: Record<string, unknown> | undefined) => void;
 }
 
-/** Stores the default choice as an omitted key so unchanged configs stay small. */
 function ProviderSettingsSelect({
   field,
   value,

@@ -43,9 +43,6 @@ describe("guardHttpResponseWriteErrors", () => {
     });
 
     server.on("upgrade", (_request, socket) => {
-      // Simulate the client vanishing while the auth rejection response is
-      // written to the upgrade socket: the write failure surfaces as an
-      // "error" event on a socket Node's http server no longer listens to.
       socket.destroy(Object.assign(new Error("write EPIPE"), { code: "EPIPE" }));
     });
 
@@ -74,7 +71,6 @@ describe("guardHttpResponseWriteErrors", () => {
     expect(writeErrors[0]).toBeInstanceOf(Error);
     expect((writeErrors[0] as NodeJS.ErrnoException).code).toBe("EPIPE");
 
-    // The process survived the failed write and the server keeps serving.
     server.on("request", (_request, response) => {
       response.writeHead(200, { "content-type": "text/plain" });
       response.end("ok");

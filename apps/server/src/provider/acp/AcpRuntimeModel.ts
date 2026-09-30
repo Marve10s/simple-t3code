@@ -279,13 +279,6 @@ function extractToolCallCommand(rawInput: unknown, title: string | undefined): s
   return extractCommandFromTitle(title);
 }
 
-// Some ACP agents (observed with Grok's CLI) resend the ENTIRE accumulated tool-call
-// output on every `tool_call_update` notification instead of a delta, so a redrawing
-// terminal progress bar can balloon a single tool call to hundreds of KB per update at
-// several updates per second. Cap what we retain/emit to a bounded tail so one busy tool
-// call cannot flood runtime event ingestion. We always keep the tail: `tool_call_update`
-// deltas routinely omit `kind`, so there is no reliable way to tell a redrawing terminal
-// from another tool here, and the end is the useful part of any live-growing output.
 const TOOL_CALL_CONTENT_MAX_CHARS = 8_000;
 const TOOL_CALL_CONTENT_TRUNCATION_MARKER = "[Earlier output truncated]\n\n";
 
@@ -299,10 +292,6 @@ function boundToolCallOutputText(text: string): string {
 
 const RAW_OUTPUT_TEXT_FIELDS = ["content", "stdout", "stderr", "output"] as const;
 
-// `rawOutput` is provider-defined and, for terminal-shaped tools, mirrors the same
-// cumulative text-growth problem as `content` (see the comment above). Bound its known
-// text-bearing fields the same way so a chatty provider cannot smuggle unbounded output
-// through this field instead.
 function boundToolCallRawOutput(rawOutput: unknown): unknown {
   if (!isRecord(rawOutput)) {
     return rawOutput;
@@ -331,10 +320,6 @@ function toolCallContentText(entry: EffectAcpSchema.ToolCallContent): string | u
   return entry.content.text;
 }
 
-// Trim is used for display `text`, so whitespace-only (or whitespace-padded) entries never
-// contribute to `chunks` and used to take the early returns with the original array. Bound
-// each text entry independently so those paths cannot persist an unbounded terminal buffer
-// on `toolCall.data.content` / `rawPayload`.
 function boundToolCallContentEntries(
   content: ReadonlyArray<EffectAcpSchema.ToolCallContent>,
 ): ReadonlyArray<EffectAcpSchema.ToolCallContent> {
@@ -385,10 +370,6 @@ function extractTextContentFromToolCallContent(
   };
 }
 
-// Walk the original text entries from the joined tail window so a retained slice that
-// spans entries around an image/diff stays on those entries. Non-text kinds keep their
-// relative order; blank text entries are dropped; the truncation marker is prepended to
-// the first remaining text entry.
 function distributeRetainedTailAcrossContent(
   content: ReadonlyArray<EffectAcpSchema.ToolCallContent>,
   tail: string,
@@ -445,10 +426,6 @@ function normalizeToolKind(kind: unknown): string | undefined {
   return typeof kind === "string" && kind.trim().length > 0 ? kind.trim() : undefined;
 }
 
-/**
- * Map an ACP tool kind onto the canonical runtime item type used by the
- * thread activity model. Unknown kinds fall back to a generic tool call.
- */
 export function canonicalItemTypeFromAcpToolKind(kind: string | undefined): ToolLifecycleItemType {
   switch (kind) {
     case "execute":
@@ -585,12 +562,6 @@ export function mergeToolCallState(
   };
 }
 
-// Even with bounded content (see TOOL_CALL_CONTENT_MAX_CHARS above), a redrawing terminal
-// can still shift its bounded tail window on nearly every notification, which would emit
-// a runtime event per redraw. Coalesce those: only emit early when the tool call's detail
-// has grown meaningfully since the last emission, otherwise batch up to a small number of
-// skipped updates before emitting anyway, so the UI still gets periodic progress and the
-// final (completed/failed) state is always emitted immediately.
 const TOOL_CALL_UPDATE_MIN_DETAIL_GROWTH_CHARS = 256;
 const TOOL_CALL_UPDATE_COALESCE_LIMIT = 10;
 
@@ -612,9 +583,6 @@ function toolCallOutputUnchanged(previous: AcpToolCallState, next: AcpToolCallSt
   );
 }
 
-// Command tools keep `detail` equal to the command, so live stdout lives on
-// `data.content` / `data.rawOutput`. Measure that too, otherwise coalescing never
-// sees growth and in-progress output is held until completed/failed.
 export function toolCallProgressLength(state: AcpToolCallState): number {
   let contentChars = 0;
   const content = state.data.content;
@@ -728,10 +696,6 @@ export const waitForSessionLoadReplayIdle = (input: {
     }
   });
 
-/**
- * Model state some agents (Grok) advertise in `initialize._meta.modelState`, before any
- * session exists. Undefined when the agent does not advertise it or the shape is unknown.
- */
 export function sessionModelStateFromInitialize(
   initializeResult: EffectAcpSchema.InitializeResponse,
 ): EffectAcpSchema.SessionModelState | undefined {
@@ -757,11 +721,6 @@ export function syntheticLoadSessionResponseFromInitialize(
   };
 }
 
-// The parsed AcpToolCallState already carries bounded content (see makeToolCallState /
-// extractTextContentFromToolCallContent above), but the raw JSON-RPC notification is also
-// threaded through as `rawPayload` for logging/debugging and ends up persisted on the
-// runtime event. Substitute the same bounded `content`/`rawOutput` there so an oversized
-// cumulative update cannot smuggle the unbounded buffer back in through the raw payload.
 function boundToolCallRawPayload(
   params: EffectAcpSchema.SessionNotification,
   update: AcpToolCallUpdate,

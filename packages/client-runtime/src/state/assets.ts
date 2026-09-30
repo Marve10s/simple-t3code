@@ -72,9 +72,7 @@ export type AssetUrlState =
   | {
       readonly _tag: "Success";
       readonly url: string;
-      /** The host path the server chose to serve, when it differs from what was asked for. */
       readonly sourcePath?: string;
-      /** Pixel size from the image header, when the server could read one. */
       readonly imageDimensions?: AssetImageDimensions;
     };
 
@@ -130,7 +128,6 @@ export function createAssetEnvironmentAtoms<R, E>(
       local.environmentId,
       request(WS_METHODS.assetsCreateUrl, input),
     );
-    // Callers resolve against the thread's server, so preserve the local server's origin.
     return { ...asset, relativeUrl: new URL(asset.relativeUrl, local.httpBaseUrl).href };
   });
   const createUrl = createEnvironmentQueryAtomFamily(runtime, {
@@ -168,10 +165,6 @@ export function createAssetEnvironmentAtoms<R, E>(
   };
 }
 
-/**
- * Keeps project icons visible while their environment reconnects. Each resource
- * owns its last resolved URL, including a confirmed missing-icon response.
- */
 export function createProjectFaviconUrlAtomFamily(input: {
   readonly imageCache?: ProjectFaviconCache;
   readonly createUrl: (target: {

@@ -11,7 +11,6 @@ export { SettingsScreenContent };
 export function SettingsScreen(
   props: Pick<ScreenHeaderProps, "title" | "actions" | "trailing"> & {
     readonly children: ReactNode;
-    /** A native form sheet already owns its rounded outer frame. */
     readonly formSheet?: boolean;
   },
 ) {

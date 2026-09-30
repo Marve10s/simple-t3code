@@ -1,12 +1,3 @@
-/**
- * CodexAdapterLive - Scoped live implementation for the Codex provider adapter.
- *
- * Wraps the typed Codex session runtime behind the `CodexAdapter` service
- * contract and maps runtime failures into the shared `ProviderAdapterError`
- * algebra.
- *
- * @module CodexAdapterLive
- */
 import {
   EventId,
   type CanonicalItemType,
@@ -90,7 +81,6 @@ const PROVIDER = ProviderDriverKind.make("codex");
 export interface CodexAdapterLiveOptions {
   readonly instanceId?: ProviderInstanceId;
   readonly environment?: NodeJS.ProcessEnv;
-  /** The provider's model list; supplies model display names for runtime info. */
   readonly models?: Effect.Effect<ReadonlyArray<ServerProviderModel>>;
   readonly makeRuntime?: (
     options: CodexSessionRuntimeOptions,
@@ -512,13 +502,6 @@ function getCodexTurnAccumulator(
   return created;
 }
 
-/**
- * Usage added by one `thread/tokenUsage/updated` notification. Codex reports a
- * running `total` for the thread and `last`, the usage of the newest model
- * response. Within a turn the growth of `total` equals `last`. Without a prior
- * total (first update after resume or rollback), or when Codex reset the
- * running total, `last` is the delta.
- */
 function codexTurnTokenUsageDelta(
   previous: CodexCumulativeTokenUsage | undefined,
   current: CodexCumulativeTokenUsage,
@@ -553,8 +536,6 @@ function accumulateCodexTurnTokenUsage(
 ): void {
   const current = codexTokenUsageBreakdown(usage.total);
   if (state.activeTurnId !== turnId) {
-    // The total is thread-wide, so every update moves the baseline. A late
-    // update for a finished turn is not counted toward the live turn.
     state.baseline = current;
     return;
   }
@@ -610,9 +591,6 @@ function completeCodexTurnTokenUsage(
     };
   }
 
-  // Codex counts cache reads and writes inside inputTokens. Clamp the
-  // subsets so the record keeps the documented relationships even if a
-  // counter drifts.
   return {
     usageStatus: completed ? "complete" : "partial",
     usageScope: "main_agent",
@@ -803,20 +781,13 @@ function itemDetail(itemType: CanonicalItemType, item: CodexLifecycleItem): stri
   return undefined;
 }
 
-// Codex sends `reason` only sometimes, and sends it blank rather than absent
-// often enough to matter, so an empty one must not outrank the paths below.
 function nonEmptyDetail(value: string | null | undefined): string | undefined {
   const trimmed = value?.trim();
   return trimmed === undefined || trimmed.length === 0 ? undefined : trimmed;
 }
 
-// Keeps one oversized patch from pushing a wall of paths through every consumer
-// of the approval, while still saying how much it covers.
 const MAX_DESCRIBED_FILE_CHANGES = 20;
 
-// An apply-patch approval carries the edited paths as the keys of `fileChanges`.
-// Without them the approval card has nothing to show but its own title — the
-// command-execution branch already falls back to the command for the same reason.
 function describeFileChanges(
   fileChanges: EffectCodexSchema.ServerRequest__ApplyPatchApprovalParams["fileChanges"] | undefined,
 ): string | undefined {
@@ -1048,14 +1019,6 @@ function mapItemLifecycle(
   };
 }
 
-/**
- * Maps the session runtime's synthetic `collabAgent/*` events (native
- * multi-agent v2 child-thread signals) into the shared task.* lifecycle.
- * Agent identity = child thread id; nickname is the display title, role is
- * agentRole (fallback: last agentPath segment, then "general-purpose").
- * A completed child turn is idle (resumable), not terminal. timelineBypass
- * keeps these rows out of the parent chat.
- */
 function mapCollabAgentEvent(
   event: ProviderEvent,
   canonicalThreadId: ThreadId,
@@ -1075,16 +1038,10 @@ function mapCollabAgentEvent(
   const nickname = typeof payload.nickname === "string" ? payload.nickname : undefined;
   const role =
     (typeof payload.role === "string" ? payload.role : undefined) ?? pathLeaf ?? "general-purpose";
-  // A bare thread id is not a name. Omitting the title lets the client fold
-  // keep the real one from task.started instead of clobbering it (probe
-  // finding: progress rows renamed math_one to its UUID).
   const knownName = nickname ?? pathLeaf;
   const title = knownName ?? agentThreadId;
   const model = typeof payload.model === "string" ? payload.model.trim() : "";
   const effort = typeof payload.effort === "string" ? payload.effort.trim() : "";
-  // Identity repeated on every status patch so rows are self-describing when
-  // the start row ages out of activity retention (review finding: a
-  // reconstructed agent had a UUID name and no role/path).
   const linkage = {
     role,
     ...(knownName ? { title: knownName } : {}),
@@ -1131,10 +1088,6 @@ function mapCollabAgentEvent(
         ];
       }
       if (activityKind === "started") {
-        // Wire-probe finding: children often register via subAgentActivity
-        // alone (no thread/started with a spawn source), so this is the one
-        // shot at a task.started with a real name — agentPath leaf beats a
-        // bare thread-id title.
         return [
           {
             ...base,
@@ -1148,8 +1101,6 @@ function mapCollabAgentEvent(
           },
         ];
       }
-      // Reading a child's result also emits "interacted" after its turn is idle.
-      // Only the child's turn or thread lifecycle can prove it resumed work.
       return [];
     }
     case "collabAgent/turnStarted":
@@ -1161,7 +1112,6 @@ function mapCollabAgentEvent(
         },
       ];
     case "collabAgent/turnCompleted": {
-      // Idle, not terminal: the identity is resumable via sendInput/resume.
       const turn =
         typeof payload.turn === "object" && payload.turn !== null
           ? (payload.turn as Record<string, unknown>)
@@ -1188,7 +1138,6 @@ function mapCollabAgentEvent(
           : undefined;
       const statusType = typeof status?.type === "string" ? status.type : undefined;
       if (statusType === "systemError") {
-        // Silently dropping this once left children stuck running forever.
         return [
           {
             ...base,
@@ -1222,8 +1171,6 @@ function mapCollabAgentEvent(
       return [];
     }
     case "collabAgent/tokenUsage": {
-      // Cumulative per child thread: always the `total` breakdown, never
-      // `last` (which shrinks on follow-ups). Client folds max-merge.
       const tokenUsage =
         typeof payload.tokenUsage === "object" && payload.tokenUsage !== null
           ? (payload.tokenUsage as Record<string, unknown>)
@@ -1234,8 +1181,6 @@ function mapCollabAgentEvent(
           : undefined;
       const count = (value: unknown): number | undefined =>
         typeof value === "number" && Number.isFinite(value) && value >= 0 ? value : undefined;
-      // Same validation as every other field: RuntimeTaskUsage.totalTokens
-      // is NonNegativeInt, so NaN/Infinity/negative wire values must miss.
       const totalTokens = count(total?.totalTokens);
       if (totalTokens === undefined) {
         return [];
@@ -1277,9 +1222,6 @@ function mapCollabAgentEvent(
       if (!itemTypeRaw) {
         return [];
       }
-      // A loose summary from the raw item: the child stream is untyped at
-      // this boundary (synthetic event payload), so read best-effort fields
-      // rather than force a schema decode.
       const looseSummary =
         (typeof item?.command === "string" ? item.command : undefined) ??
         (typeof item?.title === "string" ? item.title : undefined) ??
@@ -1375,8 +1317,6 @@ function mapToRuntimeEvents(
             EffectCodexSchema.ServerRequest__FileChangeRequestApprovalParams,
             event.payload,
           );
-          // These params carry no path of their own, only the root the agent
-          // wants to write under.
           return nonEmptyDetail(payload?.reason) ?? nonEmptyDetail(payload?.grantRoot);
         }
         case "mcpServer/elicitation/request":
@@ -2233,15 +2173,6 @@ function mapToRuntimeEvents(
   return [];
 }
 
-/**
- * Build a Codex provider adapter bound to a specific `CodexSettings` payload.
- *
- * The adapter is a captured closure over `codexConfig` — the `binaryPath` and
- * `homePath` are read from that payload, not from `ServerSettingsService`.
- * This is what makes multi-instance routing possible: each `ProviderInstance`
- * in the registry owns its own closure with its own config, so two Codex
- * instances with different `homePath`s cannot step on each other.
- */
 export const makeCodexAdapter = Effect.fn("makeCodexAdapter")(function* (
   codexConfig: CodexSettings,
   options?: CodexAdapterLiveOptions,
@@ -2340,11 +2271,6 @@ export const makeCodexAdapter = Effect.fn("makeCodexAdapter")(function* (
             : {}),
         };
         const turnTokenUsage = makeCodexTurnTokenUsageState();
-        // Codex reports a usage-limit stop as OpenAI's own sentence, which on a
-        // Business workspace blames credits for a window that ran out. The
-        // snapshot naming that window arrives in its own notification, before or
-        // after the stop and often sparse, so keep the session's merged view of
-        // it and read it when a turn fails on the limit.
         let rateLimits: CodexRateLimitSnapshot | undefined;
         const createRuntime = options?.makeRuntime ?? makeCodexSessionRuntime;
         const runtime = yield* createRuntime(runtimeInput).pipe(
@@ -2362,10 +2288,6 @@ export const makeCodexAdapter = Effect.fn("makeCodexAdapter")(function* (
           ),
         );
 
-        // Fork into the session scope, not the calling fiber. `forkChild` makes
-        // this a child of `startSession`, and Effect interrupts a fiber's
-        // children when it completes, so the consumer died on return and every
-        // runtime event the session emitted afterwards was dropped.
         const eventFiber = yield* Stream.runForEach(runtime.events, (event) =>
           Effect.gen(function* () {
             yield* writeNativeEvent(event);
@@ -2411,8 +2333,6 @@ export const makeCodexAdapter = Effect.fn("makeCodexAdapter")(function* (
                 EffectCodexSchema.V2ErrorNotification,
                 event.payload,
               );
-              // The failed `turn/completed` repeats this sentence and is answered
-              // below; relaying both would show the limit twice.
               if (errorPayload?.error.codexErrorInfo === "usageLimitExceeded") return;
             }
 
@@ -2575,11 +2495,6 @@ export const makeCodexAdapter = Effect.fn("makeCodexAdapter")(function* (
   });
 
   const sendTurn: CodexAdapterShape["sendTurn"] = Effect.fn("sendTurn")(function* (input) {
-    // Codex ingests images only. Anything else would be inlined as an image
-    // and rejected or misread; generic files reach the agent through the path
-    // line ProviderService puts in the prompt. Images are passed by path
-    // instead of base64 so the turn/start request does not scale with file
-    // size; the CLI reads the file itself.
     const codexAttachments = yield* Effect.forEach(
       (input.attachments ?? []).filter((attachment) => attachment.type === "image"),
       (attachment) => resolveAttachment(input, attachment),
@@ -2823,10 +2738,3 @@ export const makeCodexAdapter = Effect.fn("makeCodexAdapter")(function* (
     },
   } satisfies CodexAdapterShape;
 });
-
-// NOTE: the old `CodexAdapterLive` / `makeCodexAdapterLive` singleton Layer
-// exports have been removed as part of the per-instance-driver refactor.
-// `makeCodexAdapter(codexConfig, options?)` is now invoked directly by
-// `CodexDriver.create()` for each configured instance; downstream consumers
-// (server bootstrap, integration harness, this module's tests) will be
-// migrated to the registry in a follow-up pass.

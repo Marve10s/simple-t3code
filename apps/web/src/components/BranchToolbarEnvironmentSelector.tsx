@@ -22,8 +22,6 @@ interface BranchToolbarEnvironmentSelectorProps {
   envLocked: boolean;
   environmentId: EnvironmentId;
   availableEnvironments: readonly EnvironmentOption[];
-  // Absent when there is only one environment to show: the indicator still
-  // renders (as a static label) so remote projects are always identifiable.
   onEnvironmentChange?: (environmentId: EnvironmentId) => void;
 }
 
@@ -53,11 +51,6 @@ export const BranchToolbarEnvironmentSelector = memo(function BranchToolbarEnvir
     [availableEnvironments, autoEnvironmentLabel, onAutoEnvironment],
   );
 
-  // The static label carries the xs control's height (h-7 sm:h-6) as well as
-  // its padding: the composer context strip has no min-height of its own, and
-  // the glass seam joining it to the composer assumes a fixed strip height, so
-  // a shorter label would drag the seam out of line whenever this label is the
-  // only thing in the strip.
   if (envLocked || onEnvironmentChange === undefined) {
     return (
       <Tooltip>

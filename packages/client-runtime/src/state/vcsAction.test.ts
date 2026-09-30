@@ -667,7 +667,6 @@ describe("vcsActionState", () => {
         expect(AsyncResult.isSuccess(successfulResult)).toBe(true);
         expect(registry.get(state).revision).toBe(1);
         expect(removed).toEqual([`${environmentId}:*`]);
-        // The server links a created pull request to this thread, so the id must ride along.
         expect(rpcInputs).toEqual([
           { actionId: successfulTransportActionId, cwd, action, threadId },
         ]);

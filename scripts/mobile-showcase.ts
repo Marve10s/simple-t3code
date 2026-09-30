@@ -62,8 +62,6 @@ const MOBILE_BUILD_ENV = {
   ANDROID_HOME: ANDROID_SDK_ROOT,
   APP_VARIANT: "production",
   EXPO_NO_GIT_STATUS: "1",
-  // Lets the capture build require full screen on iPad so the app can rotate
-  // itself to landscape (see app.config.ts).
   T3_SHOWCASE_CAPTURE_BUILD: "1",
   JAVA_HOME:
     NodeProcess.env.JAVA_HOME ??
@@ -229,8 +227,6 @@ export function showcaseCaptureDirectory(
   outputDirectory: string,
   capture: Pick<ShowcaseCapture, "device" | "appearance" | "theme">,
 ): string {
-  // Each palette owns a leaf folder so one upload slot never mixes themes and
-  // every folder keeps a store-legal screenshot count of its own.
   return NodePath.join(
     outputDirectory,
     capture.device.storeAsset.directory,
@@ -337,8 +333,6 @@ export function parseShowcaseCliArgs(args: ReadonlyArray<string>): CliOptions {
       } else if (SHOWCASE_THEMES.some((theme) => theme === value)) {
         themes.add(value as ShowcaseTheme);
       } else {
-        // The app silently falls back to its default palette for an unknown id,
-        // so reject it here rather than shipping a mislabeled screenshot.
         throw new Error(`Unsupported theme '${value}'. Use ${SHOWCASE_THEMES.join(", ")}, or all.`);
       }
       index += 1;
@@ -808,12 +802,6 @@ async function iosSimulatorDataPath(udid: string): Promise<string> {
   return dataPath;
 }
 
-// generativeexperiencesd posts a "Ready for Apple Intelligence" follow-up
-// banner on an eligible device's first boot, and CoreFollowUp re-surfaces it
-// on every boot until the user dismisses it. Stamping the readiness marker
-// before boot makes the daemon skip the post, and dropping the CoreFollowUp
-// store clears a banner that a previous boot already queued. Runs while the
-// device is shut down so the files are read fresh on the next boot.
 async function suppressIosSystemFollowUps(udid: string): Promise<void> {
   const dataPath = await iosSimulatorDataPath(udid);
   const preferences = NodePath.join(dataPath, "Library/Preferences");
@@ -838,9 +826,6 @@ async function suppressIosSystemFollowUps(udid: string): Promise<void> {
 
 async function normalizeIosSimulator(appearance: ShowcaseAppearance, udid: string): Promise<void> {
   await runCommand("xcrun", ["simctl", "ui", udid, "appearance", appearance]);
-  // Always-on displays (Pro Max) dim a locked screen instead of turning it
-  // off, which the lock-screen wake cannot tell from a lit one. Without it the
-  // locked display goes dark and the wake lights it fully.
   await runCommand("xcrun", [
     "simctl",
     "spawn",
@@ -870,10 +855,6 @@ async function normalizeIosSimulator(appearance: ShowcaseAppearance, udid: strin
   ]);
 }
 
-// iPadOS 26 windowing ("Chamois") runs UIRequiresFullScreen apps in a fixed
-// portrait compatibility window, which defeats the in-app landscape rotation
-// the capture build relies on. Switch the device to Full Screen Apps mode
-// (Settings > Multitasking & Gestures) and restart SpringBoard to apply it.
 async function ensureIosFullScreenAppsMode(udid: string): Promise<void> {
   const current = await commandOutput("xcrun", [
     "simctl",
@@ -885,8 +866,6 @@ async function ensureIosFullScreenAppsMode(udid: string): Promise<void> {
     "SBChamoisWindowingEnabled",
   ]).catch(() => "");
   if (current.trim() === "0") return;
-  // The Settings toggle writes all three keys; SBChamoisWindowingEnabled
-  // alone is not honored on a freshly created device.
   for (const key of [
     "SBChamoisWindowingEnabled",
     "SBMedusaMultitaskingEnabled",
@@ -904,9 +883,6 @@ async function ensureIosFullScreenAppsMode(udid: string): Promise<void> {
       "false",
     ]);
   }
-  // A SpringBoard restart is not enough on a freshly created simulator (the
-  // first CI run captured with windowing still active), so reboot the device
-  // and verify the mode actually stuck.
   await runCommand("xcrun", ["simctl", "shutdown", udid]);
   await runCommand("xcrun", ["simctl", "boot", udid]);
   await runCommand("xcrun", ["simctl", "bootstatus", udid, "-b"]);
@@ -954,7 +930,6 @@ function iosAxe(): string {
 }
 
 async function runAxe(udid: string, args: ReadonlyArray<string>): Promise<void> {
-  // HID events sent right after the simulator settles are dropped without it.
   await runCommand(iosAxe(), [...args, "--udid", udid], {
     env: { ...NodeProcess.env, AXE_HID_STABILIZATION_MS: "3000" },
   }).catch((error: unknown) => {
@@ -979,10 +954,6 @@ async function iosSimulatorLocked(udid: string): Promise<boolean> {
   return state.trim().endsWith(" 1");
 }
 
-/**
- * The staging app asks for notification permission; simctl has no privacy
- * service for it, so answer the prompt until the scene reports ready.
- */
 async function allowIosNotificationsUntilReady(udid: string, ready: Promise<void>): Promise<void> {
   const state = { settled: false };
   const tapping = (async () => {
@@ -999,10 +970,6 @@ async function allowIosNotificationsUntilReady(udid: string, ready: Promise<void
   }
 }
 
-/**
- * Locks the simulator over the staged Live Activity and delivers the alert a
- * relay push would, so the lock screen shows both.
- */
 async function presentIosLockScreen(udid: string): Promise<void> {
   await runAxe(udid, ["button", "lock"]);
   const deadline = Date.now() + 15_000;
@@ -1025,16 +992,10 @@ async function presentIosLockScreen(udid: string): Promise<void> {
     );
   });
   await wakeIosLockScreen(udid);
-  // The first Live Activity on the lock screen asks to keep allowing them.
   await delay(2_000);
   await runAxe(udid, ["tap", "--label", "Allow"]).catch(() => undefined);
 }
 
-/**
- * The alert usually wakes the display, but not always. A home press on a dark
- * display only wakes it, so press only after a screenshot proves it is dark;
- * pressing on a lit lock screen would unlock the device instead.
- */
 async function wakeIosLockScreen(udid: string): Promise<void> {
   const probe = NodePath.join(NodeOS.tmpdir(), `t3-showcase-wake-${udid}.png`);
   try {
@@ -1052,7 +1013,6 @@ async function wakeIosLockScreen(udid: string): Promise<void> {
 
 function pngIsBlack(bytes: Uint8Array): boolean {
   const { data } = PNG.sync.read(Buffer.from(bytes));
-  // Sample a sparse grid; a sleeping display is uniformly black.
   for (let offset = 0; offset < data.length; offset += 4 * 997) {
     if ((data[offset] ?? 0) > 8 || (data[offset + 1] ?? 0) > 8 || (data[offset + 2] ?? 0) > 8) {
       return false;
@@ -1062,13 +1022,11 @@ function pngIsBlack(bytes: Uint8Array): boolean {
 }
 
 async function unlockIosSimulator(udid: string): Promise<void> {
-  // The first press wakes the display, the second dismisses the lock screen.
   await runAxe(udid, ["button", "home"]);
   await delay(2_000);
   await runAxe(udid, ["button", "home"]);
 }
 
-/** Mirrors the app's staged hero row (showcaseAgentActivity.ts). */
 function showcaseAgentAlert(): { readonly title: string; readonly body: string } {
   const thread = SHOWCASE_THREADS.find((candidate) => candidate.id === "pocket-command-center");
   const project = SHOWCASE_PROJECTS.find((candidate) => candidate.id === thread?.projectId);
@@ -1089,8 +1047,6 @@ async function captureIos(
   const startedByRunner = simulator.state !== "Booted";
   registerCleanup({ udid: simulator.udid, startedByRunner, createdByRunner });
   if (!startedByRunner) {
-    // Clear transient SpringBoard state (permission prompts, stale URL-open
-    // confirmations, keyboards) without erasing the developer's simulator.
     await runCommand("xcrun", ["simctl", "shutdown", simulator.udid]);
   }
   await suppressIosSystemFollowUps(simulator.udid);
@@ -1151,8 +1107,6 @@ async function captureIos(
       firstScene,
       "--showcaseTheme",
       capture.theme,
-      // The app rotates itself; Simulator menu UI scripting needs macOS
-      // Accessibility permission that CI runners do not grant to osascript.
       "--showcaseOrientation",
       capture.device.orientation ?? "portrait",
     ]);
@@ -1173,9 +1127,6 @@ async function captureIos(
       for (let attempt = 0; attempt < 2; attempt += 1) {
         const isLastAttempt = attempt === 1;
         try {
-          // A freshly installed Expo development build can spend well over 30s
-          // applying an already-bundled update after it reaches 100%. Killing it
-          // at that point sends the next capture back to the dev launcher.
           await waitForScene(120_000);
           break;
         } catch (error) {
@@ -1194,9 +1145,6 @@ async function captureIos(
     );
     await runCommand("xcrun", ["simctl", "io", simulator.udid, "screenshot", destination]);
     if (capture.device.orientation === "landscape") {
-      // A headless simulator keeps its display portrait while the rotated app
-      // renders sideways inside it; with Simulator.app attached the display
-      // itself rotates. Only post-rotate the former.
       const { width, height } = readPngDimensions(await NodeFSP.readFile(destination));
       if (height > width) {
         await runCommand("sips", ["--rotate", "270", destination]);
@@ -1219,18 +1167,12 @@ async function runAdb(serial: string, args: ReadonlyArray<string>): Promise<void
   await runCommand(androidSdkTool("platform-tools/adb"), ["-s", serial, ...args]);
 }
 
-/**
- * Emulator images post their own ongoing notices (keyboard configured, serial
- * console enabled) that would share the shade with the app's. Snoozing hides
- * them for the capture; they come back on their own an hour later.
- */
 async function snoozeAndroidSystemNotifications(serial: string): Promise<void> {
   const keys = (await adbOutput(serial, ["shell", "cmd", "notification", "list"]))
     .split("\n")
     .map((line) => line.trim())
     .filter((key) => key.includes("|") && !key.includes(`|${ANDROID_PACKAGE}|`));
   for (const key of keys) {
-    // adb joins shell args with spaces, so the key needs quoting for the pipes.
     await runAdb(serial, ["shell", `cmd notification snooze --for 3600000 '${key}'`]);
   }
 }
@@ -1414,8 +1356,6 @@ async function captureAndroid(
     await runAdb(serial, ["install", "-r", apkPath]);
   }
   await runAdb(serial, ["shell", "pm", "clear", ANDROID_PACKAGE]);
-  // The agent-activity scene posts notifications; granting up front keeps the
-  // runtime prompt off every capture.
   await runAdb(serial, [
     "shell",
     "pm",
@@ -1563,8 +1503,6 @@ async function main(): Promise<void> {
       showcaseServers.push(server);
       await waitForPort(port, `${environment.label} server`);
       await seedShowcaseEnvironment({ baseDir, projectIds: environment.projectIds });
-      // The server begins listening before the ServerEnvironment layer
-      // persists the environment id, so poll rather than read once.
       const environmentId = await waitForFileContent(
         NodePath.join(baseDir, "userdata", "environment-id"),
         `${environment.label} environment id`,
@@ -1676,9 +1614,6 @@ async function main(): Promise<void> {
 
 if (import.meta.main) {
   void main().catch((error: unknown) => {
-    // Stack over message: the harness only fails in CI, where the line that
-    // threw is the whole diagnosis and there is nobody at a terminal to
-    // re-run it with more output.
     NodeProcess.stderr.write(
       `${error instanceof Error ? (error.stack ?? error.message) : String(error)}\n`,
     );

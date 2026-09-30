@@ -4,7 +4,6 @@ import { cva, type VariantProps } from "class-variance-authority";
 import { cn } from "~/lib/utils";
 import { observeVisibleAnimation } from "~/lib/visibleAnimation";
 
-// No default size: inside a Button the parent's svg rule sizes the glyph.
 const refreshIconVariants = cva("", {
   variants: {
     size: {
@@ -16,7 +15,6 @@ const refreshIconVariants = cva("", {
   },
 });
 
-/** Keep the refresh glyph in place while its owning action is running. */
 export function RefreshIcon({
   refreshing = false,
   className,

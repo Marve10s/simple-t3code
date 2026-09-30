@@ -1,9 +1,3 @@
-/**
- * The review half of the floating composer: the summary and the verdict that sends it, together
- * with whatever line comments the review is holding. The count of those lives on the composer's
- * trigger and mode toggle, and each pending card can be dropped from the diff, so neither is
- * repeated here. The popover around it belongs to PullRequestComposer.
- */
 import type { EnvironmentId, PullRequestRef, PullRequestReviewVerdict } from "@t3tools/contracts";
 import { CheckIcon, MessageSquareIcon, XCircleIcon } from "lucide-react";
 import { useState, type ReactNode, type RefObject } from "react";
@@ -69,9 +63,6 @@ export function PullRequestReviewForm({
   const [requestedVerdict, setRequestedVerdict] = useState<PullRequestReviewVerdict>("comment");
   const comments = usePendingReviewComments(reference);
   const reviewKey = pullRequestReviewKey(reference);
-  // The panel stays mounted while the selected pull request changes. Keeping summaries beside
-  // the keyed line-comment drafts makes the selected pull request's body correct on the first
-  // render, before an effect could reset state left behind by the previous one.
   const body = usePullRequestReviewStore((store) => store.summaries[reviewKey] ?? "");
   const removeComments = usePullRequestReviewStore((store) => store.removeComments);
   const setSummary = usePullRequestReviewStore((store) => store.setSummary);
@@ -100,12 +91,9 @@ export function PullRequestReviewForm({
     });
     onPendingChange(false);
     if (result._tag === "Failure") {
-      // The draft is kept: whatever went wrong, retyping the review is not the answer.
       toastManager.add({ type: "error", title: "The review could not be submitted" });
       return;
     }
-    // More remarks may have been added while the host was accepting this snapshot. Leave those,
-    // and any summary revised in the meantime, ready for the next review.
     removeComments(
       reviewKey,
       submittedComments.map((comment) => comment.id),
@@ -115,7 +103,6 @@ export function PullRequestReviewForm({
     onSubmitted();
   };
 
-  // Forgejo requires a summary when requesting changes, even with inline comments.
   const canSubmit = (verdict: PullRequestReviewVerdict) =>
     verdict === "request-changes" && requestChangesSummaryRequired
       ? body.trim().length > 0

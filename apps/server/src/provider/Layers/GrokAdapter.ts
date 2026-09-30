@@ -91,13 +91,7 @@ const encodeUnknownJsonStringExit = Schema.encodeUnknownExit(Schema.fromJsonStri
 const PROVIDER = ProviderDriverKind.make("grok");
 const GROK_RESUME_VERSION = 1 as const;
 const NANOS_PER_MILLI = 1_000_000n;
-// ACP does not expose Grok's private `streaming_reasoning` phase. Once it has
-// emitted standard ACP progress, ten silent minutes is long enough to avoid
-// treating legitimate reasoning as a stalled stream.
 const DEFAULT_GROK_TURN_INACTIVITY_TIMEOUT_MS = 10 * 60 * 1_000;
-// A tool can legitimately run without emitting text for much longer than
-// reasoning. It still needs a deadline so a lost tool update cannot leave the
-// turn working forever.
 const DEFAULT_GROK_ACTIVE_TOOL_INACTIVITY_TIMEOUT_MS = 30 * 60 * 1_000;
 
 function encodeJsonStringForDiagnostics(input: unknown): string | undefined {
@@ -110,9 +104,7 @@ export interface GrokAdapterLiveOptions {
   readonly nativeEventLogPath?: string;
   readonly nativeEventLogger?: EventNdjsonLogger;
   readonly instanceId?: ProviderInstanceId;
-  /** Override the conservative ACP turn liveness timeout in focused tests. */
   readonly turnInactivityTimeoutMs?: number;
-  /** Override the longer active-tool liveness timeout in focused tests. */
   readonly activeToolInactivityTimeoutMs?: number;
 }
 
@@ -143,40 +135,25 @@ interface GrokSessionContext {
   readonly pendingUserInputs: Map<ApprovalRequestId, PendingUserInput>;
   turns: Array<{ id: TurnId; items: Array<unknown> }>;
   lastPlanFingerprint: string | undefined;
-  /**
-   * Latest plan.md body + turn it was emitted for. Dedupe is turn-scoped so a
-   * later turn re-proposing the same text still gets a new proposed-plan card.
-   */
   lastKnownProposedPlanMarkdown: string | undefined;
   lastKnownProposedPlanTurnId: TurnId | undefined;
-  /** True after enter_plan_mode until the turn ends or exit_plan_mode resolves. */
   planModeActive: boolean;
   activeTurnId: TurnId | undefined;
-  /** Turns already interrupted; late prompt RPCs must not resurrect them. */
   interruptedTurnIds: Set<TurnId>;
-  /** Number of sendTurn prompts currently in flight or being prepared.
-   * >0 means a turn is actively running, so a new sendTurn is a steer that
-   * cancels the in-flight prompt and continues the same turn. Only the last
-   * remaining prompt settles the turn. */
   promptsInFlight: number;
-  /** Monotonic id assigned to each sendTurn. Steers discard older epochs. */
   promptEpoch: number;
-  /** Prompt epochs below this value must not start an ACP session/prompt. */
   discardBeforeEpoch: number;
-  /** Serializes cancel-then-prompt so a steer cannot miss or hit the wrong RPC. */
   readonly promptLifecycle: Semaphore.Semaphore;
   readonly livenessSignals: Queue.Queue<GrokTurnLivenessSignal>;
   livenessTurnId: TurnId | undefined;
   lastTurnActivityAtNanos: bigint | undefined;
   readonly activeToolCallIds: Set<string>;
   livenessUpdatesInFlight: number;
-  /** Prompt RPCs that returned before their turn settlement acquired the lock. */
   promptResponsesReady: number;
   currentModelId: string | undefined;
   currentReasoningEffort: string | undefined;
   stopped: boolean;
   terminated: boolean;
-  /** Live monitor/shell identities and their originating turns. */
   readonly backgroundTasks: Map<string, GrokBackgroundTaskRecord>;
 }
 
@@ -230,7 +207,6 @@ function clearProposedPlanFallback(ctx: GrokSessionContext): void {
   ctx.planModeActive = false;
 }
 
-/** Detect Grok's enter_plan_mode tool call from ACP tool state. */
 export function isGrokEnterPlanModeToolCall(toolCall: {
   readonly title?: string;
   readonly data: Record<string, unknown>;
@@ -251,7 +227,6 @@ export function isGrokEnterPlanModeToolCall(toolCall: {
   return false;
 }
 
-/** Failed enter_plan_mode must not leave planModeActive stuck on. */
 export function nextGrokPlanModeActive(
   currentlyActive: boolean,
   toolCall: {
@@ -302,7 +277,6 @@ export function selectGrokPermissionOptionId(
   if (preferredId) {
     return preferredId;
   }
-  // Grok 4.6 often omits allow_always. T3 still offers "Always allow this session".
   if (decision === "acceptForSession") {
     const once = request.options.find((entry) => entry.kind === "allow_once");
     const onceId = once?.optionId.trim();
@@ -442,8 +416,6 @@ export function makeGrokAdapter(grokSettings: GrokSettings, options?: GrokAdapte
     const beginTurnLiveness = (ctx: GrokSessionContext, turnId: TurnId) =>
       Effect.sync(() => {
         ctx.livenessTurnId = turnId;
-        // Do not start a deadline until ACP has made observable progress.
-        // Grok's private reasoning phase is not present in the ACP stream.
         ctx.lastTurnActivityAtNanos = undefined;
         ctx.activeToolCallIds.clear();
       });
@@ -491,16 +463,11 @@ export function makeGrokAdapter(grokSettings: GrokSettings, options?: GrokAdapte
           if (event.toolCall.status === "completed" || event.toolCall.status === "failed") {
             ctx.activeToolCallIds.delete(event.toolCall.toolCallId);
           } else {
-            // A tool update without a terminal status receives a longer
-            // deadline so a long-running tool is not mistaken for a stall.
             ctx.activeToolCallIds.add(event.toolCall.toolCallId);
           }
         }
         ctx.lastTurnActivityAtNanos = activityAtNanos;
       } finally {
-        // Decrement before signaling. The watchdog treats in-flight updates as a
-        // pause; if it consumed a signal while the counter was still > 0 it would
-        // wait on the next take with no follow-up wake after this decrement.
         ctx.livenessUpdatesInFlight = Math.max(0, ctx.livenessUpdatesInFlight - 1);
         yield* signalTurnLiveness(ctx, turnId);
       }
@@ -532,8 +499,6 @@ export function makeGrokAdapter(grokSettings: GrokSettings, options?: GrokAdapte
       if (!ctx || turnId === undefined || ctx.livenessTurnId !== turnId) {
         return;
       }
-      // An approval or user-input wait can last longer than the watchdog.
-      // Its resolution gives the provider a fresh window to resume output.
       ctx.lastTurnActivityAtNanos = yield* Clock.monotonicTimeNanos;
       yield* signalTurnLiveness(ctx, turnId);
     });
@@ -586,7 +551,6 @@ export function makeGrokAdapter(grokSettings: GrokSettings, options?: GrokAdapte
         readonly errorMessage?: string;
         readonly completedStopReason?: EffectAcpSchema.StopReason | null;
         readonly emitTurnCompletion?: boolean;
-        /** Interrupt/cancel: drop every outstanding prompt slot and settle once. */
         readonly settleAllPrompts?: boolean;
       },
     ) =>
@@ -603,9 +567,6 @@ export function makeGrokAdapter(grokSettings: GrokSettings, options?: GrokAdapte
           turnId,
         });
         if (!settlementBelongsToLiveContext) {
-          // interruptTurn already consumed every prompt slot for this turn. A
-          // late prompt result must neither emit a second terminal event nor
-          // consume a slot belonging to a newer turn on the same ACP session.
           if (
             liveCtx.acpSessionId !== expectedAcpSessionId ||
             liveCtx.interruptedTurnIds.has(turnId)
@@ -683,8 +644,6 @@ export function makeGrokAdapter(grokSettings: GrokSettings, options?: GrokAdapte
           options?.completedStopReason !== undefined && canEmitTurnCompletion;
         const { activeTurnId: _activeTurnId, ...readySession } = liveCtx.session;
         liveCtx.activeTurnId = undefined;
-        // Drop turn-scoped plan fallback so a later empty exit_plan cannot
-        // resurrect this turn's markdown as a fresh proposal.
         clearProposedPlanFallback(liveCtx);
         liveCtx.session = {
           ...readySession,
@@ -759,8 +718,6 @@ export function makeGrokAdapter(grokSettings: GrokSettings, options?: GrokAdapte
             return;
           }
 
-          // Mark before cancel/drain so notifications already in flight finish
-          // before the terminal event, while late notifications are dropped.
           ctx.interruptedTurnIds.add(turnId);
           yield* Effect.ignore(
             ctx.acp.cancel.pipe(
@@ -881,7 +838,6 @@ export function makeGrokAdapter(grokSettings: GrokSettings, options?: GrokAdapte
         );
       });
 
-    /** Surface Grok plan.md as T3's proposed-plan card (while writing + on exit). */
     const emitProposedPlanCompleted = (
       ctx: GrokSessionContext,
       turnId: TurnId | undefined,
@@ -896,7 +852,6 @@ export function makeGrokAdapter(grokSettings: GrokSettings, options?: GrokAdapte
           ctx.lastKnownProposedPlanTurnId = turnId;
           return;
         }
-        // Turn-scoped dedupe: identical text on a later turn must still emit.
         if (
           ctx.lastKnownProposedPlanMarkdown === trimmed &&
           ctx.lastKnownProposedPlanTurnId === turnId
@@ -1099,9 +1054,6 @@ export function makeGrokAdapter(grokSettings: GrokSettings, options?: GrokAdapte
                 ),
               { discard: true },
             );
-            // Grok intercepts exit_plan_mode and reverse-requests client approval.
-            // Capture plan into T3 proposed-plan UI and abandon the native gate so
-            // the turn does not hang (Claude ExitPlanMode pattern).
             yield* Effect.forEach(
               ["x.ai/exit_plan_mode", "_x.ai/exit_plan_mode"] as const,
               (method) =>
@@ -1157,8 +1109,6 @@ export function makeGrokAdapter(grokSettings: GrokSettings, options?: GrokAdapte
                     const { description: _description, ...shellInput } = rawInput;
                     operationInput = shellInput;
                   }
-                  // Remember the operation, not the tool-call id or every future tool.
-                  // Generic titles without input cannot identify an operation safely.
                   const approvalKey =
                     command || (isRecord(rawInput) && Object.keys(rawInput).length > 0)
                       ? stableStringify({ kind, title, command, input: operationInput, locations })
@@ -1447,9 +1397,6 @@ export function makeGrokAdapter(grokSettings: GrokSettings, options?: GrokAdapte
                       }),
                     );
                     ctx.planModeActive = nextGrokPlanModeActive(ctx.planModeActive, event.toolCall);
-                    // Only promote session plan.md writes while plan mode is
-                    // active — avoids treating unrelated plan files as proposals.
-                    // Fresh stamp: must not share eventId with the tool lifecycle event.
                     if (ctx.planModeActive) {
                       const planMarkdown = extractGrokPlanMarkdownFromToolCallData(
                         event.toolCall.data,
@@ -1503,12 +1450,6 @@ export function makeGrokAdapter(grokSettings: GrokSettings, options?: GrokAdapte
             Effect.catch((cause) =>
               Effect.logError("Failed to process Grok runtime notification.", { cause }),
             ),
-            // Fork into the session scope, not the calling fiber. `forkChild`
-            // makes this a child of `startSession`, and Effect interrupts a
-            // fiber's children when it completes, so the consumer died as soon
-            // as `startSession` returned and every later notification was
-            // dropped. The scope is created, stored on the context and closed
-            // on teardown already; only the fork target was wrong.
             Effect.forkIn(ctx.scope),
           );
 
@@ -1556,23 +1497,12 @@ export function makeGrokAdapter(grokSettings: GrokSettings, options?: GrokAdapte
           input.threadId,
           Effect.gen(function* () {
             const ctx = yield* requireSession(input.threadId);
-            // A sendTurn while a prompt is in flight is a steer: reuse the
-            // active turn and cancel the in-flight ACP prompt so Grok takes
-            // the new instruction immediately, matching Claude/Codex, instead
-            // of waiting behind serialized session/prompt.
             const steeringTurnId = ctx.promptsInFlight > 0 ? ctx.activeTurnId : undefined;
             const turnId = steeringTurnId ?? TurnId.make(yield* randomUUIDv4);
-            // Count this prompt immediately so a superseded in-flight prompt
-            // resolving from here on does not settle the turn; decremented on
-            // preparation failure here, and after the prompt below otherwise.
             ctx.promptsInFlight += 1;
             ctx.promptEpoch += 1;
             const promptEpoch = ctx.promptEpoch;
-            // Bind the turn id before cooperative yields so interruptTurn can
-            // settle this prompt even if stop arrives during preparation.
             ctx.activeTurnId = turnId;
-            // New turn: do not fall back to a previous turn's plan.md body when
-            // exit_plan_mode omits planContent.
             if (steeringTurnId === undefined) {
               clearProposedPlanFallback(ctx);
             }
@@ -1597,8 +1527,6 @@ export function makeGrokAdapter(grokSettings: GrokSettings, options?: GrokAdapte
               );
 
               const text = input.input?.trim();
-              // Grok ingests images only. Generic files reach the agent
-              // through the path line ProviderService puts in the prompt.
               const imagePromptParts = yield* Effect.forEach(
                 (input.attachments ?? []).filter((attachment) => attachment.type === "image"),
                 (attachment) =>
@@ -1663,7 +1591,6 @@ export function makeGrokAdapter(grokSettings: GrokSettings, options?: GrokAdapte
               const displayModel = currentModelId
                 ? resolveGrokAcpBaseModelId(currentModelId)
                 : undefined;
-              // ACP slash commands must receive only their own arguments.
               const runtimeInstructions =
                 text && /^\/[^\s/]+(?:\s|$)/.test(text)
                   ? undefined
@@ -1713,10 +1640,6 @@ export function makeGrokAdapter(grokSettings: GrokSettings, options?: GrokAdapte
                   payload: displayModel ? { model: displayModel } : {},
                 });
               } else {
-                // Discard the previous epoch only after this replacement is
-                // ready. A failed steer must not skip the live prompt, which
-                // settles without a terminal event when emitTurnCompletion is
-                // false.
                 yield* settlePendingApprovalsAsCancelled(ctx.pendingApprovals);
                 yield* settlePendingUserInputsAsCancelled(ctx.pendingUserInputs);
                 ctx.discardBeforeEpoch = promptEpoch;
@@ -1796,9 +1719,6 @@ export function makeGrokAdapter(grokSettings: GrokSettings, options?: GrokAdapte
                   { dispatched },
                 )
                 .pipe(Effect.forkChild({ startImmediately: true }));
-              // Hold the lifecycle permit until the runtime has registered this
-              // prompt's RPC fiber, so a later steer's session/cancel targets
-              // this prompt. Fall through if the prompt fails before that point.
               yield* Effect.raceFirst(
                 Deferred.await(dispatched),
                 Fiber.await(fiber).pipe(Effect.asVoid),
@@ -1807,8 +1727,6 @@ export function makeGrokAdapter(grokSettings: GrokSettings, options?: GrokAdapte
             }),
           );
           if (promptStart._tag === "Skipped") {
-            // Settle after releasing promptLifecycle. Holding both locks
-            // deadlocks the next sendTurn, which takes the thread lock first.
             yield* withThreadLock(
               input.threadId,
               settlePromptInFlight(
@@ -1875,9 +1793,6 @@ export function makeGrokAdapter(grokSettings: GrokSettings, options?: GrokAdapte
                   detail: "Grok session changed before the turn completed.",
                 });
               }
-              // Keep prompt settlement atomic with respect to Stop and steering.
-              // interruptTurn marks its target before waiting for this lock, so
-              // cancellation can still win while queued ACP events are drained.
               for (let yieldAttempt = 0; yieldAttempt < 8; yieldAttempt += 1) {
                 yield* Effect.yieldNow;
               }
@@ -1916,9 +1831,6 @@ export function makeGrokAdapter(grokSettings: GrokSettings, options?: GrokAdapte
               const remainingPrompts = Math.max(0, ctx.promptsInFlight - 1);
               ctx.promptsInFlight = remainingPrompts;
 
-              // Only the last remaining prompt settles the turn. A steer-
-              // superseded prompt resolving while another is in flight or
-              // pending must leave the merged turn running.
               if (
                 remainingPrompts === 0 &&
                 ctx.activeTurnId === prepared.turnId &&

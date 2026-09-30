@@ -106,8 +106,6 @@ function SidebarControl() {
         event.target instanceof HTMLElement &&
         event.target.closest('[data-composer-rich-text="true"]')
       ) {
-        // The rich-text composer claims Mod+B for bold; the toggle stays
-        // available everywhere else, including the plain-text composer.
         return;
       }
       if (
@@ -121,15 +119,11 @@ function SidebarControl() {
       toggleSidebar();
     };
 
-    // Capture before focused editors consume commands such as Mod+B for rich-text formatting.
     window.addEventListener("keydown", onKeyDown, true);
     return () => window.removeEventListener("keydown", onKeyDown, true);
   }, [keybindings, toggleSidebar, usagePageOpen]);
 
   return (
-    // The right-side layout controls carry mr-px (border compensation inside
-    // the panel), so the trigger mirrors it: both clusters sit one extra pixel
-    // off their edge and the titlebar reads symmetric.
     <div
       className="pointer-events-none fixed left-[var(--workspace-controls-left)] top-[var(--workspace-controls-top)] z-50 ml-px flex h-[var(--workspace-topbar-height)] items-center"
       data-sidebar-control=""
@@ -138,8 +132,6 @@ function SidebarControl() {
         <TooltipTrigger
           render={
             <SidebarTrigger
-              // Over the stage artwork the trigger is a control on imagery, like the media
-              // viewer's arrows; that variant positions itself, so the layout is reset here.
               variant={isSidebarVisible && stageBackdropVariant ? "media-navigation" : "ghost"}
               className={cn(
                 "pointer-events-auto",
@@ -157,7 +149,6 @@ function SidebarControl() {
   );
 }
 
-// Moves through the app's route history like a browser's back/forward buttons.
 function NavigationHistoryShortcuts() {
   const keybindings = useAtomValue(primaryServerKeybindingsAtom);
   const routeThreadRef = useParams({
@@ -207,9 +198,6 @@ function NavigationHistoryShortcuts() {
   return null;
 }
 
-// Settings swaps the thread sidebar out of the tree. Keep the lightweight
-// project projection subscribed so returning to a draft never renders the
-// zero-project state while the environment snapshot reconnects.
 function ProjectProjectionRetention() {
   useProjects();
   return null;
@@ -220,17 +208,12 @@ export function AppSidebarLayout({ children }: { children: ReactNode }) {
   const legacySidebarEnabled = useLegacySidebarEnabled();
   const { active: panelAnimationsActive, durationMs: panelAnimationDurationMs } =
     usePanelAnimationSettings();
-  // Settings routes show the settings nav in place of whichever thread
-  // sidebar is active.
   const pathname = useLocation({ select: (location) => location.pathname });
   const panelAnimationsSuppressed = usePanelNavigationSuppression(pathname);
   const routePanelAnimationsActive = panelAnimationsActive && !panelAnimationsSuppressed;
   const isOnSettings = pathname === "/settings" || pathname.startsWith("/settings/");
   const isMacosDesktop = isElectron && isMacPlatform(navigator.platform);
   const [sidebarWidth, setSidebarWidth] = useState(readInitialThreadSidebarWidth);
-  // Subscribed rather than read once: the clamp must track live window size,
-  // and a clamped drag ends with an unchanged width, which skips the re-render
-  // that would otherwise refresh a render-time snapshot.
   const viewportWidth = useSyncExternalStore(subscribeToViewportWidth, readViewportWidth);
   const sidebarMaximumWidth = resolveThreadSidebarMaximumWidth(viewportWidth);
   const resetSidebarWidth = () => {

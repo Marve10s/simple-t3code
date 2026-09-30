@@ -1,11 +1,9 @@
 import type { HostResourcesSnapshot } from "@t3tools/contracts";
 
-/** Callers supply only connected machines hosting the project and selected provider. */
 export function chooseLoadBalancedEnvironment(
   candidates: ReadonlyArray<{
     environmentId: string;
     resources: HostResourcesSnapshot | null;
-    /** Client receipt time avoids comparing clocks on different machines. */
     receivedAt?: number;
     weight: number;
   }>,

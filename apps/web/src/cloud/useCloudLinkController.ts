@@ -23,15 +23,6 @@ export interface CloudLinkDesiredState {
   readonly publish: boolean;
 }
 
-/**
- * Drives the primary environment's T3 Connect link. T3 Connect (managed
- * tunnel) and agent-activity publishing are independent capabilities backed by
- * a single relay link, so consumers express the full desired state and
- * `reconcileCloudState` applies it: unlink when neither is wanted, otherwise
- * (re)link with the mode the managed-tunnel bit implies and set the publish
- * preference. Re-linking only happens when the managed-tunnel mode actually
- * changes, so flipping publish alone is cheap.
- */
 export function useCloudLinkController() {
   const { getToken, isSignedIn } = useAuth();
   const refreshRelayEnvironments = useAtomCommand(relayEnvironmentDiscovery.refresh, {
@@ -70,8 +61,6 @@ export function useCloudLinkController() {
     });
   };
 
-  // Older environment servers predate the managedTunnelActive field; for them a
-  // link always implies a managed tunnel, so fall back to `linked`.
   const managedTunnelActive =
     primaryCloudLinkState.data?.managedTunnelActive ?? primaryCloudLinkState.data?.linked ?? false;
   const publishAgentActivity = primaryCloudLinkState.data?.publishAgentActivity ?? false;
@@ -87,13 +76,7 @@ export function useCloudLinkController() {
     const tokenResult = await settlePromise(() => getToken(resolveRelayClerkTokenOptions()));
     const wantsLink = desired.managedTunnel || desired.publish;
 
-    // A failure after this point may follow a partially applied mutation (e.g.
-    // the link succeeded but the preference update did not), so every exit —
-    // success or failure — refreshes the rendered state to whatever the server
-    // actually holds now.
     if (!wantsLink) {
-      // Unlink works without a relay token — a failed token read must not
-      // leave the user unable to turn T3 Connect off.
       const unlinkResult = await unlinkPrimaryEnvironment({
         target,
         clerkToken: tokenResult._tag === "Success" ? (tokenResult.value ?? null) : null,

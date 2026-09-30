@@ -79,8 +79,6 @@ export function ShowcaseCaptureCoordinator(props: { readonly pathname: string })
   const [orientationSettled, setOrientationSettled] = useState(false);
   const [agentActivityStaged, setAgentActivityStaged] = useState(false);
   const requestedSceneRef = useRef<ShowcaseScene | null>(null);
-  // Staging reads the latest entities without restarting on every shell
-  // update, which would re-enter a permission prompt that is still open.
   const entitiesRef = useRef({ threads, projects });
   useEffect(() => {
     entitiesRef.current = { threads, projects };
@@ -97,9 +95,6 @@ export function ShowcaseCaptureCoordinator(props: { readonly pathname: string })
     const readLaunchRequest = () => {
       const values = getNativeShowcasePairingUrls();
       if (values.length === 0) return;
-      // The palette rides the same launch request as the pairing URLs, so
-      // reading it here settles it without a timeout that could expire while
-      // the request is still on its way.
       setRequestedTheme(getNativeShowcaseTheme());
       setThemeRequestSettled(true);
       setPairingUrls(values);
@@ -136,8 +131,6 @@ export function ShowcaseCaptureCoordinator(props: { readonly pathname: string })
       const value = getNativeShowcaseScene();
       if (!value || requestedSceneRef.current === value) return;
       requestedSceneRef.current = value;
-      // A native draw belongs only to the scene request that produced it. In
-      // particular, revisiting review must wait for its newly mounted surface.
       clearShowcaseRenderSignal();
       setAgentActivityStaged(false);
       setRequestedScene(value);
@@ -147,8 +140,6 @@ export function ShowcaseCaptureCoordinator(props: { readonly pathname: string })
     return () => clearInterval(interval);
   }, []);
 
-  // Captures pick a palette for both color schemes so the requested theme is
-  // used whichever system appearance the runner set on the device.
   const themeApplied =
     requestedTheme === null
       ? themeRequestSettled
@@ -159,7 +150,6 @@ export function ShowcaseCaptureCoordinator(props: { readonly pathname: string })
       !SHOWCASE_ENABLED ||
       requestedTheme === null ||
       themeApplied ||
-      // Writing before stored preferences load would be overwritten by them.
       !appearancePreferencesReady
     ) {
       return;
@@ -188,8 +178,6 @@ export function ShowcaseCaptureCoordinator(props: { readonly pathname: string })
   }, [connectPairingUrl, pairingUrls]);
 
   const routeScene = sceneFromPathname(props.pathname);
-  // Agent activity is captured over the thread list: the runner locks the
-  // simulator or opens the notification shade on top of it.
   const scene =
     requestedScene === "agent-activity" && routeScene === "threads" ? "agent-activity" : routeScene;
   const hasServerFixture =
@@ -243,7 +231,6 @@ export function ShowcaseCaptureCoordinator(props: { readonly pathname: string })
       navigation.dispatch(StackActions.popToTop());
       return;
     }
-    // Follows the environments scene, whose settings sheet popToTop leaves open.
     if (requestedScene === "agent-activity") {
       navigation.dispatch(CommonActions.reset({ index: 0, routes: [{ name: "Home" }] }));
       return;
@@ -300,14 +287,11 @@ export function ShowcaseCaptureCoordinator(props: { readonly pathname: string })
             ? "fixture threads not loaded"
             : await stageShowcaseAgentActivity(activity, now);
         if (outcome === true) return true;
-        // Surfaces in the runner's Metro output when the scene never turns ready.
         if (outcome !== lastOutcome)
           console.warn(`[showcase] agent activity not staged: ${outcome}`);
         lastOutcome = outcome;
         return false;
       },
-      // The first attempt waits on the notification permission prompt until
-      // the runner answers it.
       { isCancelled: () => cancelled, attemptTimeoutMs: 60_000 },
     ).then((staged) => {
       if (!cancelled && staged) setAgentActivityStaged(true);
@@ -324,10 +308,7 @@ export function ShowcaseCaptureCoordinator(props: { readonly pathname: string })
       requestedScene === null ||
       scene !== requestedScene ||
       !hasFixture ||
-      // Never report a scene ready while the capture orientation is still
-      // being applied — a screenshot taken early has the wrong dimensions.
       !orientationSettled ||
-      // Likewise for the palette: an early screenshot shows the default theme.
       !themeApplied ||
       (scene === "agent-activity" && !agentActivityStaged) ||
       !isShowcaseNativeContentReady({ scene, themeId, renderSignal })

@@ -175,8 +175,6 @@ function collectToolbarItems(children: ReactNode): NativeStackHeaderItem[] {
     const item = convertToolbarChild(child);
     if (item) {
       if (item.type === "spacing") {
-        // Native inserts spacing items at `index`, treating a missing index
-        // as 0 — which would move the spacer in front of earlier siblings.
         (item as { index?: number }).index = items.length;
       }
       items.push(item);
@@ -192,7 +190,6 @@ function NativeHeaderToolbarRoot(props: {
   const navigation = useNativeStackNavigation();
   const items = useMemo(() => collectToolbarItems(props.children), [props.children]);
 
-  // Swap toolbar owners before paint so split and compact headers cannot clear each other.
   useLayoutEffect(() => {
     if (!navigation) {
       return;

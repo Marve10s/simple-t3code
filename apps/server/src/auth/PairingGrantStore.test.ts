@@ -172,8 +172,6 @@ it.layer(NodeServices.layer)("PairingGrantStore.layer", (it) => {
     Effect.gen(function* () {
       const bootstrapCredentials = yield* PairingGrantStore.PairingGrantStore;
 
-      // The desktop-bootstrap grant lives for 24h. Within that window
-      // it stays reusable.
       yield* TestClock.adjust(Duration.hours(12));
       const stillValid = yield* bootstrapCredentials.consume("desktop-bootstrap-token");
       expect(stillValid.method).toBe("desktop-bootstrap");

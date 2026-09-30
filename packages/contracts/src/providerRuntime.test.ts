@@ -243,7 +243,6 @@ describe("classifyTaskAgentKind", () => {
   it("agent-owned tasks are background unless themselves agent-flavored", () => {
     expect(classifyTaskAgentKind({ taskType: "local_bash", agentId: "owner" })).toBe("background");
     expect(classifyTaskAgentKind({ taskType: undefined, agentId: "owner" })).toBe("background");
-    // Nested agent: outlives its parent, stays in the roster.
     expect(classifyTaskAgentKind({ taskType: "local_agent", agentId: "owner" })).toBe("agent");
   });
 });

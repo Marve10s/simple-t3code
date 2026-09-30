@@ -53,7 +53,6 @@ export interface ProjectionThreadProposedPlanRepositoryShape {
   readonly upsert: (
     proposedPlan: ProjectionThreadProposedPlan,
   ) => Effect.Effect<void, ProjectionRepositoryError>;
-  /** Read one plan without loading the thread's other plans. */
   readonly getByPlanId: (
     input: GetProjectionThreadProposedPlanInput,
   ) => Effect.Effect<Option.Option<ProjectionThreadProposedPlan>, ProjectionRepositoryError>;

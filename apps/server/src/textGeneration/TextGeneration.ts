@@ -15,17 +15,14 @@ export interface CommitMessageGenerationInput {
   branch: string | null;
   stagedSummary: string;
   stagedPatch: string;
-  /** When true, the model also returns a semantic branch name for the change. */
   includeBranch?: boolean;
   policy?: TextGenerationPolicy | undefined;
-  /** What model and provider to use for generation. */
   modelSelection: ModelSelection;
 }
 
 export interface CommitMessageGenerationResult {
   subject: string;
   body: string;
-  /** Only present when `includeBranch` was set on the input. */
   branch?: string | undefined;
 }
 
@@ -38,7 +35,6 @@ export interface PrContentGenerationInput {
   diffPatch: string;
   changeRequestTemplate?: string | undefined;
   policy?: TextGenerationPolicy | undefined;
-  /** What model and provider to use for generation. */
   modelSelection: ModelSelection;
 }
 
@@ -51,7 +47,6 @@ export interface BranchNameGenerationInput {
   cwd: string;
   message: string;
   attachments?: ReadonlyArray<ChatAttachment> | undefined;
-  /** What model and provider to use for generation. */
   modelSelection: ModelSelection;
 }
 
@@ -63,10 +58,8 @@ export interface ThreadTitleGenerationInput {
   linkedContext?: string | undefined;
   cwd: string;
   message: string;
-  /** Present when replacing an existing title from the current thread history. */
   previousTitle?: string | undefined;
   attachments?: ReadonlyArray<ChatAttachment> | undefined;
-  /** What model and provider to use for generation. */
   modelSelection: ModelSelection;
 }
 
@@ -75,34 +68,21 @@ export interface ThreadTitleGenerationResult {
   needsRefinement?: boolean | undefined;
 }
 
-/**
- * TextGeneration - Service tag for commit and change request text generation.
- */
 export class TextGeneration extends Context.Service<
   TextGeneration,
   {
-    /**
-     * Generate a commit message from staged change context.
-     */
     readonly generateCommitMessage: (
       input: CommitMessageGenerationInput,
     ) => Effect.Effect<CommitMessageGenerationResult, TextGenerationError>;
 
-    /**
-     * Generate change request title/body from branch and diff context.
-     */
     readonly generatePrContent: (
       input: PrContentGenerationInput,
     ) => Effect.Effect<PrContentGenerationResult, TextGenerationError>;
 
-    /**
-     * Generate a concise branch name from a user message.
-     */
     readonly generateBranchName: (
       input: BranchNameGenerationInput,
     ) => Effect.Effect<BranchNameGenerationResult, TextGenerationError>;
 
-    /** Generate a concise thread title from a first message or thread history. */
     readonly generateThreadTitle: (
       input: ThreadTitleGenerationInput,
     ) => Effect.Effect<ThreadTitleGenerationResult, TextGenerationError>;
@@ -133,7 +113,7 @@ const resolveInstance = (
     ),
   );
 
-/** @public Service construction is part of the canonical Effect module API. */
+/** @public */
 export const make = Effect.gen(function* () {
   const registry = yield* ProviderInstanceRegistry.ProviderInstanceRegistry;
   const sourceControl = yield* SourceControlProviderRegistry.SourceControlProviderRegistry;

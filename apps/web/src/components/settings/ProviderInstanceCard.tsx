@@ -120,24 +120,11 @@ function providerEnvironmentsEqual(
   );
 }
 
-/**
- * Read `customModels` from the opaque config blob. The concrete driver
- * schemas type it as `CustomModelSetting[]`, but it arrives here as
- * `Schema.Unknown`, so the shared reader does the shape checking.
- */
 function readConfigCustomModels(config: unknown): ReadonlyArray<CustomModelDefinition> {
   if (config === null || typeof config !== "object") return [];
   return readCustomModelEntries((config as Record<string, unknown>).customModels);
 }
 
-/**
- * Set `key` to an arbitrary value on the opaque config blob. Unlike
- * provider settings field updates, does not drop empty-looking values — the
- * caller is responsible for deciding whether an empty array / empty
- * object should be stored explicitly (e.g. `customModels: []` is a
- * meaningful "user cleared their custom list" state distinct from
- * "driver default").
- */
 function nextConfigBlobWithValue(
   config: unknown,
   key: string,
@@ -149,11 +136,6 @@ function nextConfigBlobWithValue(
   return base;
 }
 
-/**
- * Custom rows come from current settings so name/descriptor edits show
- * instantly; a bare entry falls back to the live row's driver-default
- * capabilities (the server fills those in on its next probe).
- */
 export function deriveProviderModelsForDisplay(input: {
   readonly liveModels: ReadonlyArray<ServerProviderModel> | undefined;
   readonly customModels: ReadonlyArray<CustomModelDefinition>;
@@ -373,20 +355,7 @@ interface ProviderInstanceCardProps {
   readonly onSelect?: (() => void) | undefined;
   readonly readOnly?: boolean | undefined;
   readonly onUpdate: (nextInstance: ProviderInstanceConfig) => void;
-  /**
-   * Pass `undefined` to hide the delete footer entirely. Built-in default
-   * instance slots use `undefined` — they can't be deleted without losing
-   * the slot, and their "reset to defaults" affordance lives on an outer
-   * reset button instead. Explicit `| undefined` in the type accommodates
-   * `exactOptionalPropertyTypes: true`, where an absent key and
-   * `{ onDelete: undefined }` are treated as distinct shapes.
-   */
   readonly onDelete?: (() => void) | undefined;
-  /**
-   * Optional outer reset button rendered next to the driver icon. Built-in
-   * default slots supply a reset-to-factory control here; custom instances
-   * omit it.
-   */
   readonly headerAction?: ReactNode | undefined;
   readonly setup?: ReactNode;
   readonly runtime?: ReactNode;
@@ -401,25 +370,6 @@ interface ProviderInstanceCardProps {
   readonly isUpdating?: boolean | undefined;
 }
 
-/**
- * Renders one provider instance as either a compact selectable list row or
- * the full editor shown beside that list. Both modes use the same enabled
- * state and provider metadata.
- *
- * Behavior notes:
- *   - `liveProvider` is matched by the caller via `instanceId`; when no
- *     match is available (e.g. the server hasn't probed yet, or the
- *     driver is not shipped by the current build) the card still renders
- *     with a neutral "checking" summary.
- *   - Unknown drivers (`driverOption === undefined`) get a read-only
- *     notice instead of editable fields, so fork instances round-trip
- *     without accidentally destroying their config.
- *   - The enabled Switch writes to the envelope's `instance.enabled`
- *     field, which is the single enabled flag: the server folds any legacy
- *     driver-specific `config.enabled` into the envelope on load and both
- *     sides resolve through `resolveProviderInstanceEnabled` (an explicit
- *     false wins, then envelope, then config, then the driver default).
- */
 export function ProviderInstanceCard({
   instanceId,
   instance,
@@ -446,8 +396,6 @@ export function ProviderInstanceCard({
 }: ProviderInstanceCardProps) {
   const enabled = resolveProviderInstanceEnabled(instance);
   const compatibility = enabled ? liveProvider?.compatibilityAdvisory : undefined;
-  // A locally disabled provider reads "Disabled" with a muted dot even if its
-  // last server status is stale. Enabled providers use the server status.
   const statusKey: ProviderStatusKey = enabled
     ? ((liveProvider?.status as ProviderStatusKey | undefined) ?? "warning")
     : "disabled";
@@ -497,18 +445,11 @@ export function ProviderInstanceCard({
     },
   });
 
-  // Narrow `instance.driver` for callers that key on the closed
-  // `ProviderDriverKind` union (e.g. `normalizeModelSlug`'s alias table). Custom
-  // fork drivers pass through as `null` and those callers fall back to
-  // verbatim behaviour.
   const driverKind: ProviderDriverKind | null = isProviderDriverKind(instance.driver)
     ? instance.driver
     : null;
   const customModels =
     instance.driver === "antigravity" ? [] : readConfigCustomModels(instance.config);
-  // Server-returned models may lag behind settings writes. Treat probe
-  // models as the source for built-ins only; custom rows come directly
-  // from the current instance config so add/remove reflects immediately.
   const modelsForDisplay = deriveProviderModelsForDisplay({
     liveModels: liveProvider?.models,
     customModels,
@@ -597,14 +538,12 @@ export function ProviderInstanceCard({
     <code className="text-xs text-muted-foreground">{versionLabel}</code>
   ) : null;
 
-  // Healthy and disabled rows read fine from their text; only trouble gets a dot.
   const statusDotNode =
     statusKey === "warning" || statusKey === "error" ? (
       <span className={cn("size-1.5 shrink-0 rounded-full", statusStyle.dot)} aria-hidden />
     ) : null;
   const needsAttention = statusKey === "warning" || statusKey === "error";
   const statusDiagnostic = hasCompatibilityWarning && needsAttention ? summary.detail : null;
-  // Keep compatibility copy compact; the version popover carries the explanation.
   const inlineStatusDetail = hasCompatibilityWarning
     ? compatibility?.status === "broken"
       ? "Incompatible"

@@ -387,8 +387,6 @@ describe("AssetAccess", () => {
         );
         const savedDirectory = path.join(root, "saved");
         const realpathSpy = vi.mocked(NodeFSP.realpath).mockImplementationOnce(async () => {
-          // A pathname-only guard can see the original parents during realpath,
-          // but the private file during both lstat calls and open.
           await native.unlink(publicDirectory);
           await native.rename(savedDirectory, publicDirectory);
           const canonical = await native.realpath(canonicalPath);
@@ -1131,18 +1129,14 @@ describe("AssetAccess", () => {
         kind: "github-media",
         url: "https://github.com/user-attachments/assets/1a1842fb-6383-492f-873c-57aa0033fa6c",
         cwd: "/repo",
-        // The signed URL's own expiry, which is how long a client may keep the bytes.
         expiresAt: attachment.expiresAt,
       });
 
-      // A `blob` link addresses the page; only the raw host answers a credential with bytes.
       const committed = yield* issue("https://github.com/owner/repo/blob/main/docs/shot.png");
       expect(yield* resolve(committed.relativeUrl)).toMatchObject({
         url: "https://raw.githubusercontent.com/owner/repo/main/docs/shot.png",
       });
 
-      // The pre-`user-attachments` form, Git LFS bytes, and a name no `decodeURIComponent`
-      // accepts all arrive from real bodies.
       const legacy = yield* issue("https://github.com/owner/repo/assets/45952064/1a1842fb");
       expect(yield* resolve(legacy.relativeUrl)).toMatchObject({
         url: "https://github.com/owner/repo/assets/45952064/1a1842fb",

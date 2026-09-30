@@ -50,22 +50,12 @@ export function resolveSidebarRowAccessibility(input: {
   readonly isActive: boolean;
 }): { readonly label: string; readonly current: "page" | undefined } {
   return {
-    // The title is the row's identity and must lead when users scan tasks.
-    // Only static context belongs here; nested action labels remain separate controls.
     label: [input.title, input.statusLabel, input.projectDisplayName].filter(Boolean).join(", "),
     current: input.isActive ? "page" : undefined,
   };
 }
 
-// Visible sidebar rows are prewarmed into the thread-detail cache so opening a
-// nearby thread usually reuses an already-hot subscription. Each prewarmed
-// thread holds a live, fully hydrated detail subscription (all messages and
-// activities, growing as agents work) for as long as the row stays visible,
-// so this limit is a direct renderer-heap and server-load multiplier — keep
-// it small; cold opens still render instantly from the cached snapshot.
 const SIDEBAR_THREAD_PREWARM_LIMIT = 3;
-// A small buffer keeps the next few rows warm without leasing every row that
-// content-visibility leaves mounted below the scroll viewport.
 const SIDEBAR_ROW_SUBSCRIPTION_OVERSCAN_PX = 160;
 
 export function useSidebarRowSubscriptionLease(isActive: boolean): {
@@ -104,9 +94,6 @@ export function useSidebarRowSubscriptionLease(isActive: boolean): {
   };
 }
 
-// A row keeps the last live value it rendered so a released lease never
-// blanks its badge. The value is bound to `key`, so a different worktree or
-// linked pull request cannot reuse the previous one.
 export function useRetainedValue<T>(key: string | null, value: T | null): T | null {
   const retained = React.useRef<{ readonly key: string; readonly value: T } | null>(null);
   if (key !== null && value !== null) {
@@ -116,30 +103,17 @@ export function useRetainedValue<T>(key: string | null, value: T | null): T | nu
   return key !== null && retained.current?.key === key ? retained.current.value : null;
 }
 
-// Sidebar.motion handles ordinary section changes. Sortable transforms own
-// dragging; replaying their committed DOM order would animate the drop twice.
 export const animateSidebarLayoutChanges: AnimateLayoutChanges = (args) =>
   args.isSorting ? defaultAnimateLayoutChanges(args) : false;
 
-// Rows and section markers share one sortable list. The separators resolve
-// the lifecycle action; Sidebar.drag previews the resulting layout. Pinned
-// and active threads keep the dragged position; settled threads use time
-// order. Snoozed rows can leave the shelf, but dropping into it is not
-// supported because snoozing requires a wake time.
-
 export type SidebarSection = "pinned" | "active" | "snoozed" | "settled";
 
-/** Sortable ids: thread rows use their scoped key; structural items use a
-    colon-free prefix: scoped thread keys always contain a colon. */
 const SIDEBAR_MARKER_PREFIX = "sidebar-marker-";
 
 export type SidebarListMarker =
-  /** The top boundary is also a landing target when there are no pins. */
   | "pinned-header"
-  /** Stand-in rows so an empty section has somewhere for the gap to open. */
   | "active-placeholder"
   | "settled-placeholder"
-  /** The boundary between pinned and active rows. */
   | "pinned-divider"
   | "snoozed-header"
   | "settled-header";
@@ -156,10 +130,6 @@ export function sidebarListItemId(item: SidebarListItem): string {
   return item.kind === "thread" ? item.key : sidebarMarkerId(item.marker);
 }
 
-/** The section a slot belongs to, read off the markers around it: from
-    the top down, everything before the pinned divider is pinned, then the
-    inbox until the snoozed header, the shelf until the settled header,
-    then settled. */
 function sectionAtSidebarSlot(items: readonly SidebarListItem[], index: number): SidebarSection {
   let section: SidebarSection = "pinned";
   for (let i = 0; i < index && i < items.length; i += 1) {
@@ -172,8 +142,6 @@ function sectionAtSidebarSlot(items: readonly SidebarListItem[], index: number):
   return section;
 }
 
-/** Resolve the destination section and manual order from an arrayMove across
- * the separators. The snoozed shelf is never a destination. */
 export type SidebarDropTarget = {
   readonly section: "pinned" | "active" | "settled";
   readonly pinnedOrder: readonly string[];
@@ -207,15 +175,11 @@ export function resolveSidebarDropTarget(
 
 export type SidebarThreadDropPlan =
   | { readonly kind: "none" }
-  /** Within the pinned block: the existing key writes. */
   | {
       readonly kind: "reorder-pinned";
       readonly order: readonly string[];
       readonly assignments: ReadonlyArray<{ readonly id: string; readonly orderKey: string }>;
     }
-  /** From another section into the pinned block. Fresh pins take `orderKey`
-      on the pin command. `extraAssignments` land afterward, including the
-      moved row when it was already pinned beneath a snooze. */
   | {
       readonly kind: "pin";
       readonly order: readonly string[];
@@ -232,9 +196,6 @@ export type SidebarThreadDropPlan =
     }
   | { readonly kind: "settle" };
 
-/** What dropping in `to` does to a thread lifted from `from`, for the badge
-    on the lifted row. Null while reordering inside one section and for the
-    snoozed shelf, which cannot be a drop target. */
 export type SidebarDropVerb = "pin" | "unpin" | "settle" | "unsettle" | "wake";
 
 export function resolveSidebarDropVerb(
@@ -252,12 +213,10 @@ export function resolveSidebarDropVerb(
 export function planSidebarThreadDrop(input: {
   readonly activeKey: string;
   readonly activeSection: SidebarSection;
-  /** Snoozed threads can retain pinning and settlement beneath the shelf. */
   readonly activePinned?: boolean;
   readonly activeSettled?: boolean;
   readonly supportsSettlement?: boolean;
   readonly target: SidebarDropTarget;
-  /** All pinned keys in displayed order before the drop. */
   readonly pinnedOrder: readonly string[];
   readonly pinnedKeysById: ReadonlyMap<string, string | null | undefined>;
   readonly reorderableKeys?: ReadonlySet<string>;
@@ -312,7 +271,6 @@ export function planSidebarThreadDrop(input: {
       return activeSection === "settled" ? { kind: "none" } : { kind: "settle" };
     case "pinned": {
       const order = target.pinnedOrder;
-      // Dropped back where it started: nothing to write.
       if (
         activeSection === "pinned" &&
         order.length === pinnedOrder.length &&
@@ -345,8 +303,6 @@ export function planSidebarThreadDrop(input: {
   }
 }
 
-/** Project a drop's lifecycle fields before sorting its destination. Reusing
-    the server's re-entry rules keeps the preview in place when events arrive. */
 export function applySidebarThreadDrop<
   T extends Pick<
     SidebarThreadSummary,
@@ -411,10 +367,6 @@ type LogicalSidebarProject = SidebarProject & {
 
 export type ThreadTraversalDirection = "previous" | "next";
 
-/**
- * Shared-worktree checks must exclude only successful deletions, never the
- * whole batch. A null result skips an entry that the caller can no longer find.
- */
 export async function deleteSelectedThreadEntries<
   TEntry extends { readonly threadKey: string },
 >(input: {
@@ -508,11 +460,6 @@ export function buildBulkTitleRegenerationContextMenuItem(input: {
   };
 }
 
-/**
- * Bulk unpin follows the same "count only what the action will touch" rule
- * as title regeneration: on a mixed selection the label counts the pinned
- * rows alone, and the item disappears when nothing selected is pinned.
- */
 export function buildBulkUnpinContextMenuItem(input: {
   pinnedCount: number;
 }): ContextMenuItem<"unpin"> | null {
@@ -534,9 +481,6 @@ export interface ThreadStatusPill {
   pulse: boolean;
 }
 
-// Rollup order mirrors the per-thread resolver exactly: attention states,
-// then active work, then the actionable plan prompt, then passive
-// monitoring. A Monitoring sibling must never hide a Plan Ready thread.
 const THREAD_STATUS_PRIORITY: Record<ThreadStatusPill["label"], number> = {
   "Pending Approval": 6,
   "Awaiting Input": 5,
@@ -661,11 +605,6 @@ export function shouldClearThreadSelectionOnMouseDown(target: HTMLElement | null
   return !target.closest(THREAD_SELECTION_SAFE_SELECTOR);
 }
 
-// A double-click dispatches two `click` events before `dblclick`: the first has
-// `detail === 1`, the second `detail === 2`. The second click must not run the
-// row's single-click navigation, otherwise double-click-to-rename would also
-// navigate. `MouseEvent.detail` is 0 for synthetic/keyboard activations, which
-// still count as a normal single activation.
 export function isTrailingDoubleClick(detail: number): boolean {
   return detail > 1;
 }
@@ -675,7 +614,6 @@ function nodeClosest(node: object | null, selector: string): unknown {
   return node.closest(selector);
 }
 
-/** Clicks on a nested link keep the link's meaning. The row must not treat them as multi-select. */
 export function isSidebarNestedLinkClick(target: EventTarget | null): boolean {
   if (target == null || typeof target !== "object") return false;
   if (nodeClosest(target, "a[href]") !== null) return true;
@@ -688,10 +626,6 @@ export function isSidebarNestedLinkClick(target: EventTarget | null): boolean {
   return nodeClosest(parent, "a[href]") !== null;
 }
 
-// Shift+click on the new thread button creates directly in the current
-// project, skipping the command palette's project picker. With a single
-// project there is nothing to pick, so a plain click already creates
-// immediately and the modifier changes nothing.
 export function shouldCreateNewThreadInCurrentProject(
   shiftKey: boolean,
   projectGroupCount: number,
@@ -781,13 +715,6 @@ export function isContextMenuPointerDown(input: {
   return input.isMac && input.button === 0 && input.ctrlKey;
 }
 
-// ── Sidebar thread status model ─────────────────────────────────────
-// Five visual states, three colors: color is reserved for "act now"
-// (approval), "in motion" (working), and "broken" (failed). Ready is the
-// unlabeled resting state — the agent stopped and is waiting on the user,
-// whether it finished, asked a question, or proposed a plan.
-// Unread completion is tracked separately: it describes whether a ready
-// thread needs attention, not what the thread is currently doing.
 export type SidebarThreadStatus =
   | "approval"
   | "input"
@@ -826,13 +753,9 @@ export function resolveSidebarThreadStatus(thread: SidebarThreadStatusInput): Si
   if (thread.session?.status === "running" || thread.session?.status === "starting") {
     return "working";
   }
-  // A failed session outranks lingering background liveness: the user must
-  // see the failure, not a stale Working (review finding).
   if (thread.session?.status === "error") {
     return "failed";
   }
-  // Background work outlives the turn: fleets read as working; monitoring
-  // only when watch loops are the sole live work.
   if (thread.backgroundLiveness === "working") {
     return "working";
   }
@@ -842,9 +765,6 @@ export function resolveSidebarThreadStatus(thread: SidebarThreadStatusInput): Si
   return "ready";
 }
 
-/** First VALID timestamp wins: `a ?? b` falls through on null, but a present-
-    yet-malformed string must also fall through to the next candidate rather
-    than sink the row to the epoch. */
 export function firstValidTimestampMs(
   ...candidates: ReadonlyArray<string | null | undefined>
 ): number {
@@ -856,8 +776,6 @@ export function firstValidTimestampMs(
   return 0;
 }
 
-/** String twin of firstValidTimestampMs for callers that need the ISO string
-    (display labels, tick anchors) rather than epoch ms. */
 function firstValidTimestamp(
   ...candidates: ReadonlyArray<string | null | undefined>
 ): string | null {
@@ -870,19 +788,11 @@ function firstValidTimestamp(
 
 export { sortActiveThreadsByOrderKey as sortThreadsForSidebar } from "@t3tools/client-runtime/state/thread-sort";
 
-// Pinned-reorder key math and the keyed sort live in client-runtime
-// (state/thread-sort) so web and mobile compute identical pinned orders.
 export { pinOrderKeyBetween, planPinnedReorder } from "@t3tools/client-runtime/state/thread-sort";
 export { sortPinnedThreadsByOrderKey as sortPinnedThreadsForSidebar } from "@t3tools/client-runtime/state/thread-sort";
 
 const EMPTY_CONTENT_MATCH_KEYS: ReadonlySet<string> = new Set<string>();
 
-/**
- * Search the already-ordered sidebar thread collection by title or linked PR,
- * plus any thread whose messages the server matched (`contentMatchKeys`, keyed
- * by `threadSearchMatchKey`). Keeping the input order means lifecycle ordering
- * (active, snoozed, settled) remains stable while the user narrows the list.
- */
 export function searchSidebarThreads<
   T extends {
     readonly environmentId: EnvironmentId;
@@ -950,10 +860,6 @@ export function reduceSidebarProjectScopeMenuState(
   }
 }
 
-/** The timestamp a working thread's elapsed label counts from: the running
-    turn's start (request time until adoption), falling back to the session's
-    last transition when the turn projection lags behind. Malformed
-    timestamps fall through to the next candidate, not just missing ones. */
 export function resolveWorkingStartedAt(
   thread: Pick<SidebarThreadSummary, "latestTurn" | "session">,
 ): string | null {
@@ -1013,8 +919,6 @@ export function resolveThreadStatusPill(input: {
     };
   }
 
-  // An actionable plan prompt outranks lingering background work: it needs
-  // the user's decision, while liveness merely reports (review finding).
   const hasPlanReadyPrompt =
     !thread.hasPendingUserInput &&
     thread.interactionMode === "plan" &&
@@ -1029,10 +933,6 @@ export function resolveThreadStatusPill(input: {
     };
   }
 
-  // The turn can settle while native background work runs on. Subagent and
-  // workflow fleets read as plain Working; Monitoring is reserved for watch
-  // loops (a parent agent babysitting a PR, tailing checks) with no other
-  // live work. Same recede treatment as Working per inbox-zero.
   if (thread.backgroundLiveness === "working") {
     return {
       label: "Working",
@@ -1135,8 +1035,6 @@ function sortProjectsByActivity<TProject extends SidebarProject>(
     return [...projects];
   }
 
-  // Each project's timestamp walks all of its threads, so compute it once
-  // per project instead of once per comparison.
   return projects
     .map((project) => ({
       project,
@@ -1211,11 +1109,6 @@ export function sortLogicalProjectsForSidebar<
   );
 }
 
-/**
- * Sorts the cross-environment project collection used by landing surfaces.
- * Project ids are only unique within an environment, and archived threads
- * must not make a project appear recently active.
- */
 export function sortScopedProjectsForSidebar<
   TProject extends ScopedSidebarProject,
   TThread extends ScopedSidebarThread,

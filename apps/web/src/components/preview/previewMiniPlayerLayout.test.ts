@@ -15,7 +15,6 @@ import {
 const container = { width: 1_000, height: 700 };
 const source = { width: 1_600, height: 1_000 };
 const gap = PREVIEW_MINI_PLAYER_EDGE_GAP;
-// A centered composer stack with margins on each side.
 const composer = { left: 100, right: 900, height: 150 };
 const obstacles: PreviewMiniPlayerObstacles = { composer };
 const tallComposer: PreviewMiniPlayerObstacles = { composer: { ...composer, height: 300 } };
@@ -118,8 +117,6 @@ describe("resolvePreviewMiniPlayerFrame", () => {
   });
 
   it("keeps a tall frame parked beside the composer across layout passes", () => {
-    // The frame an edge resize produced in the left margin, resolved again from
-    // the stored width and position on the next render.
     const phone = { width: 390, height: 844 };
     const beside = { composer: { left: 300, right: 900, height: 300 } };
     const resized = resizePreviewMiniPlayer({
@@ -229,8 +226,6 @@ describe("resizePreviewMiniPlayer", () => {
   });
 
   it("lets a player beside a tall composer keep its height on an edge drag", () => {
-    // A portrait player parked in the margin left of the composer, already
-    // taller than the rows above the composer, nudged from its right edge.
     const phone = { width: 390, height: 844 };
     const start = { x: 12, y: 100, width: 240, height: 519 };
     const beside = { composer: { left: 300, right: 900, height: 300 } };
@@ -244,7 +239,6 @@ describe("resizePreviewMiniPlayer", () => {
         obstacles: beside,
       }),
     ).toEqual({ x: 12, y: 100, width: 250, height: 541 });
-    // The same drag with the composer under the player is still held above it.
     expect(
       resizePreviewMiniPlayer({
         start: { ...start, x: 400 },

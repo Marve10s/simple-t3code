@@ -16,7 +16,6 @@ const TAILSCALE_STATUS_JSON = JSON.stringify({
   Self: { DNSName: "bb-1.tail1234.ts.net.", TailscaleIPs: ["100.64.1.2"] },
 });
 
-/** Spawner whose `tailscale status --json` exits with the given output. */
 const spawnerLayer = (input: { readonly exitCode: number; readonly stdout: string }) =>
   Layer.succeed(
     ChildProcessSpawner.ChildProcessSpawner,

@@ -33,7 +33,6 @@ let sharedWorkerPool:
     }
   | undefined;
 
-/** Create workers after a viewer commits, then reuse them across short panel closures. */
 function acquireDiffWorkerPool(themeName: DiffThemeName, poolSize: number) {
   const entry = (sharedWorkerPool ??= {
     pool: new WorkerPoolManager(
@@ -94,7 +93,6 @@ function DiffWorkerThemeSync({ themeName }: { themeName: DiffThemeName }) {
   return null;
 }
 
-// Plain-text views do not queue a highlight task that could retry a blank first render.
 function DiffWorkerReady({ children }: { children?: ReactNode }) {
   const workerPool = useWorkerPool();
   const [readyPool, setReadyPool] = useState<WorkerPoolManager>();
@@ -109,7 +107,6 @@ function DiffWorkerReady({ children }: { children?: ReactNode }) {
     const finish = () => {
       if (mounted) setReadyPool(workerPool);
     };
-    // Failed pools use Pierre's existing main-thread highlighter.
     void workerPool.initialize().then(finish, finish);
     return () => {
       mounted = false;

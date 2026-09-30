@@ -15,10 +15,6 @@ import * as DesktopAppSettings from "../settings/DesktopAppSettings.ts";
 import * as DesktopState from "../app/DesktopState.ts";
 import * as DesktopUpdates from "./DesktopUpdates.ts";
 
-/** Shared DesktopUpdates test harness: a fully stubbed updater layer whose
-    electron-updater events are driven by hand via `emit`. Used by
-    DesktopUpdates.test.ts and DesktopRemoteUpdates.test.ts. */
-
 export const flushCallbacks = Effect.yieldNow;
 
 export interface UpdatesHarnessOptions {
@@ -35,7 +31,6 @@ export interface UpdatesHarnessOptions {
   readonly startBackend?: Effect.Effect<void>;
   readonly env?: Record<string, string | undefined>;
   readonly platform?: NodeJS.Platform;
-  /** Contents of the resources/package-type marker a Linux package ships. */
   readonly packageType?: string | undefined;
 }
 
@@ -208,8 +203,6 @@ export function makeHarness(options: UpdatesHarnessOptions = {}) {
         } satisfies DesktopAppSettings.DesktopAppSettings["Service"])
       : DesktopAppSettings.layer;
 
-  // Tracks the restart markers installs leave, so installs stay free of real
-  // disk I/O that would outrun the tests' settle loops.
   const updateRestartMarkers = new Set<string>();
   const fileSystemLayer = FileSystem.layerNoop({
     readFileString: (path) =>

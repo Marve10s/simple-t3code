@@ -65,8 +65,6 @@ it.effect("projects auto-settle opt-out and survives a manual settle", () =>
     );
     expect(disabled.threads[0]?.autoSettleDisabledAt).toBe(now);
 
-    // The flag is independent of the settled lifecycle: settling by hand and
-    // un-settling later must not clear it.
     const settled = yield* projectEvent(
       disabled,
       makeEvent({

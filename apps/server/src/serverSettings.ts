@@ -1,15 +1,3 @@
-/**
- * ServerSettings - Server-authoritative settings service.
- *
- * Owns persistence, validation, and change notification of settings that affect
- * server-side behavior (binary paths, streaming mode, env mode, custom models,
- * text generation model selection).
- *
- * Follows the same pattern as `keybindings.ts`: JSON file + Cache + PubSub +
- * Semaphore + FileSystem.watch for concurrency and external edit detection.
- *
- * @module ServerSettings
- */
 import {
   DEFAULT_TEXT_GENERATION_MODEL,
   DEFAULT_TEXT_GENERATION_MODEL_BY_PROVIDER,
@@ -67,22 +55,11 @@ const decodeServerSettings = Schema.decodeUnknownEffect(ServerSettings);
 const textEncoder = new TextEncoder();
 const textDecoder = new TextDecoder();
 
-/**
- * Fold the legacy in-config `enabled` flag into the envelope-level
- * `ProviderInstanceConfig.enabled` and strip it from the config blob, so
- * explicit provider instances carry exactly one enabled flag. Old settings
- * files can hold both flags with conflicting values; an explicit false on
- * either side wins so a user's disable is never silently undone. Runs on
- * every load and update — the file converges on the next write.
- */
 const foldProviderInstanceEnabledFlags = (settings: ServerSettings): ServerSettings => {
   let changed = false;
   const providerInstances: Record<string, ProviderInstanceConfig> = {};
   for (const [instanceId, instance] of Object.entries(settings.providerInstances)) {
     const config = instance.config;
-    // Only fold boolean flags: a malformed `enabled` (e.g. `"false"`) must
-    // stay in the blob so driver schema validation flags it instead of the
-    // fold silently repairing the config.
     if (
       config === null ||
       typeof config !== "object" ||
@@ -139,11 +116,6 @@ function providerEnvironmentSecretName(input: {
   return `provider-env-${Buffer.from(input.instanceId, "utf8").toString("base64url")}-${Buffer.from(input.name, "utf8").toString("base64url")}`;
 }
 
-/**
- * On disk a hub key or Bitbucket token is replaced by this marker and the
- * real value lives in the secret store, mirroring provider environment
- * secrets. A client that sends the marker back means "keep what you have".
- */
 const SECRET_REDACTED = "\u2022\u2022\u2022\u2022\u2022\u2022";
 
 function usageLimitSourceSecretName(sourceId: string): string {
@@ -184,7 +156,6 @@ export function redactServerSettingsForClient(settings: ServerSettings): ServerS
         : instance,
     ]),
   );
-  // The hub key is a bearer secret; clients only need to know one is set.
   const usageLimitSources = Object.fromEntries(
     Object.entries(settings.usageLimitSources).map(([id, source]) => [
       id,
@@ -205,32 +176,22 @@ export function redactServerSettingsForClient(settings: ServerSettings): ServerS
 export class ServerSettingsService extends Context.Service<
   ServerSettingsService,
   {
-    /** Start the settings runtime and attach file watching. */
     readonly start: Effect.Effect<void, ServerSettingsError>;
 
-    /** Await settings runtime readiness. */
     readonly ready: Effect.Effect<void, ServerSettingsError>;
 
-    /** Read the current settings. */
     readonly getSettings: Effect.Effect<ServerSettings, ServerSettingsError>;
 
-    /** Patch settings and persist. Returns the new full settings object. */
     readonly updateSettings: (
       patch: ServerSettingsPatch,
     ) => Effect.Effect<ServerSettings, ServerSettingsError>;
 
-    /** Stream of settings change events. */
     readonly streamChanges: Stream.Stream<ServerSettings>;
 
-    /**
-     * Acquire a settings change subscription synchronously in the current
-     * fiber. Use this before reading a snapshot when changes between the
-     * snapshot and a lazily started stream must not be lost.
-     */
     readonly subscribeChanges: Effect.Effect<Stream.Stream<ServerSettings>, never, Scope.Scope>;
   }
 >()("t3/serverSettings/ServerSettingsService") {
-  /** @deprecated Import and use `layerTest` from this module. */
+  /** @deprecated */
   static readonly layerTest = (overrides: DeepPartial<ServerSettings> = {}) => layerTest(overrides);
 }
 
@@ -339,9 +300,6 @@ function resolveTextGenerationProvider(settings: ServerSettings): ServerSettings
 }
 
 function fallbackTextGenerationProvider(settings: ServerSettings): ServerSettings {
-  // Same precedence as isModelSelectionProviderEnabled: an explicit provider
-  // instance wins over the legacy providers map, which decodes to defaults
-  // (codex enabled) when the Providers UI has only written providerInstances.
   const fallbackEntry = Object.entries(settings.providers).find(([driver, provider]) => {
     const instance = settings.providerInstances[ProviderInstanceId.make(driver)];
     return instance === undefined ? provider.enabled : resolveProviderInstanceEnabled(instance);
@@ -363,7 +321,6 @@ function fallbackTextGenerationProvider(settings: ServerSettings): ServerSetting
   };
 }
 
-// Values under these keys are compared as a whole — never stripped field-by-field.
 const ATOMIC_SETTINGS_KEYS: ReadonlySet<string> = new Set([
   "backgroundActivity",
   "automaticGitFetchInterval",
@@ -373,7 +330,6 @@ const ATOMIC_SETTINGS_KEYS: ReadonlySet<string> = new Set([
   "pullRequestMergeMethod",
 ]);
 
-// Preserve both enabled states because provider history cannot recover a new opt-in.
 const PERSISTED_SERVER_SETTINGS_DEFAULTS = {
   ...DEFAULT_SERVER_SETTINGS,
   providers: {
@@ -433,19 +389,11 @@ interface LegacyProjectSettingsRow {
   readonly scripts: string;
 }
 
-/**
- * One-time fold of the legacy per-project fields into `projectSettingsOverrides`:
- * the three `project*Overrides` maps and the settings columns on the project
- * aggregate. Keys already present in the generic record win. Marked with
- * `projectSettingsFolded` so a later reset in the UI survives restarts.
- */
 function foldLegacyProjectSettings(
   settings: ServerSettings,
   rows: ReadonlyArray<LegacyProjectSettingsRow>,
 ): ServerSettings {
   if (settings.projectSettingsFolded) return settings;
-  // Nothing to fold yet (fresh install): leave the marker off so the file
-  // stays sparse, and check again on the next load.
   if (
     rows.length === 0 &&
     Object.keys(settings.projectAgentBrowserAccessOverrides).length === 0 &&
@@ -473,8 +421,6 @@ function foldLegacyProjectSettings(
   for (const [projectId, value] of Object.entries(settings.projectAutoPullOverrides)) {
     set(projectId, "defaultAutoPull", value);
   }
-  // A stored null meant "reset to machine defaults", which is now plain
-  // inheritance; the project's own aggregate scripts must not resurface.
   const resetScripts = new Set<string>();
   for (const [projectId, value] of Object.entries(settings.projectScriptOverrides)) {
     if (value === null) resetScripts.add(projectId);
@@ -568,11 +514,6 @@ const make = Effect.gen(function* () {
     ),
   );
 
-  /**
-   * Moves Bitbucket tokens hand-edited into settings.json into the secret store as they load,
-   * so plaintext does not stay on disk. If the store is unavailable, the token keeps working
-   * from the file and the move is retried on the next load.
-   */
   const moveInlineBitbucketTokens = (settings: ServerSettings) =>
     Effect.gen(function* () {
       const bitbucket = { ...settings.bitbucket };
@@ -600,8 +541,6 @@ const make = Effect.gen(function* () {
   const loadSettingsFromDisk = Effect.gen(function* () {
     let settings = DEFAULT_SERVER_SETTINGS;
     let persisted: typeof PersistedOptionalProviderSettings.Type = {};
-    // A file that failed to decode must stay on disk for the user to repair;
-    // the fold below only writes when it started from the file's real contents.
     let settingsFileTrusted = true;
 
     if (yield* readConfigExists) {
@@ -681,7 +620,6 @@ const make = Effect.gen(function* () {
     const folded = settingsFileTrusted
       ? foldLegacyProjectSettings(loaded, legacyProjectRows)
       : loaded;
-    // Only rewrite a file that decoded cleanly; an untrusted one stays for the user to repair.
     const migrated = settingsFileTrusted ? yield* moveInlineBitbucketTokens(folded) : folded;
     if (migrated !== loaded) {
       yield* writeSettingsAtomically(migrated);
@@ -825,7 +763,6 @@ const make = Effect.gen(function* () {
           }
 
           nextSecretKeys.add(secretName);
-          // Match the provider environment's last-value-wins behavior for duplicate names.
           const previous = variable.valueRedacted
             ? current.providerInstances[ProviderInstanceId.make(instanceId)]?.environment?.findLast(
                 (entry) => entry.name === variable.name,
@@ -915,8 +852,6 @@ const make = Effect.gen(function* () {
       for (const field of BITBUCKET_SECRET_FIELDS) {
         let value = bitbucket[field];
         if (value === SECRET_REDACTED) {
-          // The marker keeps what is saved. A plaintext value hand-edited into settings.json
-          // is not in the secret store yet, so move it there instead of dropping it.
           const inline = current.bitbucket[field];
           if (inline === SECRET_REDACTED || inline.length === 0) continue;
           value = inline;
@@ -991,7 +926,6 @@ const make = Effect.gen(function* () {
                 }),
             ),
           );
-          // A store operation may mutate before reporting an error (for example chmod after rename).
           applied.push({ ...change, previousValue });
           yield* (
             change.kind === "write"
@@ -1078,9 +1012,6 @@ const make = Effect.gen(function* () {
 
     const revalidateAndEmitSafely = revalidateAndEmit.pipe(Effect.ignoreCause({ log: true }));
 
-    // Debounce watch events so the file is fully written before we read it.
-    // Editors emit multiple events per save (truncate, write, rename) and
-    // `fs.watch` can fire before the content has been flushed to disk.
     const debouncedSettingsEvents = fs.watch(settingsDir).pipe(
       Stream.filter((event) => {
         return (

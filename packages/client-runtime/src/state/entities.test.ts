@@ -375,8 +375,6 @@ describe("environment entity projections", () => {
     expect(projects).toHaveLength(2);
     expect(threads.every((thread) => thread.environmentId === ENVIRONMENT_ID)).toBe(true);
     expect(threads).toHaveLength(2);
-    // The per-environment atoms still read the cached snapshot, so switching
-    // back on restores the rows without a refetch.
     expect(
       harness.registry.get(harness.projects.environmentProjectsAtom(offEnvironmentId)),
     ).toHaveLength(2);

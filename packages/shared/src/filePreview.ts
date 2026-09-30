@@ -10,7 +10,6 @@ export type FilePreviewKind =
   | "text"
   | "unsupported";
 
-/** Content classification is identical for captured attachments and workspace references. */
 export function filePreviewKind(file: {
   readonly name: string;
   readonly mimeType?: string;
@@ -55,7 +54,6 @@ export function filePreviewKind(file: {
 
 export const FILE_TEXT_PREVIEW_MAX_BYTES = 1024 * 1024;
 
-/** Reject binary data rather than displaying replacement characters as a document. */
 export function decodeFilePreviewText(bytes: Uint8Array, truncated = false) {
   const bounded = bytes.subarray(0, FILE_TEXT_PREVIEW_MAX_BYTES);
   if (bounded.some((byte) => byte === 0))
@@ -113,13 +111,11 @@ const AUDIO_MIME_TYPE_BY_EXTENSION = new Map([
   [".aiff", "audio/aiff"],
 ]);
 
-/** Audio a player can request inline; the server serves these with byte ranges like video. */
 export function audioMimeTypeFromExtension(extension: string): string | null {
   if (!/^\.[a-z0-9]+$/i.test(extension)) return null;
   return AUDIO_MIME_TYPE_BY_EXTENSION.get(extension.toLowerCase()) ?? null;
 }
 
-/** Classifies a literal filesystem extension, without URL decoding or suffix removal. */
 export function mediaMimeTypeFromExtension(extension: string): string | null {
   if (!/^\.[a-z0-9]+$/i.test(extension)) return null;
   return (
@@ -128,7 +124,6 @@ export function mediaMimeTypeFromExtension(extension: string): string | null {
   );
 }
 
-/** Files the server serves in place from anywhere on its host: media, audio and browser documents. */
 export function hostPreviewMimeTypeFromExtension(extension: string): string | null {
   if (!/^\.[a-z0-9]+$/i.test(extension)) return null;
   return (
@@ -139,7 +134,6 @@ export function hostPreviewMimeTypeFromExtension(extension: string): string | nu
   );
 }
 
-/** Classifies an authored media path or URL. Filesystem validation uses the literal extension. */
 export function mediaMimeType(path: string): string | null {
   const trimmed = path.trim();
   const source = trimmed.startsWith("<") && trimmed.endsWith(">") ? trimmed.slice(1, -1) : trimmed;
@@ -156,9 +150,7 @@ export function mediaMimeType(path: string): string | null {
   }
   try {
     sourcePath = decodeURIComponent(sourcePath);
-  } catch {
-    // A literal percent character is valid in a filename.
-  }
+  } catch {}
   const basename = sourcePath.split(/[\\/]/).at(-1) ?? "";
   const extensionIndex = basename.lastIndexOf(".");
   return extensionIndex < 0 ? null : mediaMimeTypeFromExtension(basename.slice(extensionIndex));
@@ -183,7 +175,6 @@ export function isWorkspaceImagePreviewPath(path: string): boolean {
   return hasPreviewExtension(path, WORKSPACE_IMAGE_PREVIEW_EXTENSIONS);
 }
 
-/** File viewers receive literal filesystem paths, not Markdown URLs. */
 export function isWorkspaceVideoPreviewPath(path: string): boolean {
   return videoMimeType({ name: path, mimeType: "" }) !== null;
 }

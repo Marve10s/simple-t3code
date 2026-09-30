@@ -102,11 +102,6 @@ export interface WorkLogEntry {
   toolLifecycleStatus?: WorkLogToolLifecycleStatus;
   sourceActivityKind?: OrchestrationThreadActivity["kind"];
   toolCallId?: string;
-  /**
-   * One row per workflow run or per-turn batch of direct spawns, like web's
-   * "Kicked off N subagents" CTA. Mobile has no Agents sheet, so the row
-   * also carries each agent's terminal state to derive its status label.
-   */
   agentSpawn?: {
     readonly workflowId: string | null;
     readonly agentTaskIds: ReadonlyArray<string>;
@@ -114,7 +109,6 @@ export interface WorkLogEntry {
       readonly title: string;
       readonly status: WorkLogToolLifecycleStatus | undefined;
       readonly detail: string | undefined;
-      /** When this member last reported, so the card can show the newest activity. */
       readonly updatedAt: string;
     }>;
   };
@@ -124,12 +118,9 @@ export interface WorkLogEntry {
 interface DerivedWorkLogEntry extends WorkLogEntry {
   sourceActivityKind: OrchestrationThreadActivity["kind"];
   collapseKey?: string;
-  /** Grouping key for subagent lifecycle rows (one row per agent). */
   taskId?: string;
-  /** The tool call that launched this agent, when the provider reports one. */
   agentSpawnToolCallId?: string;
   isWorkflowCoordinator?: boolean;
-  /** Shell/monitor/plan tasks: ordinary work-log rows, never spawn batches. */
   isBackgroundTask?: boolean;
 }
 
@@ -185,23 +176,12 @@ export type ThreadFeedEntry =
       readonly expanded: boolean;
     }
   | {
-      /**
-       * The turn's single live slot. Web keys its live tool row and its
-       * "Thinking" row identically so the slot updates in place; here the
-       * slot holds "Thinking" whenever no tool row is shimmering, so a tool
-       * failing does not insert a row under the group it lives in.
-       */
       readonly type: "thinking";
       readonly id: string;
       readonly createdAt: string;
       readonly turnId: TurnId | null;
     }
   | {
-      /**
-       * One batch of spawned subagents. Rendered as its own card because a
-       * single-line tool row has no room for what the agents are doing now,
-       * which on a phone is the one thing worth showing.
-       */
       readonly type: "agent-spawn";
       readonly id: string;
       readonly createdAt: string;
@@ -212,9 +192,7 @@ export type ThreadFeedEntry =
     };
 
 export interface AgentSpawnSummary {
-  /** "Locate UNO hand rendering code" for one agent, "3 subagents" for a batch. */
   readonly title: string;
-  /** Latest member activity while working, else the batch outcome. */
   readonly status: string;
   readonly tone: "working" | "completed" | "failed" | "stopped";
   readonly members: ReadonlyArray<{
@@ -233,7 +211,6 @@ export type ThreadFeedLatestTurn = Pick<
 
 type ThreadFeedActivityGroup = Extract<ThreadFeedEntry, { readonly type: "activity-group" }>;
 
-// These keys are immutable inputs. Weak caches release old histories with their source data.
 const activityEntriesCache = new WeakMap<
   ReadonlyArray<OrchestrationThreadActivity>,
   ReadonlyArray<Extract<RawThreadFeedEntry, { readonly type: "activity" }>>
@@ -348,7 +325,6 @@ function resolvePendingUserInputAnswer(
   );
 }
 
-/** Some providers settle agents through task.updated instead of task.completed. */
 const MOBILE_TERMINAL_UPDATE_STATUSES: ReadonlySet<string> = new Set([
   "completed",
   "failed",
@@ -371,15 +347,6 @@ function isTerminalTaskUpdate(activity: OrchestrationThreadActivity): boolean {
   );
 }
 
-/**
- * Quiet-timeline guarantee (mirrors web's session-logic): agent-internal
- * activity lives in the Agents sheet, not the work log. Agent lifecycle rows
- * pass even when bypassed or owned by another agent, because they fold into
- * their spawn batch rather than rendering on their own; that is how Codex
- * children (all bypassed) and Claude workflow members reach the batch row.
- * Terminal rows are kept regardless — with no Agents surface on mobile they
- * are the terminal signal.
- */
 function isAgentInternalActivity(activity: OrchestrationThreadActivity): boolean {
   const payload =
     activity.payload && typeof activity.payload === "object"
@@ -398,8 +365,6 @@ function isAgentInternalActivity(activity: OrchestrationThreadActivity): boolean
     if (!ownedByAgent && payload.timelineBypass !== true) {
       return false;
     }
-    // An agent's own shells stay internal; the agents themselves fold into
-    // their batch. A bypassed batch marker keeps its terminal row.
     if (typeof payload.taskId === "string" && payload.agentKind === "agent") {
       return false;
     }
@@ -411,7 +376,6 @@ function isAgentInternalActivity(activity: OrchestrationThreadActivity): boolean
   return payload.timelineBypass === true || ownedByAgent;
 }
 
-/** Agent (non-background) task.started rows seed spawn batches. */
 function isAgentTaskStartedActivity(activity: OrchestrationThreadActivity): boolean {
   const payload =
     activity.payload && typeof activity.payload === "object"
@@ -426,17 +390,12 @@ function deriveWorkLogEntries(
   const ordered = Arr.sort(activities, activityOrder);
   const entries: DerivedWorkLogEntry[] = [];
   for (const activity of foldUserInputActivities(ordered)) {
-    // The setup card owns its snapshot, including failed and cancelled outcomes.
     if (
       isWorktreeSetupActivity(activity.kind) &&
       (activity.tone !== "error" || activity.kind === "worktree-setup")
     )
       continue;
     if (activity.kind === "tool.started") continue;
-    // Like web: an agent's task.started row anchors its batch. It has a fixed
-    // id and timestamp, unlike progress ticks, whose stable per-task id is
-    // rewritten with a new createdAt on every update (and would otherwise
-    // make the batch row a "fresh" row again on each tick).
     if (activity.kind === "task.started" && !isAgentTaskStartedActivity(activity)) continue;
     if (activity.kind === "task.updated" && !isTerminalTaskUpdate(activity)) continue;
     if (activity.kind === "tool.progress") continue;
@@ -450,10 +409,6 @@ function deriveWorkLogEntries(
   return collapseDerivedWorkLogEntries(entries);
 }
 
-/** Adapters forward unknown wire-only SDK messages (background_tasks_changed,
- *  commands_changed, ...) as runtime warnings. The suffix comes from
- *  describeUnknownSdkMessage in the Claude adapter; a row with no displayable
- *  text carries nothing a user can act on, so it does not render. */
 function isNoContentRuntimeWarning(activity: OrchestrationThreadActivity): boolean {
   return (
     activity.kind === "runtime.warning" &&
@@ -484,7 +439,6 @@ function toDerivedWorkLogEntry(activity: OrchestrationThreadActivity): DerivedWo
   const changedFiles = extractChangedFiles(payload);
   const title = extractToolTitle(payload);
   const toolPresentation = extractToolActivityPresentation(payload);
-  // Terminal task updates carry identity so they replace each child's progress row.
   const isTaskActivity =
     activity.kind === "task.started" ||
     activity.kind === "task.progress" ||
@@ -618,8 +572,6 @@ function toDerivedWorkLogEntry(activity: OrchestrationThreadActivity): DerivedWo
   ) {
     toolLifecycleStatus = activity.tone === "error" ? "failed" : "completed";
   }
-  // A Codex child that finishes its turn reports "idle" (resumable, not
-  // terminal). For the batch row that is a finished member.
   if (!toolLifecycleStatus && isTaskActivity && payload?.status === "idle") {
     toolLifecycleStatus = "completed";
   }
@@ -633,11 +585,6 @@ function toDerivedWorkLogEntry(activity: OrchestrationThreadActivity): DerivedWo
   return entry;
 }
 
-/**
- * Spawn-group key for a subagent lifecycle row. Workflow members and their
- * coordinator share the coordinator's group; direct spawns batch per turn.
- * Same keys as web's session-logic so both clients fold the same rows.
- */
 function agentSpawnGroupKey(entry: DerivedWorkLogEntry): string {
   const taskId = entry.taskId ?? "";
   const workflowSlot = taskId.indexOf(":wf:");
@@ -646,19 +593,12 @@ function agentSpawnGroupKey(entry: DerivedWorkLogEntry): string {
   return entry.turnId ? `direct:${entry.turnId}` : `direct:task:${taskId}`;
 }
 
-/**
- * The batch row keeps the group's anchor identity (id, createdAt, turnId,
- * label) so it renders where the run launched instead of drifting to the
- * newest progress tick, and gains each member's latest lifecycle state.
- */
 function agentSpawnRow(
   anchor: DerivedWorkLogEntry,
   workflowId: string | null,
   agentTaskIds: ReadonlyArray<string>,
   members: NonNullable<WorkLogEntry["agentSpawn"]>["agents"],
 ): DerivedWorkLogEntry {
-  // A finished coordinator settles members that never reported their own
-  // end; Claude stops synthesizing member ticks once the workflow is done.
   const coordinator = workflowId === null ? undefined : members[agentTaskIds.indexOf(workflowId)];
   const agents =
     coordinator?.status !== undefined && coordinator.status !== "inProgress"
@@ -669,12 +609,9 @@ function agentSpawnRow(
         )
       : members;
   const agentSpawn = { workflowId, agentTaskIds, agents };
-  // The batch row has no detail of its own: its body lists the members.
   const { detail: _detail, ...anchorWithoutDetail } = anchor;
   return {
     ...anchorWithoutDetail,
-    // The row's own lifecycle is the batch's: live while any member is, then
-    // the worst terminal state, so the group summary and shimmer follow it.
     toolLifecycleStatus: agentSpawnLifecycleStatus(agents),
     agentSpawn,
   };
@@ -730,17 +667,10 @@ function collapseDerivedWorkLogEntries(
   entries: ReadonlyArray<DerivedWorkLogEntry>,
 ): DerivedWorkLogEntry[] {
   const collapsed: DerivedWorkLogEntry[] = [];
-  // Task rows collapse by identity, not adjacency (quiet-timeline guarantee;
-  // mirrors web's session-logic). Background tasks keep one row per taskId;
-  // agent spawns fold into one row per spawn group, decided at the FIRST row
-  // seen for a taskId because later rows can arrive under synthetic turns.
   const taskRowIndex = new Map<string, number>();
   const spawnRowIndex = new Map<string, number>();
   const spawnGroupByTaskId = new Map<string, string>();
   const toolLifecycleRowIndex = new Map<string, number>();
-  // Tool calls that launched an agent (Claude's Agent tool, ACP subagent
-  // calls). The batch card is the whole story of that call, so its own
-  // lifecycle row is dropped.
   const spawnToolCallIds = new Set(
     entries.flatMap((entry) =>
       entry.agentSpawnToolCallId !== undefined ? [entry.agentSpawnToolCallId] : [],
@@ -1010,11 +940,6 @@ function buildWorkEntryExpandedBody(entry: WorkLogEntry): string | null {
   return blocks.length > 0 ? blocks.join("\n\n") : null;
 }
 
-/**
- * Even single-line details can be truncated by the available screen width.
- * Cheap field checks come first so large tool payloads are not serialized
- * for every row (see the deferred-expansion test).
- */
 function workEntryCanExpand(entry: WorkLogEntry): boolean {
   if (entry.questionAnswer) return true;
   if (entry.agentSpawn) return agentSpawnMembers(entry.agentSpawn).length > 0;
@@ -1033,7 +958,6 @@ function stripShellWrapper(value: string): string {
   return (match?.[1] ?? trimmed).trim();
 }
 
-/** Expanded rows retain detail formatting; commands stay in the separate body. */
 export function workEntryRowLabel(entry: WorkLogEntry, expanded = false): string {
   if (entry.agentSpawn) return agentSpawnLabel(entry.agentSpawn);
   const presentation = resolveWorkEntryToolPresentation(entry);
@@ -1078,12 +1002,6 @@ function capitalizePhrase(value: string): string {
   return `${trimmed.charAt(0).toUpperCase()}${trimmed.slice(1)}`;
 }
 
-/**
- * Batch label for a spawn row, matching web's CTA wording. Web reads live
- * agent state from its Agents panel; mobile has only the lifecycle states
- * folded into the row, so "working" means a member has not reported a
- * terminal state yet.
- */
 export function agentSpawnLabel(spawn: NonNullable<WorkLogEntry["agentSpawn"]>): string {
   const members = agentSpawnMembers(spawn);
   const count = Math.max(members.length, 1);
@@ -1100,7 +1018,6 @@ export function agentSpawnLabel(spawn: NonNullable<WorkLogEntry["agentSpawn"]>):
   return `Ran ${subjects} · ${status}`;
 }
 
-/** Workflow coordinators sit in their own batch but are not a member. */
 function agentSpawnMembers(spawn: NonNullable<WorkLogEntry["agentSpawn"]>) {
   return spawn.agents.filter((_, index) => spawn.agentTaskIds[index] !== spawn.workflowId);
 }
@@ -1120,12 +1037,6 @@ function agentSpawnTone(status: WorkLogToolLifecycleStatus | undefined): AgentSp
   }
 }
 
-/**
- * What the spawn card shows. While members work, the status line is the
- * newest member activity (its progress detail), so the card reads like the
- * live tool row does for a single call. Once every member settles, it is the
- * batch outcome in web's CTA wording.
- */
 export function agentSpawnSummary(
   spawn: NonNullable<WorkLogEntry["agentSpawn"]>,
   batchStatus: WorkLogToolLifecycleStatus | undefined,
@@ -1141,8 +1052,6 @@ export function agentSpawnSummary(
     };
   });
   const tone = agentSpawnTone(batchStatus);
-  // A workflow's coordinator is not a member; before any member reports the
-  // batch has none.
   const title =
     members.length === 0
       ? "Subagents"
@@ -1163,7 +1072,6 @@ export function agentSpawnSummary(
       (members.length > 1 ? `${working.length} of ${members.length} working` : "Working");
     return { title, status, tone, members };
   }
-  // The batch tone covers a coordinator that failed or stopped on its own.
   const failed = members.filter((member) => member.tone === "failed").length;
   const stopped = members.filter((member) => member.tone === "stopped").length;
   const outcome =
@@ -1571,7 +1479,6 @@ function groupAdjacentActivities(entries: ReadonlyArray<RawThreadFeedEntry>): Th
   };
 
   for (const entry of entries) {
-    // Skip empty messages so they don't break activity grouping.
     if (isEmptyMessage(entry)) {
       continue;
     }
@@ -1658,10 +1565,6 @@ function deriveThreadFeedTurnFolds(
       pendingUserBoundary = entry.message.createdAt;
       continue;
     }
-    // Thinking is work, so it folds with the rest of it. A provider that
-    // interleaves a block with every tool call would otherwise leave dozens of
-    // "Thought" rows standing beside the "Worked for ..." summary.
-    // Nothing folds while the turn is live, which is when traces are watched.
     const turnId =
       entry.type === "message" &&
       (entry.message.role === "assistant" || entry.message.role === "reasoning")
@@ -1691,9 +1594,6 @@ function deriveThreadFeedTurnFolds(
     if (turnId === unsettledTurnId) {
       continue;
     }
-    // A live turn is already excluded above, so only an answer still being
-    // written may hold a fold open. A thinking block stranded by a crashed
-    // provider keeps its streaming flag forever and must not.
     if (
       entries.some(
         (entry) =>
@@ -1718,10 +1618,6 @@ function deriveThreadFeedTurnFolds(
     if (hiddenEntryIds.size === 0) {
       continue;
     }
-    // A lone compaction row stays visible on its own; it only folds away as
-    // part of a turn that already folds other work. Thinking is the same: a
-    // question answered by thought alone keeps its "Thought" row
-    // rather than collapsing behind a "Worked for ..." that hides nothing else.
     const hidesFoldableWork = entries.some(
       (entry) =>
         hiddenEntryIds.has(entry.id) &&
@@ -1872,19 +1768,12 @@ export function deriveThreadFeedPresentation(
       );
     }
   }
-  // A working turn always shows one live activity. When no tool row is
-  // shimmering (no tools yet, or the latest failed), that row is "Thinking".
-  // The trailing group's live row and this row share LIVE_ACTIVITY_ROW_ID, so
-  // the handoff between them happens in place (one row, new content) instead
-  // of a row being inserted below the group every time a call fails.
   if (
     activeWorkStartedAt !== null &&
     !result.some(
       (row) =>
         (row.type === "work-toggle" && row.shimmer) ||
         row.id === LIVE_ACTIVITY_ROW_ID ||
-        // A working spawn card is the live activity: its status line shows
-        // what the agents are doing, so a Thinking row under it would lie.
         (row.type === "agent-spawn" &&
           row.summary.tone === "working" &&
           row.turnId === unsettledTurnId),
@@ -1955,7 +1844,6 @@ function appendMixedActivityRun(
     entry.type === "activity-group" ? entry.activities : [],
   );
   const trailingGroup = history.at(-1);
-  // A missing completion before the latest thought must not reclaim the live line.
   const summaryActivities =
     live && trailingGroup?.type === "activity-group" ? trailingGroup.activities : activities;
   const toolRows: ThreadFeedEntry[] = [];
@@ -2043,11 +1931,6 @@ function groupConsecutiveReasoningMessages(
   return result;
 }
 
-/**
- * Shared by the trailing tool group's live row and the "Thinking" row so the
- * list keeps one mounted row for the turn's live slot (mirrors web's
- * LIVE_ACTIVITY_ROW_ID). Anything keyed by row id must not distinguish them.
- */
 export const LIVE_ACTIVITY_ROW_ID = "live-activity-row";
 
 function thinkingRow(createdAt: string, turnId: TurnId | null) {
@@ -2137,8 +2020,6 @@ function appendActivityGroupRows(
     }
     flushGroupableRun(false);
     if (spawn !== undefined) {
-      // Keyed by the batch, not the anchor activity: the anchor can change
-      // as members arrive, and a changed key remounts the card.
       const groupId = `agent-spawn:${spawn.workflowId ?? activity.turnId ?? spawn.agentTaskIds[0]}`;
       result.push({
         type: "agent-spawn",
@@ -2207,10 +2088,6 @@ function appendToolGroupRows(
   const active = latestActiveActivity !== undefined;
   const live = activeTail || active;
   const latestActivity = latestActiveActivity ?? activities.at(-1)!;
-  // Like web, the trailing run keeps shining after its latest call succeeds;
-  // only a failed, declined, or stopped call hands the live slot to "Thinking".
-  // Only the trailing run can be the turn's live slot; an in-progress row in
-  // an earlier run (a call whose end was never reported) stays in place.
   const shimmer = activeTail && (active || latestActivity.status === "success");
   const singleActivity = activities.length === 1 ? latestActivity : null;
   const summary = live
@@ -2252,8 +2129,6 @@ function appendToolGroupRows(
       : undefined;
   result.push({
     type: "work-toggle",
-    // The shimmering trailing row is the turn's live slot; it keeps that
-    // identity (and so its mounted view) until "Thinking" takes the slot.
     id: shimmer ? LIVE_ACTIVITY_ROW_ID : `${live ? "work-live" : "work-toggle"}:${groupId}`,
     createdAt: sourceGroup.createdAt,
     turnId: sourceGroup.turnId,

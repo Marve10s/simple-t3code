@@ -15,7 +15,6 @@ export interface SourceControlLinkSubject {
   readonly body: string | null;
 }
 
-/** Return undefined synchronously for unsupported URLs, without starting a lookup. */
 export type ResolveSourceControlLink = (input: {
   readonly cwd: string;
   readonly url: URL;
@@ -25,7 +24,6 @@ export interface SourceControlProviderContext {
   readonly provider: SourceControlProviderInfo;
   readonly remoteName: string;
   readonly remoteUrl: string;
-  /** An explicit web authority can disambiguate Forgejo logins sharing an SSH alias. */
   readonly requestedHost?: string;
 }
 
@@ -37,11 +35,6 @@ export interface SourceControlRefSelector {
 
 const MAX_ERROR_TRANSPORT_VALUE_LENGTH = 256;
 
-/**
- * Sanitizes user-provided source-control identifiers before attaching them to
- * contract errors. This is intentionally narrower than request validation: it
- * only strips URL secrets and bounds diagnostic values sent over transport.
- */
 export function transportSafeSourceControlErrorValue(value: string): string {
   let printable = "";
   for (const character of value) {
@@ -58,9 +51,7 @@ export function transportSafeSourceControlErrorValue(value: string): string {
     url.search = "";
     url.hash = "";
     safe = url.toString();
-  } catch {
-    // Plain repository and change-request identifiers are not URLs.
-  }
+  } catch {}
 
   return safe.slice(0, MAX_ERROR_TRANSPORT_VALUE_LENGTH);
 }
@@ -96,7 +87,6 @@ export class SourceControlProvider extends Context.Service<
   SourceControlProvider,
   {
     readonly kind: SourceControlProviderKind;
-    /** Optional capability for issue and change-request subjects. */
     readonly resolveLink?: ResolveSourceControlLink;
     readonly listChangeRequests: (input: {
       readonly cwd: string;

@@ -43,7 +43,6 @@ interface ResolvedTarget {
   readonly url: string;
 }
 
-/** The project's host and provider supply defaults for a repository-and-number input. */
 function projectHostAndProvider(project: OrchestrationProjectShell | undefined): {
   readonly host: string | null;
   readonly kind: SourceControlProviderKind | null;
@@ -57,12 +56,6 @@ function projectHostAndProvider(project: OrchestrationProjectShell | undefined):
   };
 }
 
-/**
- * Turns whichever shape the agent passed into one host-level identity. A URL
- * wins outright; otherwise the repository and number are completed with the
- * thread's project host, which is where an agent working in that checkout
- * almost always opened the pull request.
- */
 const resolveTarget = Effect.fn("PullRequestsToolkit.resolveTarget")(function* (
   input: PullRequestTargetInput,
   project: OrchestrationProjectShell | undefined,
@@ -85,7 +78,6 @@ const resolveTarget = Effect.fn("PullRequestsToolkit.resolveTarget")(function* (
   const repository = input.repository.toLowerCase();
   const url =
     changeRequestUrlFor(
-      // The project's kind only describes its own host; another host gets no URL guess.
       host === projectHost.host ? projectHost.kind : null,
       host,
       repository,
@@ -127,7 +119,6 @@ function entryOf(
   };
 }
 
-/** What the tools report from a thread shell; exported so the shape is testable without a layer. */
 export function listThreadPullRequests(
   thread: Pick<OrchestrationThreadShell, "pullRequests">,
 ): ListThreadPullRequestsResult {
@@ -207,8 +198,6 @@ const make = Effect.gen(function* () {
           })
           .pipe(
             Effect.as(false),
-            // The decider rejects a second link of the same PR; for the agent that is
-            // the outcome it asked for, not an error.
             Effect.catchTags({ OrchestrationCommandInvariantError: () => Effect.succeed(true) }),
             Effect.catchCause(dispatchFailure(PullRequestLinkFailedError)),
           );

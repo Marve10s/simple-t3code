@@ -8,7 +8,6 @@ interface RecordingDecorationOptions {
   readonly frameRate: number;
 }
 
-/** Decorates a detached canvas; no recording UI is inserted into the preview page. */
 export async function createRecordingCompositor(
   source: MediaStream,
   options: RecordingDecorationOptions,
@@ -74,7 +73,6 @@ export async function createRecordingCompositor(
   }
 }
 
-/** Keeps input timing and coordinates independent of native video frame delivery. */
 export class RecordingDecorations {
   private ring: {
     x: number;
@@ -139,7 +137,6 @@ export class RecordingDecorations {
   }
 
   draw(context: CanvasRenderingContext2D, width: number, height: number, now: number) {
-    // Guest coordinates are CSS pixels; native frames include zoom and display scale.
     const scale = width / (this.key?.width ?? this.ring?.width ?? 1280);
     const ring = this.ring;
     if (ring && (ring.held || (ring.releasedAt !== null && now < ring.releasedAt + 600))) {

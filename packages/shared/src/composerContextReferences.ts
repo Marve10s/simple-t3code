@@ -7,12 +7,6 @@ import {
   type KnownComposerContextRecord,
 } from "@t3tools/contracts";
 
-/**
- * Canonical inline reference: `[label](t3-context://v1/<kind>/<contextId>)`, or the image
- * form `![label](...)`. The link carries position and identity only; the payload lives in the
- * message's context records. Labels are display text and never identity.
- */
-
 const CONTEXT_PROTOCOL = "t3-context:";
 const COMPOSER_CONTEXT_HREF_PREFIX = `${CONTEXT_PROTOCOL}//v1/`;
 const CONTEXT_KIND_PATTERN = /^[a-z][a-z0-9-]{0,39}$/;
@@ -39,7 +33,6 @@ export function parseComposerContextHref(
   return { kind, contextId: contextId as ComposerContextId };
 }
 
-/** Labels must survive a Markdown link: no brackets or line breaks, bounded, never empty. */
 export function sanitizeComposerContextLabel(label: string, kind: ComposerContextKind): string {
   const cleaned = label
     .replace(/[[\]\\\r\n]/g, " ")
@@ -63,7 +56,6 @@ export interface ComposerContextReferenceOccurrence {
   kind: ComposerContextKind;
   contextId: ComposerContextId;
   label: string;
-  /** Whether the occurrence used the `![...]` image form. */
   image: boolean;
   source: string;
   start: number;
@@ -74,8 +66,6 @@ export function collectComposerContextReferences(
   text: string,
 ): ComposerContextReferenceOccurrence[] {
   const occurrences: ComposerContextReferenceOccurrence[] = [];
-  // No link can match without the protocol prefix; skip the scan entirely on
-  // plain prose so long messages never pay for a regex walk per `[`.
   if (!text.includes("](t3-context:")) return occurrences;
   for (const match of text.matchAll(CONTEXT_LINK)) {
     const parsed = parseComposerContextHref(match[3]!);
@@ -105,10 +95,6 @@ export function replaceComposerContextReferences(
   return result + text.slice(cursor);
 }
 
-// ---------------------------------------------------------------------------
-// Provider projection
-// ---------------------------------------------------------------------------
-
 const CONTEXT_ENVELOPE_TAG = "t3_context";
 const CONTEXT_ENTRY_TAG = "context";
 
@@ -117,7 +103,6 @@ function kindDisplayName(kind: ComposerContextKind): string {
   return spaced.charAt(0).toUpperCase() + spaced.slice(1);
 }
 
-/** `[Image: shot.png; ref=ctx_1]` — readable in place, with the id the payload is keyed by. */
 export function formatComposerContextProviderMarker(
   kind: ComposerContextKind,
   label: string,
@@ -130,10 +115,6 @@ export function formatComposerContextProviderMarker(
   return `[${kindDisplayName(kind)}: ${escapeComposerContextPayloadText(cleanLabel)}; ref=${contextId}]`;
 }
 
-/**
- * Captured text is data. A terminal line or PR comment that contains `</t3_context>` or
- * `</context>` must not be able to close the envelope and forge a record.
- */
 function escapeComposerContextPayloadText(text: string): string {
   return text.replace(
     new RegExp(String.raw`<(?=/?(?:${CONTEXT_ENVELOPE_TAG}|${CONTEXT_ENTRY_TAG})\b)`, "gi"),
@@ -178,7 +159,6 @@ function formatElementDetails(element: ElementContextDetails): string[] {
   return lines;
 }
 
-/** Body lines for one payload, including authoritative paths and names behind display labels. */
 function formatComposerContextProviderPayload(record: KnownComposerContextRecord): string {
   switch (record.kind) {
     case "image":
@@ -250,11 +230,6 @@ function formatEnvelopeEntry(
   return `${open}>\n${escapeComposerContextPayloadText(body)}\n</${CONTEXT_ENTRY_TAG}>`;
 }
 
-/**
- * What the provider reads: every reference becomes an in-place marker, and each unique
- * referenced payload appears once in a trailing envelope, in first-reference order.
- * Unreferenced records are not emitted. Binary attachments travel on their own channel.
- */
 export function projectComposerContextForProvider(input: {
   text: string;
   records: ReadonlyArray<ComposerContextRecord>;
@@ -263,7 +238,6 @@ export function projectComposerContextForProvider(input: {
   if (occurrences.length === 0) return input.text;
   const recordsById = new Map<ComposerContextId, ComposerContextRecord | undefined>();
   for (const record of input.records) {
-    // Even callers that bypass the wire schema must not silently select an ambiguous payload.
     recordsById.set(record.contextId, recordsById.has(record.contextId) ? undefined : record);
   }
   const body = replaceComposerContextReferences(input.text, (occurrence) =>

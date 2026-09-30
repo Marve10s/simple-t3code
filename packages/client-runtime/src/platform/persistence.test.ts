@@ -11,9 +11,6 @@ import * as Arbitrary from "effect/unstable/arbitrary/Arbitrary";
 
 import { encodeShellSnapshotForCache } from "./persistence.ts";
 
-// Generated values can hold untrimmed strings, which a decoded value never
-// has. One encode and decode gives a value a client can hold; values that
-// fail are dropped. Size 30 makes the generator fill optional fields.
 const sampleDecoded = <S extends Schema.Constraint>(schema: S) =>
   Effect.gen(function* () {
     const encode = Schema.encodeEffect(schema);
@@ -36,8 +33,6 @@ describe("encodeShellSnapshotForCache", () => {
       const projects = yield* sampleDecoded(OrchestrationProjectShell);
       const snapshot: OrchestrationShellSnapshot = {
         snapshotSequence: 1,
-        // The generator rarely makes monogram icons, and they are the one
-        // project field whose encoding differs from the decoded value.
         projects: projects.map((project, index) =>
           index % 2 === 0
             ? { ...project, projectIcon: { kind: "monogram", text: "T3", color: "blue" } }

@@ -1,4 +1,3 @@
-/** Allow time to deliver an overlay failure before the broker times out. */
 export const PREVIEW_HOST_RESPONSE_MARGIN_MS = 1_500;
 
 const HOST_RESPONSE_MARGIN_FRACTION = 0.2;
@@ -14,7 +13,6 @@ export function resolveHostWaitBudgetMs(requestTimeoutMs: number): number {
   return Math.max(0, requestTimeoutMs - reservedMs);
 }
 
-/** Both readiness probes and polling delays share the request's host deadline. */
 export async function waitForHostReadiness(
   deadlineMs: number,
   isReady: () => Promise<boolean>,

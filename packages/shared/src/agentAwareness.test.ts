@@ -117,10 +117,6 @@ describe("projectThreadAwareness", () => {
       thread: thread({ latestTurn: finishedTurn }),
     });
 
-    // Session teardown settles still-running turns by session status, and
-    // that write can race turn.completed; the completion timestamp is the
-    // durable signal. Without this the thread resolves to null persistently
-    // and gets tombstoned off the lock-screen card instead of showing Done.
     expect(state?.phase).toBe("completed");
 
     const trulyInterrupted = projectThreadAwareness({
@@ -132,9 +128,6 @@ describe("projectThreadAwareness", () => {
   });
 
   it("projects ready sessions with no materialized turn as completed", () => {
-    // Quick threads without code changes never get a checkpoint, so the SQL
-    // shell has no latestTurn row and latest_turn_id is cleared when the
-    // session settles; the ready session is the only completion signal left.
     const state = projectThreadAwareness({
       environmentId: "env-1" as EnvironmentId,
       project,

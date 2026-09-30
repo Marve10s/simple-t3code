@@ -29,7 +29,6 @@ const EMPTY_ENVIRONMENT_SHELL_STATE_ATOM = Atom.make(
   }),
 ).pipe(Atom.withLabel("mobile-environment-shell:empty"));
 
-/** Reads one environment's shell projection without waiting on other environments. */
 export function useEnvironmentShellState(environmentId: EnvironmentId | null) {
   const result = useAtomValue(
     environmentId === null

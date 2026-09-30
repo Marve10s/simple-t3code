@@ -60,8 +60,6 @@ type ThreadPatch = Partial<Omit<OrchestrationThread, "id" | "projectId">>;
 const MAX_THREAD_MESSAGES = 2_000;
 const MAX_THREAD_CHECKPOINTS = 500;
 
-// Async questions can stay open while the agent produces more activity.
-// Match the database snapshot's pending-question retention.
 function retainThreadActivities(activities: OrchestrationThread["activities"]) {
   const recentStart = activities.length - 500;
   if (recentStart <= 0) return activities;
@@ -81,24 +79,15 @@ function retainThreadActivities(activities: OrchestrationThread["activities"]) {
     (activity, index) =>
       index >= recentStart ||
       pendingActivities.has(activity) ||
-      // The worktree setup record is upserted under one id for the thread's
-      // whole life and is the only durable copy of a running setup; an async
-      // setup script can outlast a chatty first turn.
       activity.kind === WORKTREE_SETUP_ACTIVITY_KIND,
   );
 }
 
 function checkpointStatusToLatestTurnState(status: "ready" | "missing" | "error") {
   if (status === "error") return "error" as const;
-  // Match SQL and client projections: a missing git ref is not an interruption.
   return "completed" as const;
 }
 
-/**
- * Turn state to settle a still-running latest turn with when its session
- * leaves the "running" status, or null while the session is (re)starting or
- * running and the turn must stay unsettled.
- */
 function settledTurnStateForSessionStatus(
   status: OrchestrationSession["status"],
 ): "completed" | "interrupted" | "error" | null {
@@ -117,8 +106,6 @@ function settledTurnStateForSessionStatus(
   }
 }
 
-// Runs for every thread event (including streaming deltas) against every
-// thread the server has ever seen, so copy the array rather than map it.
 function updateThread(
   threads: ReadonlyArray<OrchestrationThread>,
   threadId: ThreadId,
@@ -128,7 +115,6 @@ function updateThread(
   return index === -1 ? threads : patchThreadAt(threads, index, patch);
 }
 
-/** For callers that already located the thread and must not scan again. */
 function patchThreadAt(
   threads: ReadonlyArray<OrchestrationThread>,
   index: number,
@@ -139,7 +125,6 @@ function patchThreadAt(
   return next;
 }
 
-/** Patch that swaps a thread's links and re-derives the legacy single-PR field from them. */
 function pullRequestsPatch(
   thread: Pick<OrchestrationThread, "projectId">,
   pullRequests: ReadonlyArray<ThreadPullRequestLink>,
@@ -172,11 +157,6 @@ function removePullRequestLink(
   return pullRequests.filter((entry) => !threadPullRequestKeysEqual(entry, key));
 }
 
-/**
- * Host for a legacy `linkedPullRequest` being replayed into the link array.
- * Legacy links never carried one; the project's canonical key
- * (`<host>/<owner>/<name>`) is the best witness, then the link URL.
- */
 function legacyPullRequestHost(
   project: OrchestrationProject | undefined,
   linked: ThreadLinkedPullRequest,
@@ -196,8 +176,6 @@ function legacyLinkToPullRequests(
   linked: ThreadLinkedPullRequest | null,
   linkedAt: string,
 ): ReadonlyArray<ThreadPullRequestLink> {
-  // The legacy field held one user-chosen link, so null clears exactly the
-  // manual ones and leaves created/agent/stack links alone.
   const withoutManual = thread.pullRequests.filter((entry) => entry.source !== "manual");
   if (linked === null) return withoutManual;
   return upsertPullRequestLink(withoutManual, {
@@ -533,9 +511,6 @@ export function projectEvent(
             threads: updateThread(nextBase.threads, payload.threadId, {
               settledOverride: payload.reason === "user" ? "active" : null,
               settledAt: null,
-              // Re-entry stamp for active-list ordering. A thread already
-              // pinned active keeps its stamp: the activity reset that clears
-              // the pin is not a re-entry and must not reorder the list.
               unsettledAt:
                 existing?.settledOverride === "active"
                   ? (existing.unsettledAt ?? null)
@@ -588,8 +563,6 @@ export function projectEvent(
           ...nextBase,
           threads: updateThread(nextBase.threads, payload.threadId, {
             pinnedAt: null,
-            // Unpin clears the slot: re-pinning is "pin again", not "restore
-            // an ancient position".
             pinOrderKey: null,
             updatedAt: payload.updatedAt,
           }),
@@ -622,8 +595,6 @@ export function projectEvent(
       return decodeForEvent(ThreadMetaUpdatedPayload, event.payload, event.type, "payload").pipe(
         Effect.map((payload) => {
           const thread = nextBase.threads.find((entry) => entry.id === payload.threadId);
-          // Legacy single-link events replay into the link array so the
-          // derived linkedPullRequest and pullRequests never disagree.
           const legacyLinkPatch =
             thread !== undefined && payload.linkedPullRequest !== undefined
               ? pullRequestsPatch(
@@ -724,7 +695,6 @@ export function projectEvent(
       ).pipe(
         Effect.map((payload) => {
           const thread = nextBase.threads.find((entry) => entry.id === payload.threadId);
-          // A sync for a link the user removed in the meantime is stale; drop it.
           if (
             !thread ||
             !thread.pullRequests.some((link) => threadPullRequestKeysEqual(link, payload))
@@ -857,8 +827,6 @@ export function projectEvent(
           "session",
         );
 
-        // Leaving the "running" session status is the turn-end signal: settle
-        // a still-running latest turn so its duration reflects the whole turn.
         const settledTurnState = settledTurnStateForSessionStatus(session.status);
         return {
           ...nextBase,
@@ -889,9 +857,6 @@ export function projectEvent(
                   ? {
                       ...thread.latestTurn,
                       state: settledTurnState,
-                      // A running turn's completedAt can only hold a mid-turn
-                      // placeholder checkpoint timestamp — the session leaving
-                      // "running" is the authoritative turn end.
                       completedAt: session.updatedAt,
                     }
                   : thread.latestTurn,
@@ -960,11 +925,6 @@ export function projectEvent(
           "checkpoint",
         );
 
-        // Do not let a placeholder (status "missing") overwrite a checkpoint
-        // that has already been captured with a real git ref (status "ready").
-        // ProviderRuntimeIngestion may fire multiple turn.diff.updated events
-        // per turn; without this guard later placeholders would clobber the
-        // real capture dispatched by CheckpointReactor.
         const existing = thread.checkpoints.find((entry) => entry.turnId === checkpoint.turnId);
         if (existing && existing.status !== "missing" && checkpoint.status === "missing") {
           return nextBase;
@@ -977,8 +937,6 @@ export function projectEvent(
           .toSorted((left, right) => left.checkpointTurnCount - right.checkpointTurnCount)
           .slice(-MAX_THREAD_CHECKPOINTS);
 
-        // Mid-turn diff updates produce placeholder checkpoints; record the
-        // checkpoint, but don't settle a turn its session is still running.
         const turnStillRunning =
           thread.session?.status === "running" && thread.session.activeTurnId === payload.turnId;
 

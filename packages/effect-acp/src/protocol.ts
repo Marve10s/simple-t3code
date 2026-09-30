@@ -43,7 +43,6 @@ export type AcpIncomingNotification =
       readonly params: unknown;
     };
 
-/** Standard I/O whose input can report provider-specific ACP failures. */
 export interface AcpStdio extends Omit<Stdio.Stdio, "stdin"> {
   readonly stdin: Stream.Stream<Uint8Array, PlatformError.PlatformError | AcpError.AcpError>;
 }
@@ -87,7 +86,6 @@ const decodeElicitationComplete = Schema.decodeUnknownEffect(
 );
 const parserFactory = RpcSerialization.ndJsonRpc();
 const MAX_BUFFERED_RAW_NOTIFICATIONS = 32;
-// Outbound JSON-RPC notification: no `id`, so peers never treat it as a request.
 const encodeJsonRpcNotification = Schema.encodeUnknownExit(
   Schema.fromJsonString(
     Schema.Struct({
@@ -134,8 +132,6 @@ export const makeAcpPatchedProtocol = Effect.fn("makeAcpPatchedProtocol")(functi
   const offerOutgoing = Effect.fn("offerOutgoing")(function* (
     message: RpcMessage.FromClientEncoded | RpcMessage.FromServerEncoded,
   ) {
-    // RpcClient emits `@effect/rpc/Interrupt` when a pending request's fiber is interrupted.
-    // ACP has no such method; agents log it as an error and cannot act on it, so drop it.
     if (message._tag === "Interrupt") {
       return;
     }
@@ -558,9 +554,6 @@ export const makeAcpPatchedProtocol = Effect.fn("makeAcpPatchedProtocol")(functi
     supportsNotifications: true,
   });
 
-  // JSON-RPC notifications carry no `id`. Encoding a Request without `isNotification`
-  // emits an `id`, which real agents (Grok CLI) parse as a malformed request and silently drop.
-  // That made `session/cancel` a no-op against Grok while the lenient mock agent accepted it.
   const sendNotification = Effect.fn("sendNotification")(function* (
     method: string,
     payload: unknown,

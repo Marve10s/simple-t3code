@@ -129,7 +129,6 @@ describe("truncateTraceAttributes", () => {
     const error = truncated["error"] as { stack: string; nested: Array<string> };
     assert.equal(error.stack.length, 500 + "…[truncated]".length);
     assert.equal(error.nested[0]?.length, 500 + "…[truncated]".length);
-    // Input is untouched: the live span's attributes are shared.
     assert.equal(attributes.error.stack, stack);
   });
 

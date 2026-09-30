@@ -145,7 +145,6 @@ it.layer(NodeServices.layer)("message context plumbing", (it) => {
       const message = afterMessage.threads[0]?.messages[0];
       expect(message?.context).toEqual(context);
 
-      // A later non-streaming update without context keeps the original records.
       const afterUpdate = yield* projectEvent(
         afterMessage,
         makeEvent(3, "thread.message-sent", {

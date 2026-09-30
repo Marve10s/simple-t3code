@@ -177,7 +177,6 @@ export function runStream<TTag extends EnvironmentStreamCommandRpcTag>(
 }
 
 interface SubscriptionOptions<TTag extends EnvironmentSubscriptionRpcTag> {
-  /** Reports protocol or programming defects without changing their recovery policy. */
   readonly onDefect?: (
     cause: Cause.Cause<EnvironmentRpcStreamFailure<TTag>>,
   ) => Effect.Effect<void, never, never>;
@@ -237,9 +236,6 @@ function subscribeDynamicMapped<TTag extends EnvironmentSubscriptionRpcTag, A>(
                         input,
                       });
                       const stream = mapStream(session, method(input));
-                      // An evicted preview host completes its registration stream.
-                      // Re-register only after completion; failures still follow the
-                      // session recovery policy and browser actions are never replayed.
                       return (
                         tag === WS_METHODS.previewAutomationConnect
                           ? stream.pipe(Stream.repeat(Schedule.spaced("1 second")))
@@ -325,7 +321,6 @@ export function subscribeDynamic<TTag extends EnvironmentSubscriptionRpcTag>(
   return subscribeDynamicMapped(tag, makeInput, (_session, stream) => stream, options);
 }
 
-/** Tags each value before `switchMap` can buffer it across a session change. */
 export function subscribeDynamicWithSession<TTag extends EnvironmentSubscriptionRpcTag>(
   tag: TTag,
   makeInput: (session: RpcSession) => Effect.Effect<EnvironmentRpcInput<TTag>>,

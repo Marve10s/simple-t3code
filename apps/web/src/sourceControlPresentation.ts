@@ -71,7 +71,6 @@ export function getSourceControlPresentation(
   }
 }
 
-/** For surfaces that know only the host kind, such as a change request row or filter. */
 export function getSourceControlPresentationForKind(
   kind: SourceControlProviderKind,
 ): SourceControlPresentation {

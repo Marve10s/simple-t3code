@@ -19,7 +19,6 @@ export const StoredGitHubRoutingPermission = Schema.Struct({
 });
 export type StoredGitHubRoutingPermission = typeof StoredGitHubRoutingPermission.Type;
 
-/** Trust belongs to the saved endpoint, never to an environment id advertised by a server alone. */
 export function gitHubRoutingConnectionKey(entry: ConnectionCatalogEntry): string | null {
   const target = entry.target;
   if (target._tag === "RelayConnectionTarget")

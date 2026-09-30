@@ -445,8 +445,6 @@ describe("DesktopTelemetryPublisher", () => {
         } as const;
         yield* publisher.publishUpdateReport(report);
 
-        // A subscriber that attaches after the publish (the backend spawned
-        // by a relaunch) still sees the latest report replayed.
         const decoder = new TextDecoder();
         const decodeMessage = Schema.decodeUnknownEffect(
           Schema.fromJsonString(DesktopHostTelemetryMessage),

@@ -105,7 +105,6 @@ describe("ThreadBackgroundLiveness", () => {
       status: undefined,
       kind: "started",
     });
-    // Terminal tick arrives with no taskType (common on task.completed).
     liveness.recordTaskLiveness({
       threadId,
       taskId: "m1",
@@ -172,7 +171,6 @@ describe("ThreadBackgroundLiveness", () => {
   it("reclassification moves a task between buckets instead of duplicating it", () => {
     const liveness = ThreadBackgroundLiveness.make();
     const threadId = "t-live-reclass";
-    // First seen without a taskType: counts as an agent.
     liveness.recordTaskLiveness({
       threadId,
       taskId: "x1",
@@ -181,8 +179,6 @@ describe("ThreadBackgroundLiveness", () => {
       kind: "started",
     });
     expect(liveness.getThreadBackgroundLiveness(threadId)).toBe("working");
-    // Later transition reveals it's a shell: downgrade to monitoring, not
-    // a stale duplicate pinning "working".
     liveness.recordTaskLiveness({
       threadId,
       taskId: "x1",
@@ -191,7 +187,6 @@ describe("ThreadBackgroundLiveness", () => {
       kind: "progress",
     });
     expect(liveness.getThreadBackgroundLiveness(threadId)).toBe("monitoring");
-    // Turning out to be inert or agent-owned drops the prior entry too.
     liveness.recordTaskLiveness({
       threadId,
       taskId: "x1",

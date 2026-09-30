@@ -6,7 +6,6 @@ import { AndroidAnchoredMenu } from "../../components/AndroidAnchoredMenu";
 import { MaterialSearchField } from "../../components/MaterialSearchField";
 import { useMaterialToolbarLayout } from "../../components/useMaterialToolbarLayout";
 
-/** Keep Files search in the same header row on compact and expanded layouts. */
 export function MaterialFilesHeader(props: {
   readonly projectName: string;
   readonly searchQuery: string;
@@ -37,7 +36,6 @@ export function MaterialFilesHeader(props: {
 
   return (
     <View>
-      {/* Keep the title/subtitle's natural height, including larger text, while searching. */}
       <View
         pointerEvents={searching ? "none" : "auto"}
         accessibilityElementsHidden={searching}

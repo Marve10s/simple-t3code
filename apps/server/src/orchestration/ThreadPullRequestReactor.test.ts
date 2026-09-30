@@ -143,7 +143,6 @@ const makeHarness = Effect.fn("makeThreadPullRequestHarness")(function* (options
   readonly existingWorktrees?: ReadonlyArray<string>;
   readonly project?: OrchestrationProjectShell;
   readonly resolveRepositoryIdentity?: RepositoryIdentityResolver["Service"]["resolve"];
-  /** Serve full sweep reads from this instead of `threads`. */
   readonly getShellSnapshot?: ProjectionSnapshotQueryShape["getShellSnapshot"];
 }) {
   const activation = yield* Deferred.make<void>();
@@ -153,7 +152,6 @@ const makeHarness = Effect.fn("makeThreadPullRequestHarness")(function* (options
     threads: options.threads,
     updatedAt: NOW,
   });
-  // Each shell read: a thread id for a one-thread read, null for a full read.
   const reads = yield* Queue.unbounded<ThreadId | null>();
   const events = yield* PubSub.unbounded<OrchestrationEvent>();
   const commands = yield* Ref.make<ReadonlyArray<SyncCommand>>([]);
@@ -592,7 +590,6 @@ describe("ThreadPullRequestReactor", () => {
           yield* Effect.gen(function* () {
             const reactor = yield* fixture.start();
             expect(yield* Ref.get(fixture.commands)).toHaveLength(0);
-            // A one-thread read cannot show that other pending threads are gone.
             const gone = ThreadId.make("gone");
             yield* fixture.publish({
               type: "thread.unarchived",
@@ -682,8 +679,6 @@ describe("ThreadPullRequestReactor", () => {
         ["archived", 6],
       ]);
 
-      // Startup, then two periodic passes. The startup backfill lookup fails,
-      // so the first periodic pass retries it from the full read.
       const discover = (read: ProjectionSnapshotQueryShape["getShellSnapshot"]) =>
         Effect.gen(function* () {
           const online = yield* Ref.make(false);
@@ -745,7 +740,6 @@ describe("ThreadPullRequestReactor", () => {
         "resumed 2",
         "resumed 2",
       ]);
-      // The last pass has no backfill left, so it reads no settled thread.
       expect(fullReads.at(-1)).toContain("imported");
       expect(unsettledReads.at(-1)).toEqual(["linked", "open", "resumed"]);
     }).pipe(

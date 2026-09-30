@@ -413,5 +413,4 @@ export function resolveLiveThreadBranchUpdate(input: {
   };
 }
 
-// Re-export from shared for backwards compatibility in this module's exports
 export { resolveAutoFeatureBranchName } from "@t3tools/shared/git";

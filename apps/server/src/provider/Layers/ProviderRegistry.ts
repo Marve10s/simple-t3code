@@ -1,27 +1,3 @@
-/**
- * ProviderRegistryLive — aggregates per-instance snapshot streams into a
- * single materialized list.
- *
- * Historically this Layer composed four per-kind Live Layers
- * (`CodexProviderLive`, `ClaudeProviderLive`, …) that each exposed a
- * `ServerProviderShape`. Those Lives were deleted during the driver /
- * instance refactor — every driver now carries its `snapshot: ServerProviderShape`
- * bundled onto the `ProviderInstance` the registry produces.
- *
- * Each configured instance (including multi-instance setups like
- * `codex_personal` + `codex_work`) contributes one `ProviderSnapshotSource`,
- * keyed by `instanceId`. Instances whose driver is unavailable or whose
- * config failed to decode are merged from `instanceRegistry.listUnavailable`
- * as shadow snapshots so the UI can render their exact unavailable reason.
- *
- * Cache paths on disk are now keyed by `instanceId`. Because
- * `defaultInstanceIdForDriver(kind) === kind` for built-in kinds, existing
- * `<kind>.json` files remain the on-disk location for that driver's default
- * instance. Identity-less legacy cache contents are ignored and replaced by
- * the first live refresh.
- *
- * @module ProviderRegistryLive
- */
 import {
   defaultInstanceIdForDriver,
   ProviderDriverKind,
@@ -116,8 +92,6 @@ const shouldRetainMissingProviderModels = (provider: ServerProvider): boolean =>
     return false;
   }
 
-  // Successful discovery replaces these inventories so cached retired models disappear.
-  // Antigravity's local health check does not authenticate or discover models.
   const isPendingAntigravityAuthentication =
     isAntigravity && provider.status === "warning" && provider.auth.status === "unknown";
   const isPendingInitialProbe =
@@ -138,9 +112,6 @@ const mergeProviderModels = (
   nextModels: ReadonlyArray<ServerProvider["models"][number]>,
 ): ReadonlyArray<ServerProvider["models"][number]> => {
   const shouldRetainMissingModels = shouldRetainMissingProviderModels(provider);
-  // Custom rows are derived from settings and every snapshot carries the full
-  // current list, so a custom model missing from `nextModels` was removed by
-  // the user and must not be resurrected from the previous snapshot.
   const retainablePreviousModels = previousModels.filter((model) => !model.isCustom);
 
   if (shouldRetainMissingModels && nextModels.length === 0 && retainablePreviousModels.length > 0) {
@@ -164,14 +135,6 @@ const mergeProviderModels = (
     : mergedModels;
 };
 
-/**
- * Antigravity's health check only initializes the agent, so after a server
- * restart it reports the account as unchecked. The saved Google login still
- * works, and the previous snapshot proves it. Carry that account state until
- * a session, refresh, or sign-out reports something new. A confirmed missing
- * installation, sign-out, disabled instance, or a changed sign-in method is
- * never overridden.
- */
 const carrySavedAntigravityAccount = (
   previousProvider: ServerProvider,
   nextProvider: ServerProvider,
@@ -189,8 +152,6 @@ const carrySavedAntigravityAccount = (
   ) {
     return undefined;
   }
-  // The pending boot probe (`installed: false`, warning) and a failed probe
-  // keep their own status; only a passed health check reads as ready.
   const status =
     nextProvider.installed && nextProvider.status === "warning" ? "ready" : nextProvider.status;
   return { auth: previousProvider.auth, status };
@@ -204,8 +165,6 @@ export const mergeProviderSnapshot = (
     return nextProvider;
   }
   const savedAccount = carrySavedAntigravityAccount(previousProvider, nextProvider);
-  // "Google account access is not checked yet" describes the probe, not the
-  // account; it must not outlive the state it explained.
   const { message: _uncheckedMessage, ...nextWithoutMessage } = nextProvider;
   return {
     ...(savedAccount?.status === "ready" ? nextWithoutMessage : nextProvider),
@@ -254,20 +213,10 @@ const correlateSnapshotWithSource = (
   return Effect.succeed(snapshot);
 };
 
-/**
- * Key a snapshot for aggregation and persistence. Snapshot sources
- * must be correlated by instance id before reaching this map; missing
- * identities are defects, not runtime routing fallbacks.
- */
 const snapshotInstanceKey = (provider: ServerProvider): ProviderInstanceId => {
   return provider.instanceId;
 };
 
-// Project a live `ProviderInstance` into the aggregator's consumption
-// shape. Each call re-captures the instance's `snapshot` closures, so
-// after `ProviderInstanceRegistry` rebuilds an instance (e.g. because
-// its settings changed), a fresh source rides the new PubSub instead
-// of a closed one.
 const buildSnapshotSource = (instance: ProviderInstance): ProviderSnapshotSource => ({
   instanceId: instance.instanceId,
   driverKind: instance.driverKind,
@@ -286,18 +235,11 @@ export const ProviderRegistryLive = Layer.effect(
     const fileSystem = yield* FileSystem.FileSystem;
     const path = yield* Path.Path;
 
-    // Aggregator PubSub — consumers (WS gateway, etc.) subscribe here for
-    // coalesced updates across every instance.
     const changesPubSub = yield* Effect.acquireRelease(
       PubSub.unbounded<ReadonlyArray<ServerProvider>>(),
       PubSub.shutdown,
     );
 
-    // Boot-only: hydrate `providersRef` from the on-disk per-instance
-    // cache so the UI has something to render during the first refresh.
-    // Instances added post-boot skip this path; their first entry in
-    // `providersRef` comes from the reactive `syncLiveSources` pass
-    // below.
     const bootInstances = yield* instanceRegistry.listInstances;
     const bootSources = bootInstances.map(buildSnapshotSource);
     const fallbackProviders = yield* loadProviders(bootSources);
@@ -315,12 +257,6 @@ export const ProviderRegistryLive = Layer.effect(
       bootSources,
       (source) =>
         Effect.gen(function* () {
-          // One cache file per configured instance. For the default
-          // instance of a built-in kind the path equals `<kind>.json` —
-          // identical to the legacy filename. We still require the cache
-          // payload to carry matching instance id + driver kind; old
-          // identity-less payloads are discarded and the awaited refresh
-          // below repopulates the cache.
           const filePath = yield* resolveProviderStatusCachePath({
             cacheDir: config.providerStatusCacheDir,
             instanceId: source.instanceId,
@@ -380,15 +316,9 @@ export const ProviderRegistryLive = Layer.effect(
       ReadonlyMap<ProviderInstanceId, { readonly update?: ServerProviderUpdateState | undefined }>
     >(new Map());
 
-    // Live-source registry — the dynamic counterpart to the boot-time
-    // `bootSources`. Keyed by `instanceId`; the stored `ProviderInstance`
-    // reference is used for identity equality so "no-op" reconciles
-    // (settings unchanged) skip re-subscribing + re-probing.
     const liveSubsRef = yield* Ref.make<ReadonlyMap<ProviderInstanceId, ProviderInstance>>(
       new Map(),
     );
-    // Serialize `syncLiveSources` so a rapid burst of reconciles doesn't
-    // interleave two passes clobbering each other's fiber bookkeeping.
     const syncSemaphore = yield* Semaphore.make(1);
 
     const getLiveSources: Effect.Effect<ReadonlyArray<ProviderSnapshotSource>> = Ref.get(
@@ -397,12 +327,6 @@ export const ProviderRegistryLive = Layer.effect(
 
     const persistProvider = (provider: ServerProvider) =>
       Effect.gen(function* () {
-        // Persist every instance — the file name is the instance id, so
-        // multi-instance setups (e.g. `codex_personal`, `codex_work`) each
-        // get their own cache. We resolve the path fresh so snapshots
-        // produced by newly-added instances post-boot still land on disk
-        // without the aggregator holding a stale `cachePathByInstance`
-        // entry.
         const key = snapshotInstanceKey(provider);
         const filePath = yield* resolveProviderStatusCachePath({
           cacheDir: config.providerStatusCacheDir,
@@ -502,8 +426,6 @@ export const ProviderRegistryLive = Layer.effect(
       },
     ) {
       const providers = yield* upsertProviders([provider], options);
-      // Reclassify the current read model after fetching. Never republish the
-      // probe captured before the fetch: a newer health result may have landed.
       if (!(yield* Ref.getAndSet(compatibilityRefreshRunning, true))) {
         yield* manifestService.refresh.pipe(
           Effect.andThen(upsertProviders([], { persist: false })),
@@ -577,7 +499,6 @@ export const ProviderRegistryLive = Layer.effect(
       if (provider === undefined) {
         return yield* refreshAll();
       }
-      // Kind-scoped refreshes target the default instance for that driver.
       const defaultInstanceId = defaultInstanceIdForDriver(provider);
       const sources = yield* getLiveSources;
       const providerSource = sources.find(
@@ -607,9 +528,6 @@ export const ProviderRegistryLive = Layer.effect(
       provider: ProviderDriverKind,
       options?: { readonly fresh?: boolean },
     ) {
-      // Read the instance registry, not `liveSubsRef`: the latter trails
-      // reconciliation, and an update must never run a retired instance's
-      // command against a freshly configured executable.
       const instance = yield* instanceRegistry.getInstance(instanceId);
       if (!instance || instance.driverKind !== provider) {
         return makeManualProviderMaintenanceCapabilities(provider);
@@ -617,26 +535,6 @@ export const ProviderRegistryLive = Layer.effect(
       return yield* instance.snapshot.resolveMaintenance(options);
     });
 
-    /**
-     * Diff the aggregator's live-source set against the current
-     * `ProviderInstanceRegistry` and:
-     *   - subscribe to each newly-added or rebuilt instance's
-     *     `streamChanges` (so periodic + enrichment refreshes land in
-     *     `providersRef`);
-     *   - read each newly-added/rebuilt instance's current snapshot after
-     *     subscribing, closing the race with its independently-running
-     *     background startup probe;
-     *   - prune `providersRef` of instances that no longer exist.
-     *
-     * Provider refreshes are owned by each managed provider and never run
-     * on this layer's construction path. Consumers see cached or pending
-     * snapshots immediately, then receive live probe results through the
-     * already-attached change stream.
-     *
-     * Per-instance subscription fibers are not tracked explicitly. When
-     * a rebuilt instance's old child scope closes, its PubSub shuts
-     * down and our `Stream.runForEach` fiber exits naturally.
-     */
     const syncLiveSources = syncSemaphore.withPermits(1)(
       Effect.gen(function* () {
         const instances = yield* instanceRegistry.listInstances;
@@ -650,10 +548,6 @@ export const ProviderRegistryLive = Layer.effect(
         }
         const previousSubs = yield* Ref.get(liveSubsRef);
 
-        // Carry over subscriptions for instances whose identity is
-        // unchanged (reconcile treated them as no-op). Instances that
-        // disappeared, or were rebuilt with a different reference,
-        // fall through to the "newly-added" branch below.
         const carriedOver = new Map<ProviderInstanceId, ProviderInstance>();
         for (const [instanceId, previousInstance] of previousSubs) {
           const nextInstance = nextByInstance.get(instanceId);
@@ -662,8 +556,6 @@ export const ProviderRegistryLive = Layer.effect(
           }
         }
 
-        // Collect new/rebuilt instances in `nextByInstance` insertion
-        // order (which preserves settings-author order).
         const newlyAdded: Array<readonly [ProviderInstanceId, ProviderInstance]> = [];
         for (const [instanceId, instance] of nextByInstance) {
           if (carriedOver.has(instanceId)) {
@@ -694,10 +586,6 @@ export const ProviderRegistryLive = Layer.effect(
           }
         }
 
-        // Fork long-lived subscriptions to each new/rebuilt instance's
-        // change stream before reading its current snapshot. If the
-        // driver's own initial probe finishes during this sync, either
-        // the current read or the active subscriber observes the result.
         for (const [, instance] of newlyAdded) {
           const source = buildSnapshotSource(instance);
           yield* Stream.runForEach(source.streamChanges, (provider) =>
@@ -706,10 +594,6 @@ export const ProviderRegistryLive = Layer.effect(
         }
         yield* Effect.yieldNow;
 
-        // Snapshot current state without starting a probe. Managed providers
-        // launch their startup refresh independently, so this closes the
-        // subscription race without putting external work on the registry
-        // or HTTP server construction path.
         yield* Effect.forEach(
           newlyAdded,
           ([, instance]) =>
@@ -733,8 +617,6 @@ export const ProviderRegistryLive = Layer.effect(
         }
         yield* Ref.set(liveSubsRef, nextSubs);
 
-        // Drop aggregator state for instances that have disappeared —
-        // otherwise the UI would keep rendering ghosts.
         const [previousProviders, providers] = yield* Ref.modify(
           providersRef,
           (previousProviders) => {
@@ -774,50 +656,9 @@ export const ProviderRegistryLive = Layer.effect(
       }),
     );
 
-    // Seed `providersRef` with the boot-time fallback snapshots so
-    // consumers calling `getProviders` immediately after layer build see
-    // a populated list — even before the first `syncLiveSources` refresh
-    // resolves. Cached snapshots (already in `providersRef`) merge with
-    // these via `upsertProviders` so on-disk state wins where present
-    // and pending fallbacks fill the gaps.
     yield* upsertProviders(fallbackProviders, { publish: false });
-    // Subscribe to registry mutations BEFORE running the initial sync.
-    // `subscribeChanges` acquires the dequeue synchronously in this
-    // fibre; the subscription is active the instant this `yield*`
-    // returns. Forking the consumer loop later cannot lose a publish
-    // because no publish can reach a not-yet-subscribed dequeue.
-    //
-    // (Contrast with the pre-fix code that did
-    // `Stream.runForEach(instanceRegistry.streamChanges, …).pipe(Effect.forkScoped)`.
-    // `Stream.fromPubSub` defers `PubSub.subscribe` to stream start,
-    // and `forkScoped` only schedules the fibre — so a reconcile that
-    // published between "fibre scheduled" and "fibre starts running"
-    // was dropped, which made any settings change that replaced an
-    // instance never propagate to the aggregator's `providersRef`.)
-    // Subscribe to registry mutations BEFORE running the initial sync.
-    // `subscribeChanges` acquires the `PubSub.Subscription` synchronously
-    // in this fibre; the subscription is registered with the PubSub the
-    // instant this `yield*` returns, so any subsequent publish is
-    // buffered in the subscription regardless of when the consumer
-    // fibre below actually starts running.
-    //
-    // (Contrast with the pre-fix code that did
-    // `Stream.runForEach(instanceRegistry.streamChanges, …).pipe(Effect.forkScoped)`.
-    // `instanceRegistry.streamChanges` is `Stream.fromPubSub(changes)`,
-    // which defers `PubSub.subscribe` to stream start. `forkScoped` only
-    // schedules the consumer fibre — so a reconcile that published
-    // between "fibre scheduled" and "fibre starts running + subscribes"
-    // was dropped, which made any settings change that replaced an
-    // instance never propagate to the aggregator's `providersRef`.)
     const instanceChanges = yield* instanceRegistry.subscribeChanges;
-    // Initial sync attaches subscriptions and snapshots current state for
-    // every instance present at boot. Provider probes are already running in
-    // their managed background fibers and never block this layer.
     yield* syncLiveSources;
-    // React to registry mutations — instance added / removed / rebuilt.
-    // `Stream.fromSubscription` builds a stream over the pre-acquired
-    // subscription rather than subscribing on stream start, which is
-    // what closes the race.
     yield* Stream.runForEach(
       Stream.fromSubscription(instanceChanges),
       () => syncLiveSourcesAndContinue,

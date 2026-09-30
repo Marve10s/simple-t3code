@@ -8,12 +8,6 @@ export function isBaseThreadRoute(pathname: string): boolean {
   return BASE_THREAD_ROUTE_PATTERN.test(pathname);
 }
 
-/**
- * A persistent sidebar selects a peer destination in place. A compact list
- * drills into a new destination so the native back stack remains available.
- * From Home the selection pushes (never replaces) so Home stays beneath the
- * thread — collapsing back to a compact width keeps a sane back stack.
- */
 export function resolveThreadSelectionNavigationAction(input: {
   readonly usesSplitView: boolean;
   readonly pathname: string;
@@ -25,7 +19,6 @@ export function resolveThreadSelectionNavigationAction(input: {
   return isBaseThreadRoute(input.pathname) ? "set-params" : "replace";
 }
 
-/** Dismiss sheets and select their underlying workspace destination in one stack update. */
 export function resolveThreadSelectionOverlayState(input: {
   readonly state: NavigationState | undefined;
   readonly workspaceRouteKey: string | undefined;
@@ -52,11 +45,6 @@ export function resolveThreadSelectionOverlayState(input: {
   };
 }
 
-/**
- * On regular-width layouts, the file browser and preview occupy one workspace
- * destination. Replacing the browser route keeps a single back step to chat.
- * Compact layouts retain the browser as the previous stack screen.
- */
 export function resolveFileSelectionNavigationAction(input: {
   readonly hasPersistentFileInspector: boolean;
 }): AdaptiveNavigationAction {

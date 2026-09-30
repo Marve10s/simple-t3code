@@ -17,10 +17,6 @@ describe("threadDetailCursor", () => {
   });
 
   it("round-trips empty boundary values", () => {
-    // The anchor is COALESCE(requested_at, started_at, '') and the turn key
-    // is COALESCE(turn_id, ''), so a server-minted cursor can legitimately
-    // carry empty strings; rejecting them would degrade a valid cursor to a
-    // first-page request that repeats recent history (review finding).
     const cursor = {
       threadId: ThreadId.make("thread-1"),
       beforeAnchorAt: "",

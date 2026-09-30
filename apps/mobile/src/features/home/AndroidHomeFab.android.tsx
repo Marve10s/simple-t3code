@@ -32,7 +32,6 @@ export function AndroidHomeFabLayout(props: ComponentProps<typeof SharedAndroidH
     scrollState.current = next;
   }, []);
 
-  // Remount only the FAB when its font or pane changes to clear the cached expanded width.
   return (
     <View className="flex-1" onLayout={(event) => setLayoutWidth(event.nativeEvent.layout.width)}>
       <MaterialFabScrollContext value={onScroll}>{props.children}</MaterialFabScrollContext>

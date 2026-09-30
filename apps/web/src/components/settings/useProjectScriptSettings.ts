@@ -45,10 +45,6 @@ function reportScriptFailure(result: AtomCommandResult<unknown, unknown>) {
   return mapAtomCommandResult(result, () => undefined);
 }
 
-/**
- * Edits the action list on every target: the environment default when there is
- * no project, else that project's override entry. Shortcuts follow on desktop.
- */
 export function useProjectScriptSettings(
   targets: readonly {
     environmentId: EnvironmentId;

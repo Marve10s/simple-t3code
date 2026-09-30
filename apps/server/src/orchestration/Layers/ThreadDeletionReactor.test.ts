@@ -83,8 +83,6 @@ describe("ThreadDeletionReactor drain", () => {
     Effect.gen(function* () {
       const stops: Array<number> = [];
       const firstCleanupDone = yield* Deferred.make<void>();
-      // The engine has already committed and published sequence 2, but the
-      // subscriber has not received it yet: the stream releases it on demand.
       const releaseSecondEvent = yield* Deferred.make<void>();
       const latestSequence = yield* Ref.make(0);
       const engine = {
@@ -120,8 +118,6 @@ describe("ThreadDeletionReactor drain", () => {
           yield* reactor.start();
           yield* Deferred.await(firstCleanupDone);
 
-          // Sequence 1 is fully cleaned and the worker queue is idle. Sequence
-          // 2 is committed and published but still in flight to the subscriber.
           yield* Ref.set(latestSequence, 2);
           const drained = yield* Effect.forkChild(reactor.drainThrough(2));
           yield* Effect.yieldNow;

@@ -22,10 +22,6 @@ const handlers = new Map<HardwareKeyboardCommand, Set<CommandHandler>>();
 const registrationListeners = new Set<() => void>();
 let registrationVersion = 0;
 
-/**
- * Registers a context-specific hardware-keyboard action. The most recently mounted handler gets
- * the first chance to consume the command, allowing focused screens to override app defaults.
- */
 export function useHardwareKeyboardCommand(
   command: HardwareKeyboardCommand | ReadonlyArray<HardwareKeyboardCommand>,
   handler: CommandHandler,
@@ -67,7 +63,6 @@ export function subscribeToHardwareKeyboardCommandRegistrations(listener: () => 
 export function dispatchHardwareKeyboardCommand(command: HardwareKeyboardCommand): boolean {
   const commandHandlers = handlers.get(command);
   if (!commandHandlers) return false;
-  // `.reverse()` on a copy, not `.toReversed()`: Hermes has no ES2023 array methods.
   for (const handler of [...commandHandlers].reverse()) {
     if (handler(command) !== false) return true;
   }

@@ -1579,7 +1579,6 @@ describe("CheckpointReactor", () => {
         ]);
       }
       if (timing === "between turns") {
-        // Exercise the domain entry point as well as the provider turn-start event.
         yield* harness.engine.dispatch({
           type: "thread.turn.start",
           commandId: CommandId.make("cmd-after-git-init"),

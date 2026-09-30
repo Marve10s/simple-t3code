@@ -10,7 +10,6 @@ import { VideoThumbnailImage } from "./VideoThumbnailImage";
 import { useMediaActions, type MediaActionsSource } from "../lib/mediaActions";
 import { MediaActionsMenu } from "./MediaActionsMenu";
 
-/** Loads only after Play or opening the viewer. Source replacement never starts playback itself. */
 function LoadedMediaVideo(props: {
   readonly uri: string;
   readonly resolvePlaybackUri?: () => Promise<string | null>;
@@ -21,7 +20,6 @@ function LoadedMediaVideo(props: {
   const active = useRef(focused && AppState.currentState === "active");
   const fullscreen = useRef(false);
   const [attempt, setAttempt] = useState(0);
-  // Expo's Android player also reports completed playback as idle.
   const [loadState, setLoadState] = useState<"pending" | "complete" | "error">("pending");
   const player = useVideoPlayer(null, (player) => {
     player.staysActiveInBackground = false;
@@ -40,8 +38,6 @@ function LoadedMediaVideo(props: {
   useEffect(() => {
     active.current = focused && !props.paused && AppState.currentState === "active";
     if (!focused || props.paused || (!active.current && !fullscreen.current)) player.pause();
-    // Native background handling distinguishes Android's fullscreen activity
-    // from leaving the app; React Native reports both as background.
     const subscription = AppState.addEventListener("change", (state) => {
       active.current = focused && !props.paused && state === "active";
       if (state === "inactive" || (state === "background" && !fullscreen.current)) player.pause();
@@ -52,7 +48,6 @@ function LoadedMediaVideo(props: {
   useEffect(() => {
     const controller = new AbortController();
     setLoadState("pending");
-    // A renewed signature is used on Retry, not as a reason to reset the native player.
     void loadSource(controller.signal).then(
       () => {
         if (!controller.signal.aborted) setLoadState("complete");
@@ -118,7 +113,6 @@ interface MediaVideoPlayerProps {
 function MediaVideoPlayerContent(props: MediaVideoPlayerProps) {
   const mediaActions = useMediaActions(props.actionsSource);
   const [playbackUri, setPlaybackUri] = useState<string | null>(props.expanded ? props.uri : null);
-  // Keep an opened player mounted while signing or reconnecting temporarily has no usable URL.
   if (playbackUri === null && props.expanded && props.uri !== null) setPlaybackUri(props.uri);
 
   return (
@@ -143,7 +137,6 @@ function MediaVideoPlayerContent(props: MediaVideoPlayerProps) {
               mediaActions.actions.length > 0 ? "Touch and hold for media actions" : undefined
             }
             accessibilityState={{ disabled: props.uri === null || props.unavailable === true }}
-            // Stays pressable so the long-press menu still opens on a failed or unsigned tile.
             onPress={() => {
               if (props.uri !== null && !props.unavailable) setPlaybackUri(props.uri);
             }}

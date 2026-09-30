@@ -27,11 +27,6 @@ export function readPreparedConnection(environmentId: EnvironmentId) {
   );
 }
 
-/**
- * This client's authenticated session on one environment, as reported by that
- * environment's `/api/auth/session` endpoint. `data` stays populated across
- * SWR revalidations; `isPending` is only meaningful before the first resolve.
- */
 export function useEnvironmentSessionState(environmentId: EnvironmentId) {
   const result = useAtomValue(environmentSession.sessionStateAtom(environmentId));
   return {

@@ -226,8 +226,6 @@ export const makeCodexChatGptAuth = Effect.fn("makeCodexChatGptAuth")(function* 
       Effect.flatMap((json) => store.set(new TextEncoder().encode(json))),
       Effect.mapError(() => failure("save", "Could not save the ChatGPT connection.")),
     );
-  // Registration profiles outlive tokens, but belong only to this environment/instance.
-  // Accept the original single-registration record until it is next saved.
   const readRegistrations = registrationStore.get.pipe(
     Effect.mapError(() =>
       failure("registration", "Could not read the ChatGPT sign-in registration. Try again."),
@@ -266,7 +264,6 @@ export const makeCodexChatGptAuth = Effect.fn("makeCodexChatGptAuth")(function* 
     const instanceIds = new Set<string>([options.instanceId]);
     if (Option.isSome(settings)) {
       const current = yield* settings.value.getSettings;
-      // Include the legacy default instance as well as explicitly configured ones.
       instanceIds.add("codex");
       for (const [id, instance] of Object.entries(current.providerInstances)) {
         if (instance.driver === "codex") instanceIds.add(id);
@@ -292,8 +289,6 @@ export const makeCodexChatGptAuth = Effect.fn("makeCodexChatGptAuth")(function* 
       for (const session of "sessions" in saved ? saved.sessions : [saved]) {
         if (!session.scopes.includes(REQUIRED_SCOPE) || connections.has(session.clientId)) continue;
         connections.add(session.clientId);
-        // Subjects are client-scoped. Use verified email only for counting locally,
-        // never export it or merge the underlying profiles.
         const email = session.email?.trim().toLowerCase();
         if (email) accounts.add(email);
         else unidentifiedConnectedConnectionCount++;
@@ -326,7 +321,6 @@ export const makeCodexChatGptAuth = Effect.fn("makeCodexChatGptAuth")(function* 
       ),
     );
   });
-  // The active pointer and all profile token sets change in one protected atomic write.
   const save = Effect.fnUntraced(function* (record: CodexChatGptCredentials, activate = true) {
     const saved = yield* readSessions;
     yield* writeSessions({
@@ -349,7 +343,6 @@ export const makeCodexChatGptAuth = Effect.fn("makeCodexChatGptAuth")(function* 
       );
   });
   const remove = Effect.gen(function* () {
-    // Promote legacy identity into the retained profile before deleting credentials.
     const credentials = yield* read;
     if (Option.isSome(credentials)) {
       const { clientId, subject, email } = credentials.value;
@@ -445,8 +438,6 @@ export const makeCodexChatGptAuth = Effect.fn("makeCodexChatGptAuth")(function* 
     const savedRegistration = changingAccount
       ? undefined
       : registrations.profiles.find((profile) => profile.clientId === selectedClientId);
-    // Older development registrations used localhost, which cannot be changed on reauth.
-    // Register a 127.0.0.1 connection instead, preserving the verified account.
     const legacyCallback = savedRegistration?.redirectUri?.includes("//localhost:") === true;
     const registeredClientId = legacyCallback ? undefined : savedRegistration?.clientId;
     const selectedTokens = (yield* readSessions).sessions.find(
@@ -498,7 +489,6 @@ export const makeCodexChatGptAuth = Effect.fn("makeCodexChatGptAuth")(function* 
     const address = server?.address();
     if (!clientCallback && (!address || typeof address === "string"))
       return yield* failure("callback", "Could not start the local sign-in callback.");
-    // Only the port may vary between attempts; token exchange uses this exact URI.
     const port =
       address && typeof address !== "string" ? address.port : NodeCrypto.randomInt(49_152, 65_536);
     const redirectUri = `http://127.0.0.1:${port}/auth/callback`;
@@ -625,8 +615,6 @@ export const makeCodexChatGptAuth = Effect.fn("makeCodexChatGptAuth")(function* 
       const expectedSubject =
         savedRegistration?.subject ??
         (previous?.clientId === registeredClientId ? previous?.subject : undefined);
-      // Subjects are checked within the same registration. Legacy callback migration
-      // registers a new client, whose subject cannot be compared with the old client.
       if (registeredClientId && expectedSubject && identity.subject !== expectedSubject)
         return yield* failure(
           "verify",
@@ -846,7 +834,6 @@ export const makeCodexChatGptAuth = Effect.fn("makeCodexChatGptAuth")(function* 
           description: "Register a connection for another ChatGPT account.",
           type: "agent" as const,
         },
-        // The wire contract allows 32 methods; advertise the 30 most recent profiles.
         ...profiles.slice(0, 30).map((profile) => ({
           id: profileMethodId(profile.clientId),
           name: `${profile.email ?? "ChatGPT account"} · ${profile.connectionLabel}`,

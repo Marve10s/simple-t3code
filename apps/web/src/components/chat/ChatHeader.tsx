@@ -58,7 +58,6 @@ interface ChatHeaderProps {
   activeThreadId: ThreadId;
   draftId?: DraftId;
   activeThreadTitle: string;
-  /** Drafts have no server thread yet, so the title carries no action menu. */
   isServerThread: boolean;
   activeProject: EnvironmentProject | null;
   openInCwd: string | null;
@@ -80,10 +79,6 @@ interface ChatHeaderProps {
   onDeleteProjectScript: (scriptId: string) => Promise<ProjectScriptActionResult>;
 }
 
-/**
- * Rename commit rule shared with the sidebar's inline rename: trim, reject
- * empty (the caller toasts), and skip the mutation when nothing changed.
- */
 export function resolveRenameCommit(input: {
   readonly title: string;
   readonly originalTitle: string;
@@ -94,14 +89,7 @@ export function resolveRenameCommit(input: {
   return { action: "commit", title: trimmed };
 }
 
-// How long a click on the thread title waits before opening the action menu,
-// so a double-click-to-rename can cancel it first. Only the native desktop
-// menu needs this: it swallows input while open, so the wait must cover the
-// OS double-click interval. The browser fallback menu keeps seeing DOM
-// events (the second click dismisses it and dblclick still fires), so it
-// opens immediately.
 const TITLE_MENU_OPEN_DELAY_MS = 500;
-// Matches the @3xl/header-actions container breakpoint owned by this header.
 const HEADER_ACTIONS_EXPANDED_BREAKPOINT_REM = 48;
 
 export function shouldShowOpenInPicker(input: {
@@ -117,9 +105,6 @@ export function shouldShowOpenInPicker(input: {
   ) {
     return true;
   }
-  // Remote environments get the picker in deep-link mode (or its explicit
-  // "no SSH route" state). Non-primary local backends (e.g. WSL) keep it
-  // hidden, matching pre-remote behavior.
   return input.remoteOpenMode !== "local-exec";
 }
 
@@ -161,7 +146,6 @@ export const ChatHeader = memo(function ChatHeader({
     });
   }, [panelAnimationDurationMs, panelAnimationsActive]);
   const isMobile = useIsMobile();
-  // Side panels can leave a desktop header narrower than a phone.
   const [isNarrowHeader, setIsNarrowHeader] = useState(false);
   useEffect(() => {
     const container = headerActionsRef.current?.parentElement;
@@ -179,8 +163,6 @@ export const ChatHeader = memo(function ChatHeader({
     container.className = "contents";
     return container;
   });
-  // Reparent the DOM host, not the React controls: rotating a phone or resizing
-  // a window must not discard an unsaved script or Git dialog.
   const mountInlineActions = useCallback(
     (node: HTMLDivElement | null) => {
       if (node && !actionsCollapsed) node.appendChild(actionsContainer);
@@ -215,9 +197,6 @@ export const ChatHeader = memo(function ChatHeader({
   const updateThreadMetadata = useAtomCommand(threadEnvironment.updateMetadata, {
     reportFailure: false,
   });
-  // Inline rename, keyed by thread: navigating away drops an in-progress
-  // rename instead of committing stale text. Cleared on thread change (not
-  // just hidden) so returning to the thread doesn't revive the old draft.
   const [renaming, setRenaming] = useState<{ threadId: ThreadId; title: string } | null>(null);
   if (renaming !== null && renaming.threadId !== activeThreadId) {
     setRenaming(null);
@@ -265,8 +244,6 @@ export const ChatHeader = memo(function ChatHeader({
     clearTimeout(titleMenuTimerRef.current);
     titleMenuTimerRef.current = null;
   }, []);
-  // Drop a pending menu-open when the thread changes or the header unmounts,
-  // so it can never fire for a thread the user already left.
   useEffect(
     () => () => {
       cancelPendingTitleMenu();
@@ -281,18 +258,13 @@ export const ChatHeader = memo(function ChatHeader({
   }, [cancelPendingTitleMenu, openMenu]);
   const openMenuFromTitle = useCallback(
     (event: ReactMouseEvent<HTMLButtonElement>) => {
-      // The trailing click of a double-click belongs to rename, not the menu.
       if (isTrailingDoubleClick(event.detail)) return;
-      // Keyboard activation and the explicit chevron affordance can never be
-      // the first half of a double-click, so they open without waiting.
       const clickedChevron =
         (event.target as HTMLElement).closest("[data-thread-title-chevron]") !== null;
       if (event.detail === 0 || clickedChevron || window.desktopBridge === undefined) {
         openTitleMenuNow();
         return;
       }
-      // Stay pending long enough for dblclick to cancel the open before the
-      // native menu appears and swallows the second click.
       cancelPendingTitleMenu();
       titleMenuTimerRef.current = window.setTimeout(() => {
         titleMenuTimerRef.current = null;
@@ -304,7 +276,6 @@ export const ChatHeader = memo(function ChatHeader({
   const handleTitleDoubleClick = useCallback(
     (event: ReactMouseEvent) => {
       if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
-      // The chevron is the explicit menu affordance; only the title text renames.
       if ((event.target as HTMLElement).closest("[data-thread-title-chevron]") !== null) return;
       cancelPendingTitleMenu();
       closeMenu();
@@ -315,8 +286,6 @@ export const ChatHeader = memo(function ChatHeader({
   const handleHeaderContextMenu = useCallback(
     (event: ReactMouseEvent) => {
       if (renamingTitle !== null) return;
-      // The right-side controls (git, scripts, open-in) keep their own
-      // behavior; only the breadcrumb area opens the thread menu.
       if ((event.target as HTMLElement).closest("[data-chat-header-actions]")) return;
       if (!isServerThread && onOpenProjectSettings === undefined) return;
       cancelPendingTitleMenu();
@@ -404,9 +373,6 @@ export const ChatHeader = memo(function ChatHeader({
         ariaLabel="Thread breadcrumb"
         className="flex-1 overflow-clip [overflow-clip-margin:2px]"
       >
-        {/* The project always leads the header: knowing which project a
-            thread lives in is priority zero, and the thread title alone
-            doesn't answer it. */}
         {activeProject ? (
           <>
             <WorkspaceBreadcrumbItem className="shrink">
@@ -492,8 +458,6 @@ export const ChatHeader = memo(function ChatHeader({
         data-chat-header-actions
         className={cn(
           "flex shrink-0 items-center justify-end gap-2 @3xl/header-actions:gap-3",
-          // Reserve two panel toggles plus their 4px gaps and 1px edge inset.
-          // The page header adds 8px more right padding at sm.
           rightPanelOpen ? "pr-0" : "pr-18.25 sm:pr-14.25",
           "[[data-panel-animations=true]_&]:motion-safe:transition-[padding-right] [[data-panel-animations=true]_&]:motion-safe:duration-(--panel-animation-duration) [[data-panel-animations=true]_&]:motion-safe:ease-out",
         )}

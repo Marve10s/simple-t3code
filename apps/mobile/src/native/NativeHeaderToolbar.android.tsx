@@ -30,7 +30,6 @@ function NativeHeaderToolbarSearchBarSlot() {
   return null;
 }
 
-// Native header item factories are iOS-only; Android owns its in-flow header.
 export const NativeHeaderToolbar = Object.assign(NativeHeaderToolbarRoot, {
   Button: NativeHeaderToolbarButton,
   Label: NativeHeaderToolbarLabel,

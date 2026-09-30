@@ -12,10 +12,6 @@ import {
 } from "./triagePrompt.ts";
 
 it("stays byte-identical to .github/triage/PLAYBOOK.md", () => {
-  // Old releases fetch the repo copy from `main` and follow it when it differs
-  // from their bundled playbook. The two must say the same thing at HEAD, or a
-  // playbook edit silently changes behavior only for old (or only for new)
-  // installs. Edit both files together.
   const canonicalPath = NodePath.join(
     import.meta.dirname,
     "../../../../.github/triage/PLAYBOOK.md",
@@ -30,8 +26,6 @@ it("seed prompt names the context file and embeds the playbook", () => {
 });
 
 it("launch prompt stays a single argv-safe line naming the prompt file", () => {
-  // The launch argument goes through cmd.exe on Windows (.cmd shims), which
-  // cannot carry newlines; the playbook itself must stay on disk.
   const launch = buildTriageLaunchPrompt(String.raw`C:\Users\a b\.t3\userdata\triage\x\prompt.md`);
   assert.notInclude(launch, "\n");
   assert.include(launch, String.raw`C:\Users\a b\.t3\userdata\triage\x\prompt.md`);

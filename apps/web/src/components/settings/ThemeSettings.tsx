@@ -83,8 +83,6 @@ function downloadThemeFile(filename: string, contents: string): void {
   anchor.href = url;
   anchor.download = filename;
   anchor.click();
-  // Revoking synchronously can abort the download in some browsers; give the
-  // browser time to open the stream first.
   setTimeout(() => URL.revokeObjectURL(url), 30_000);
 }
 
@@ -129,8 +127,6 @@ function ThemeLibraryCard({
     onSelectAndUse: (themeIndex: number, mode: ThemeAppearance) => void;
   };
 }) {
-  // A one-appearance theme can only take its own side of the mix, so the card
-  // tooltip promises exactly what clicking it does.
   const cardModes = theme.previews.map((preview) => preview.mode);
   const [radialModeOpen, setRadialModeOpen] = useState<ThemeAppearance | null>(null);
   const radialModeGroups = (["light", "dark"] as const).map((mode) => {
@@ -146,9 +142,6 @@ function ThemeLibraryCard({
     };
   });
   return (
-    // The card surface stays a plain div (buttons cannot nest inside a button
-    // role); the title button and mode circles carry the accessible actions,
-    // while the card click is a pointer-only convenience.
     <Tooltip>
       <TooltipTrigger
         render={
@@ -531,8 +524,6 @@ export function ThemeLibrary({
     theme: ThemeDefinition;
     collectionThemes: ReadonlyArray<ThemeDefinition>;
   } | null>(null);
-  // Keep the target after closing so the dialog text remains populated during
-  // its exit animation. The next trash action replaces it before reopening.
   const [isThemeRemovalOpen, setIsThemeRemovalOpen] = useState(false);
   const [themeIdsToRemove, setThemeIdsToRemove] = useState<ReadonlyArray<string>>([]);
   const themeIdsToRemoveSet = new Set(themeIdsToRemove);
@@ -585,20 +576,13 @@ export function ThemeLibrary({
     const removedIds = new Set(themeIdsToRemove);
     if (removedIds.size === 0) return;
     const removesBase = removedIds.has(getThemeDefinition(theme)?.id ?? "");
-    // Captured raw before persistTheme clears the mix: a half naming a
-    // published theme whose set has not streamed in yet is pruned from the
-    // `themeHalves` prop, and rebuilding from that would drop it.
     const storedHalves = readThemeHalvesRaw();
-    // Keep the themes installed if we cannot move the selection off one of
-    // them; the dialog stays open so the user can retry or cancel.
     if (removesBase && !persistTheme(appearanceMode === "system" ? "system" : appearanceMode)) {
       return;
     }
     for (const appearance of ["light", "dark"] as const) {
       const half = storedHalves[appearance];
       if (half === undefined) continue;
-      // Writing a base preference clears the whole mix, so halves that name
-      // a surviving theme are written back; removed halves fall back to base.
       const next = half && removedIds.has(half) ? null : removesBase ? half : undefined;
       if (next !== undefined && !setThemeHalf(appearance, next)) {
         notifyThemeRemovalFailure();
@@ -622,9 +606,6 @@ export function ThemeLibrary({
     themeRemovalTarget,
   ]);
 
-  // ----- Automatic-mode mixing -------------------------------------------
-  // The pair model: one theme owns light, one owns dark, and the global
-  // appearance mode (light / dark / auto) decides which is showing.
   const baseCardId = getThemeDefinition(theme)?.id ?? null;
   const lightOwner = themeHalves?.light ?? baseCardId;
   const darkOwner = themeHalves?.dark ?? baseCardId;
@@ -632,18 +613,10 @@ export function ThemeLibrary({
   const assignHalf = useCallback(
     (appearance: ThemeAppearance, cardId: string | null) => {
       const otherAppearance = appearance === "light" ? "dark" : "light";
-      // Picking the default over a themed base cannot be stored as a half:
-      // the base would still own that appearance. Convert the base into an
-      // explicit half on the other side so this side falls back to default.
       if (cardId === null && baseCardId !== null) {
-        // Read raw, before persistTheme clears the mix: the other half may
-        // name a published theme that has not streamed in yet, and falling
-        // back to the base would silently rewrite it.
         const otherOwner = readThemeHalvesRaw()[otherAppearance] ?? baseCardId;
         if (!persistTheme(appearanceMode === "system" ? "system" : appearanceMode)) return;
         if (!setThemeHalf(otherAppearance, otherOwner)) {
-          // Best-effort rollback: restore the whole-theme selection rather
-          // than leaving the user with no theme at all.
           setTheme(theme);
           notifyThemeSaveFailure();
         }
@@ -664,8 +637,6 @@ export function ThemeLibrary({
     ],
   );
 
-  // "Create theme" starts from whatever is on screen for the appearance being
-  // edited, so tuning the theme you already use never means rebuilding it.
   const activeThemeForAppearance =
     getThemeDefinition((initialAppearance === "light" ? lightOwner : darkOwner) ?? "") ?? null;
 
@@ -684,15 +655,11 @@ export function ThemeLibrary({
     if (!setAppearanceMode(mode)) notifyThemeSaveFailure();
   };
 
-  // ----- Wireframe tiles on top, two-ball cards below --------------------
   const handlePairPick = (cardId: string | null) => (mode: ThemeMode) => {
     if (mode === "system") return;
     assignHalf(mode, cardId);
   };
 
-  // Rings always show the effective owner of each appearance: an unpicked
-  // half belongs to the default card (a null owner), so a fresh install
-  // shows T3 Code selected instead of nothing.
   const pickedModesFor = (cardId: string | null): ThemeMode[] => {
     const rings: ThemeMode[] = [];
     if (lightOwner === cardId) rings.push("light");
@@ -766,10 +733,6 @@ export function ThemeLibrary({
   ];
 
   const renderPairGrid = () => (
-    // One shared provider so every tooltip in the grid hands off instantly to
-    // the next hovered trigger instead of stacking on top of it. The card
-    // tooltip briefly showing while crossing between a card's two circles is
-    // accepted — scoping the group tighter makes the handoffs feel sluggish.
     <TooltipProvider>
       <div
         className="grid w-full gap-2"
@@ -816,14 +779,9 @@ export function ThemeLibrary({
         })}
         {environmentThemes
           .filter(
-            // A saved theme with the same id wins resolution, so its card is
-            // the one that must show; rendering both would also collide keys.
             (environmentTheme) => !customThemes.some((theme) => theme.id === environmentTheme.id),
           )
           .map((environmentTheme) => (
-            // No edit or remove: the environment republishes these palettes on
-            // every change, so anything saved here would be overwritten.
-            // Duplicating is the way to keep a copy.
             <ThemeLibraryCard
               activeModes={pickedModesFor(environmentTheme.id)}
               isActive={false}
@@ -917,8 +875,6 @@ export function ThemeLibrary({
       {renderPairGrid()}
       <ThemeImportDialog
         onImportedMany={(importedThemes, { updated }) => {
-          // Re-apply after collection updates. The update may remove the
-          // selected variant, in which case the theme hook falls back safely.
           if (updated) refreshTheme();
           const verb = updated ? "updated" : "added";
           toastManager.add(
@@ -933,8 +889,6 @@ export function ThemeLibrary({
           );
         }}
         onImported={(importedTheme) => {
-          // Same rule as clicking the card: a one-appearance theme takes its
-          // side of the mix instead of becoming the base for both.
           const modes = getThemeModes(importedTheme);
           if (modes.length === 1) {
             assignHalf(modes[0]!, importedTheme.id);

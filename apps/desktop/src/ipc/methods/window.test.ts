@@ -188,10 +188,10 @@ describe("pasteAsText", () => {
 
         yield* pasteAsText.handler(undefined, { sender: { id: 99 } });
         assert.equal(paste.mock.calls.length, 1);
-        ownerWindow.mockReturnValue({}); // A focused PiP/other BrowserWindow.
+        ownerWindow.mockReturnValue({});
         yield* pasteAsText.handler(undefined, { sender: { id: 42 } });
         assert.equal(paste.mock.calls.length, 1);
-        ownerWindow.mockReturnValue(null); // Detached contents.
+        ownerWindow.mockReturnValue(null);
         yield* pasteAsText.handler(undefined, { sender: { id: 42 } });
         assert.equal(paste.mock.calls.length, 1);
         ownerWindow.mockReturnValue(window);

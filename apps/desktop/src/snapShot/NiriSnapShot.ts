@@ -48,7 +48,6 @@ const isWindowChanged = Schema.is(WindowChanged);
 const isWindowClosed = Schema.is(WindowClosed);
 const isScreenshotCaptured = Schema.is(ScreenshotCaptured);
 
-/** A session hint, never a probe of another compositor or a sandbox escape. */
 export function niriSocketPath(env = process.env): string | undefined {
   if (env.FLATPAK_ID || env.SNAP) return undefined;
   if (!env.XDG_CURRENT_DESKTOP?.split(":").some((name) => name.toLowerCase() === "niri"))
@@ -56,7 +55,6 @@ export function niriSocketPath(env = process.env): string | undefined {
   return env.NIRI_SOCKET && NodePath.isAbsolute(env.NIRI_SOCKET) ? env.NIRI_SOCKET : undefined;
 }
 
-/** One bounded exchange or event subscription. All waiters end when the socket closes. */
 class NiriConnection {
   private readonly socket: NodeNet.Socket;
   private readonly listeners = new Set<(value: unknown) => void>();
@@ -69,7 +67,6 @@ class NiriConnection {
     let pending = "";
     this.socket.on("data", (chunk: string) => {
       pending += chunk;
-      // Bound even an unterminated or malicious reply; ignore unrelated events without retaining them.
       if (Buffer.byteLength(pending) > MAX_MESSAGE_BYTES) {
         this.close(new Error("Niri returned an oversized message."));
         return;
@@ -147,7 +144,6 @@ async function request(path: string, message: unknown): Promise<unknown> {
 
 export async function checkNiriCaptureSupport(path: string): Promise<void> {
   const version = decodeVersion(await request(path, "Version")).Version;
-  // 25.11 introduced both caller-selected screenshot paths and completion events.
   const match = /^(?:niri )?(\d+)\.(\d+)/.exec(version);
   if (!match || Number(match[1]) < 25 || (Number(match[1]) === 25 && Number(match[2]) < 11))
     throw new Error("SnapShots require Niri 25.11 or newer.");
@@ -170,7 +166,6 @@ async function activateNiriWindow(path: string, title: string, signal: AbortSign
       } else if (isWindowClosed(value)) {
         windows.delete(value.WindowClosed.id);
       } else return undefined;
-      // Never activate another process's lookalike window, or guess between multiple T3 windows.
       const matches = [...windows.values()].filter(
         (window) => window.pid === process.pid && window.title === title,
       );
@@ -193,7 +188,6 @@ export async function captureNiriWindow(path: string): Promise<LinuxWindowSnapsh
   const imagePath = NodePath.join(directory, "capture.png");
   const events = new NiriConnection(path);
   try {
-    // An initial state event proves subscription, whereas the EventStream reply alone does not.
     const ready = events.waitFor((value) => (isWindowsChanged(value) ? true : undefined));
     events.send("EventStream");
     await ready;
@@ -202,7 +196,6 @@ export async function captureNiriWindow(path: string): Promise<LinuxWindowSnapsh
     const captured = events.waitFor((value) =>
       isScreenshotCaptured(value) && value.ScreenshotCaptured.path === imagePath ? true : undefined,
     );
-    // Observe rejection even if the compositor rejects the command before we await its event.
     void captured.catch(() => undefined);
     await request(path, {
       Action: {
@@ -219,7 +212,6 @@ export async function captureNiriWindow(path: string): Promise<LinuxWindowSnapsh
     const after = decodeWindows(await request(path, "Windows")).Windows.find(
       (item) => item.id === window.id,
     );
-    // A changed/closed window still yields an image, but never attach text from its replacement.
     const identityUnchanged =
       after &&
       after.pid === window.pid &&
@@ -236,7 +228,6 @@ export async function captureNiriWindow(path: string): Promise<LinuxWindowSnapsh
               appName: window.app_id ?? "Application",
               appIdentifier: window.app_id ?? "",
               processId: window.pid ?? 0,
-              // Niri reports logical size, not a globally comparable screen origin.
               bounds: {
                 x: 0,
                 y: 0,
@@ -257,7 +248,6 @@ export async function captureNiriWindow(path: string): Promise<LinuxWindowSnapsh
     };
   } finally {
     events.close();
-    // The private directory is ours; never remove compositor/user-owned screenshot paths.
     await NodeFSP.rm(directory, { recursive: true, force: true });
   }
 }

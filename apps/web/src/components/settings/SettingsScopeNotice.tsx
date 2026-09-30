@@ -8,7 +8,6 @@ import { useSettingsProjectGroups } from "./useSettingsProjectGroups";
 import { useLocation, useNavigate } from "@tanstack/react-router";
 import type { EnvironmentId } from "@t3tools/contracts";
 
-/** Offer an explicit target change when a category has no settings at this scope. */
 export function SettingsScopeNotice({
   children,
   target,

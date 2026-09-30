@@ -125,11 +125,6 @@ export interface ThreadDetailScreenProps {
   readonly selectedThreadFeed: ReadonlyArray<ThreadFeedEntry>;
   readonly activeWorkStartedAt: string | null;
   readonly isCompacting: boolean;
-  /**
-   * The server has not created this thread yet. "preparing" runs while the
-   * queued creation is delivered (a worktree may be checking out); "failed"
-   * is a rejected creation whose content went back to the project draft.
-   */
   readonly creationState:
     | { readonly kind: "preparing"; readonly preparingWorktree: boolean }
     | { readonly kind: "failed"; readonly reason: string; readonly onEditTask: () => void }
@@ -143,9 +138,7 @@ export interface ThreadDetailScreenProps {
   readonly draftMessage: string;
   readonly draftAttachments: ReadonlyArray<DraftComposerAttachment>;
   readonly connectionStateLabel: EnvironmentConnectionPhase;
-  /** Message sync status for the selected thread (drives the composer status pill). */
   readonly threadSyncStatus?: EnvironmentThreadStatus;
-  /** Non-null when older turns exist beyond the loaded window. */
   readonly loadEarlier?: { readonly loading: boolean; readonly onLoadEarlier: () => void } | null;
   readonly environmentId: EnvironmentId;
   readonly projectWorkspaceRoot: string | null;
@@ -283,15 +276,6 @@ export const ThreadDetailScreen = memo(function ThreadDetailScreen(props: Thread
   const insets = useSafeAreaInsets();
   const isKeyboardVisible = useKeyboardState((state) => state.isVisible);
   const liveKeyboardHeight = useKeyboardState((state) => state.height);
-  // Android can swallow the IME hide callbacks when the app is backgrounded
-  // mid keyboard-hide (the reported repro: send — which blurs and starts the
-  // hide — then Home within a second). The keyboard library's height AND
-  // visibility then stay frozen open, so gating the sticky translation on
-  // visibility alone still strands the composer after resume. Quarantine the
-  // translation on every Android resume instead; any sign of a live keyboard
-  // stream — an owned input gaining focus, or any visibility/height movement —
-  // lifts it. A healthy resume sees no visual difference (the translation is
-  // already zero while the keyboard is closed).
   const [keyboardStateSuspect, setKeyboardStateSuspect] = useState(false);
   useEffect(() => {
     if (Platform.OS !== "android") {
@@ -338,23 +322,12 @@ export const ThreadDetailScreen = memo(function ThreadDetailScreen(props: Thread
   const [anchorMessageId, setAnchorMessageId] = useState<MessageId | null>(null);
   const [submittedMessageId, setSubmittedMessageId] = useState<MessageId | null>(null);
   const [endFollowEnabled, setEndFollowEnabled] = useState(true);
-  // Android keys the safe-area padding on keyboard visibility (#5988): the
-  // back gesture closes the keyboard while the editor stays focused, and a
-  // focus-keyed inset would leave the toolbar under the gesture bar. iOS must
-  // NOT use visibility — it only flips on keyboardDidHide, after the hide
-  // animation, so the composer would ride down flush to the screen edge and
-  // then snap up into the inset. On iOS blur precedes the hide, so the
-  // focus-keyed inset is already in place while the composer rides down.
-  // Dictation keeps that focus while the composer switches to its compact pill.
   const composerBottomInset = (
     Platform.OS === "android" ? isKeyboardVisible : composerExpanded || composerFocused
   )
     ? 0
     : Math.max(insets.bottom, 12);
   const contentPresentationKind = props.contentPresentation.kind;
-  // The raw sync status enters "synchronizing" on every full fetch, cached or
-  // not. Whether messages are already on screen decides the pill label: no
-  // data yet → "Loading messages", cached data reconciling → "Syncing".
   const realThreadSyncLabel = (() => {
     switch (props.threadSyncStatus) {
       case "empty":
@@ -368,12 +341,7 @@ export const ThreadDetailScreen = memo(function ThreadDetailScreen(props: Thread
         return null;
     }
   })();
-  // Opening a running thread resyncs for a few frames. The pill shows the
-  // sync label only when the sync lasts, so it does not flash before the timer.
   const threadSyncLabel = useDelayedStatus(selectedThreadKey, realThreadSyncLabel);
-  // One floating pill above the composer: it reads the connection phase while
-  // disconnected, the sync state while messages load, then the working timer
-  // once the feed is settled.
   const floatingStatus = ((): FloatingWorkingStatus | null => {
     const connectionStatus = connectionFloatingStatus({
       connectionError: props.connectionError,
@@ -388,7 +356,6 @@ export const ThreadDetailScreen = memo(function ThreadDetailScreen(props: Thread
       return null;
     }
     if (props.creationState?.kind === "preparing") {
-      // The setup header already reports progress in the feed.
       if (props.worktreeSetup) return null;
       return {
         kind: "preparing",
@@ -410,8 +377,6 @@ export const ThreadDetailScreen = memo(function ThreadDetailScreen(props: Thread
     return null;
   })();
   const showWorkingControl = floatingStatus !== null;
-  // Connection and working status occupy the same space. Keep the feed inset
-  // stable when reconnecting hands off to syncing and then to a running turn.
   const showFloatingStatus =
     showWorkingControl ||
     devicePreviews.length > 0 ||
@@ -432,34 +397,20 @@ export const ThreadDetailScreen = memo(function ThreadDetailScreen(props: Thread
     (Boolean(props.loadEarlier) && props.selectedThread.latestUserMessageAt !== null);
   const composerChrome = composerExpanded ? COMPOSER_EXPANDED_CHROME : COMPOSER_COLLAPSED_CHROME;
   const composerOverlapHeight = composerChrome + composerBottomInset;
-  // While a user-input request is pending, the questionnaire owns the
-  // composer slot outright: expanded it is the full card, collapsed it is a
-  // composer-style bar in the same place (with its own stop control). The
-  // composer never mounts into the transition, which keeps the collapse and
-  // keyboard animations coherent. Collapse state is keyed by request id so a
-  // new request re-expands automatically.
   const [collapsedUserInputRequestId, setCollapsedUserInputRequestId] =
     useState<ApprovalRequestId | null>(null);
   const activeUserInputRequestId = props.activePendingUserInput?.requestId ?? null;
-  // The open /usage-limits panel for this thread, model and turn. Only the open
-  // moment is stored: the rows read live provider data, so a redeemed reset
-  // credit or refreshed probe shows through. Anything that spends quota closes
-  // it: a new turn from any source, or the agent resuming after an approval or
-  // answered question.
   const [usageLimitsPanel, setUsageLimitsPanel] = useState<{
     readonly key: string;
     readonly threadKey: string;
     readonly now: number;
   } | null>(null);
-  // A pending approval or question is part of the key: once it is answered,
-  // from this client or any other, the agent resumes and spends quota.
   const usageLimitsKey = [
     selectedThreadKey,
     props.selectedThread.modelSelection.instanceId,
     props.selectedThread.latestTurn?.turnId ?? "",
     props.activePendingApproval?.requestId ?? props.activePendingUserInput?.requestId ?? "",
   ].join(":");
-  // Drop the snapshot as soon as the key changes so it cannot resurface stale.
   if (usageLimitsPanel !== null && usageLimitsPanel.key !== usageLimitsKey) {
     setUsageLimitsPanel(null);
   }
@@ -494,8 +445,6 @@ export const ThreadDetailScreen = memo(function ThreadDetailScreen(props: Thread
     [selectedThreadKey, usageLimitsKey],
   );
   const dismissUsageLimits = useCallback(() => setUsageLimitsPanel(null), []);
-  // A send may resolve after navigating away, so only the originating
-  // thread's panel is cleared; a panel opened elsewhere in the meantime stays.
   const clearUsageLimitsFor = useCallback(
     (threadKey: string) =>
       setUsageLimitsPanel((current) =>
@@ -505,15 +454,6 @@ export const ThreadDetailScreen = memo(function ThreadDetailScreen(props: Thread
   );
   const userInputCollapsed =
     activeUserInputRequestId !== null && collapsedUserInputRequestId === activeUserInputRequestId;
-  // The card's height RESERVES keyboard space at all times instead of
-  // tracking the keyboard: transforms (the sticky translation) apply
-  // same-frame on the UI thread while layout props lag a Yoga pass behind,
-  // so any height that follows the keyboard flashes the card over the nav
-  // header on the way up. With a constant height the keyboard transition is
-  // pure translation — frame-perfect by construction — and the resting card
-  // stays compact over the transcript. Before the first open the reserve is
-  // an estimate; once a real height is known the card corrects once,
-  // discretely.
   const [lastKnownKeyboardHeight, setLastKnownKeyboardHeight] = useState(0);
   useEffect(() => {
     if (liveKeyboardHeight > 0 && liveKeyboardHeight !== lastKnownKeyboardHeight) {
@@ -525,18 +465,9 @@ export const ThreadDetailScreen = memo(function ThreadDetailScreen(props: Thread
     keyboardHeight:
       lastKnownKeyboardHeight > 0 ? lastKnownKeyboardHeight : ESTIMATED_KEYBOARD_HEIGHT,
     navigationHeaderHeight,
-    // The questionnaire owns the composer slot, so only the composer's
-    // bottom inset still overlaps.
     composerOverlapHeight: composerBottomInset,
   });
   const estimatedOverlayHeight = composerOverlapHeight;
-  // The overlay's measured height includes the home-indicator inset (the
-  // composer pads it), but contentInsetAdjustmentBehavior="automatic" makes
-  // UIKit add the safe-area bottom to the content inset AGAIN — leaving a
-  // dead strip between the resting content and the composer. Report the
-  // overlay height minus the safe area; UIKit adds it back, and ThreadFeed
-  // hands LegendList the same delta via contentInsetEndStaticAdjustment so
-  // its end-scroll math matches the real resting position.
   const nativeInsetOvercount =
     props.usesAutomaticContentInsets === true && Platform.OS === "ios" ? insets.bottom : 0;
   const { contentInsetEndAdjustment, onComposerLayout } = useKeyboardChatComposerInset(
@@ -546,15 +477,6 @@ export const ThreadDetailScreen = memo(function ThreadDetailScreen(props: Thread
     -nativeInsetOvercount,
     Platform.OS === "ios" ? COMPOSER_TRANSITION_DURATION_MS : 0,
   );
-  // The expanded questionnaire is an absolute overlay on iOS, so it never
-  // changes the measured overlay height (that constancy is what keeps the
-  // feed from snapping on collapse/expand). The toggle choreography runs on
-  // SHARED VALUES set directly in the tap handler — one JS hop, then the
-  // card's rise/sink and the feed's end-inset glide animate in lockstep on
-  // the UI thread, keyboard-style, instead of waiting on React mount +
-  // onLayout + state round trips. Coverage (how far the card extends above
-  // the bar) is measured straight into a shared value by the card's
-  // onLayout, with no re-render.
   const userInputCardProgress = useSharedValue(1);
   const userInputInsetProgress = useSharedValue(1);
   const userInputCardCoverage = useSharedValue(0);
@@ -567,9 +489,6 @@ export const ThreadDetailScreen = memo(function ThreadDetailScreen(props: Thread
       { duration: 180, reduceMotion: ReduceMotion.System },
     );
   }, [floatingControlCoverage, showFloatingStatus]);
-  // Android renders the expanded card in-flow (it cannot hit-test the iOS
-  // overlay outside the bar's bounds), so its measured overlay height already
-  // includes the card — the coverage extra is iOS-only.
   const userInputCoverageApplies = Platform.OS === "ios" && activeUserInputRequestId !== null;
   const combinedContentInsetEndAdjustment = useSharedValue(
     Math.max(0, estimatedOverlayHeight - nativeInsetOvercount),
@@ -592,12 +511,6 @@ export const ThreadDetailScreen = memo(function ThreadDetailScreen(props: Thread
     threadKey: selectedThreadKey,
     visible: false,
   });
-  // The list's own corrections for these inset changes drift on short
-  // content (and the error compounds across toggles), so deterministically
-  // re-pin the end once a toggle settles: a no-op when the resting position
-  // is already right, corrective when it is not. Follow state is re-checked
-  // inside the callback — the user may grab the list during the settle
-  // window, and yanking them back would override a live gesture.
   const scheduleOverlayRepin = useCallback(
     (delayMs: number) => {
       if (overlayRepinTimerRef.current !== null) {
@@ -634,10 +547,6 @@ export const ThreadDetailScreen = memo(function ThreadDetailScreen(props: Thread
     if ((!threadChanged && !visibilityChanged) || (threadChanged && !showFloatingStatus)) {
       return;
     }
-    // LegendList applies the larger inset but does not re-anchor short
-    // followed conversations when this floating coverage changes after the
-    // initial load. Re-pin after the finite inset transition; the callback
-    // checks follow state again so a user who scrolled up stays put.
     scheduleOverlayRepin(230);
   }, [scheduleOverlayRepin, selectedThreadKey, showFloatingStatus]);
   const handleToggleUserInputCollapsed = useCallback(() => {
@@ -645,19 +554,13 @@ export const ThreadDetailScreen = memo(function ThreadDetailScreen(props: Thread
       return;
     }
     if (userInputCollapsed) {
-      // Expanding: card and feed glide start NOW, on the UI thread.
       userInputCardProgress.value = withTiming(1, USER_INPUT_TOGGLE_TIMING);
       userInputInsetProgress.value = withTiming(1, USER_INPUT_TOGGLE_TIMING);
       setCollapsedUserInputRequestId(null);
       scheduleOverlayRepin(USER_INPUT_TOGGLE_DURATION_MS + 50);
     } else {
-      // Collapsing hides the custom-answer inputs; release the keyboard with
-      // them instead of leaving it up over a dead responder.
       Keyboard.dismiss();
       userInputCardProgress.value = withTiming(0, USER_INPUT_TOGGLE_TIMING);
-      // Instant: the sinking card still covers the strip being revealed, and
-      // animating the inset downward is what drifted the short-content end
-      // anchor.
       userInputInsetProgress.value = 0;
       setCollapsedUserInputRequestId(activeUserInputRequestId);
       scheduleOverlayRepin(60);
@@ -670,7 +573,6 @@ export const ThreadDetailScreen = memo(function ThreadDetailScreen(props: Thread
     userInputInsetProgress,
   ]);
   useEffect(() => {
-    // A new request always arrives expanded.
     userInputCardProgress.value = 1;
     userInputInsetProgress.value = 1;
   }, [activeUserInputRequestId, userInputCardProgress, userInputInsetProgress]);
@@ -679,8 +581,6 @@ export const ThreadDetailScreen = memo(function ThreadDetailScreen(props: Thread
   const isSplitLayout = layoutVariant === "split";
   const contentMaxWidth = isSplitLayout ? CHAT_CONTENT_MAX_WIDTH : undefined;
   const workspaceContentWidth = useWorkspaceContentWidth();
-  // Clearing animated width can retain the unfolded width after Android resumes folded.
-  // Assign both layouts explicitly so the dock always follows its current parent.
   const composerWidthStyle = useAnimatedStyle(() =>
     isSplitLayout && workspaceContentWidth !== null
       ? { width: workspaceContentWidth.value }
@@ -699,7 +599,6 @@ export const ThreadDetailScreen = memo(function ThreadDetailScreen(props: Thread
 
   useLayoutEffect(() => {
     selectedThreadKeyRef.current = selectedThreadKey;
-    // A replaced or unmounted native editor may not emit a blur event.
     setComposerFocused(false);
   }, [selectedThreadKey, showContent]);
 
@@ -731,11 +630,6 @@ export const ThreadDetailScreen = memo(function ThreadDetailScreen(props: Thread
         return;
       }
       lastScrolledSubmittedMessageIdRef.current = submittedMessageId;
-      // Wait for the keyboard dismissal (started by blur() on send) to finish
-      // before scrolling: scrollMessageToEnd freezes keyboard-driven inset
-      // updates while it runs, and a close event swallowed by that freeze
-      // leaves the keyboard padding permanently applied — overshooting the
-      // anchor and leaving a phantom bottom inset once the reply streams in.
       void KeyboardController.dismiss()
         .then(() => {
           if (
@@ -779,7 +673,6 @@ export const ThreadDetailScreen = memo(function ThreadDetailScreen(props: Thread
       return messageId;
     }
 
-    // A sent message makes the snapshot stale; a refused send leaves it in place.
     clearUsageLimitsFor(targetThreadKey);
 
     setSubmittedMessageId(messageId);
@@ -949,28 +842,18 @@ export const ThreadDetailScreen = memo(function ThreadDetailScreen(props: Thread
         <View className="flex-1" />
       )}
 
-      {/* Floating composer — sticks to keyboard via KeyboardStickyView */}
       {showContent ? (
         <KeyboardStickyView
-          // iOS emits a native animated height target on both will-show and
-          // will-hide, so stay subscribed for the full transition. Android
-          // retains its background/resume stale-state quarantine.
           enabled={Platform.OS === "ios" || (isKeyboardVisible && !keyboardStateSuspect)}
           pointerEvents="box-none"
           style={{ position: "absolute", bottom: 0, left: 0, right: 0, top: 0 }}
           offset={{ closed: 0, opened: 0 }}
         >
-          {/* The fixed sticky host gives this bottom-anchored child a stable
-              coordinate space. Its top and height can then animate together
-              instead of the auto-sized host jumping to Yoga's destination. */}
           <Animated.View
             layout={COMPOSER_LAYOUT_TRANSITION}
             pointerEvents="box-none"
             style={[{ position: "absolute", bottom: 0, left: 0 }, composerWidthStyle]}
           >
-            {/* No paddingTop here: the overlay's measured height becomes the
-                list's bottom inset, so any padding above the pill/composer
-                pushes the resting content floor up by the same amount. */}
             <View ref={composerOverlayRef} onLayout={onComposerLayout} className="w-full">
               <FloatingWorkingControl
                 colorScheme={isDarkMode ? "dark" : "light"}
@@ -1020,8 +903,6 @@ export const ThreadDetailScreen = memo(function ThreadDetailScreen(props: Thread
                 {props.activePendingApproval || props.activePendingUserInput ? (
                   <Animated.View
                     className="shrink-0 gap-3 px-4 pb-3"
-                    // The questionnaire replaces the composer, so it must pad
-                    // the home indicator the composer normally covers.
                     style={
                       activeUserInputRequestId !== null
                         ? { paddingBottom: composerBottomInset }
@@ -1060,10 +941,6 @@ export const ThreadDetailScreen = memo(function ThreadDetailScreen(props: Thread
                 ) : null}
               </View>
 
-              {/* Hidden (not unmounted) while a user-input request owns the
-                composer slot, so composer drafts and editor state survive.
-                A rejected creation has no thread to send to; the failure card
-                owns the slot instead. */}
               <View
                 style={
                   activeUserInputRequestId !== null || props.creationState?.kind === "failed"
@@ -1085,9 +962,6 @@ export const ThreadDetailScreen = memo(function ThreadDetailScreen(props: Thread
                   queueCount={props.selectedThreadQueueCount}
                   environmentId={props.environmentId}
                   projectCwd={props.threadCwd ?? props.projectWorkspaceRoot}
-                  // Follow-ups typed during setup wait in the draft: queueing
-                  // them against a thread id the server may still reject
-                  // would strand them in the outbox.
                   sendBlockedReason={
                     props.creationState?.kind === "preparing" ? "Starting the task…" : null
                   }

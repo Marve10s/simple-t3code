@@ -304,8 +304,6 @@ describe("ProviderRuntimeIngestion", () => {
         });
       }),
     ).pipe(Layer.provide(projectionSnapshotLayer));
-    // Real clock plus an offset the test can advance, so delivery pacing in
-    // ingestion can be driven without sleeping. Sleeps stay real.
     let clockOffsetMs = 0;
     const realClock = Effect.runSync(Effect.service(Clock.Clock));
     const shiftedClock: Clock.Clock = {
@@ -324,8 +322,6 @@ describe("ProviderRuntimeIngestion", () => {
       Layer.provide(Layer.succeed(Clock.Clock, shiftedClock)),
       Layer.provideMerge(orchestrationLayer),
       Layer.provideMerge(ingestionProjectionSnapshotLayer),
-      // Single shared liveness instance across ingestion (writer), the
-      // engine, and the snapshot query (reader).
       Layer.provideMerge(ThreadBackgroundLiveness.layer),
       Layer.provideMerge(ThreadPlanProgress.layer),
       Layer.provideMerge(SqlitePersistenceMemory),
@@ -1235,10 +1231,6 @@ describe("ProviderRuntimeIngestion", () => {
     const harness = await createHarness();
     const seededAt = "2026-01-01T00:00:00.000Z";
 
-    // A turn start is pending: the session reads "starting" with no active
-    // turn tracked yet. This is the window the Claude resume handshake's
-    // phantom (turn.completed with no turnId) used to slip through, stomping
-    // "starting" back to "ready" for a turn that never existed.
     await harness.dispatch({
       type: "thread.session.set",
       commandId: CommandId.make("cmd-session-seed-untargeted-completion"),
@@ -1275,9 +1267,6 @@ describe("ProviderRuntimeIngestion", () => {
     const harness = await createHarness();
     const seededAt = "2026-01-01T00:00:00.000Z";
 
-    // A completion that names its turn still lands even when no active turn
-    // is tracked (e.g. its turn.started was lost). Only untargeted
-    // completions are rejected.
     await harness.dispatch({
       type: "thread.session.set",
       commandId: CommandId.make("cmd-session-seed-targeted-completion"),
@@ -1571,7 +1560,6 @@ describe("ProviderRuntimeIngestion", () => {
       });
     }
 
-    // A repeated completion must rewrite that row, not add a second copy.
     harness.emit({
       type: "item.completed",
       eventId: asEventId("evt-reasoning-snapshot-repeat"),
@@ -1599,7 +1587,6 @@ describe("ProviderRuntimeIngestion", () => {
     const harness = await createHarness();
     const now = "2026-01-01T00:00:00.000Z";
 
-    // Distinct timestamps: blocks are ordered by when the provider opened them.
     for (const [tag, at, streamKind, delta] of [
       ["a", "2026-01-01T00:00:01.000Z", "reasoning_summary_text", "summary one"],
       ["b", "2026-01-01T00:00:02.000Z", "reasoning_text", "raw one"],
@@ -2332,10 +2319,6 @@ describe("ProviderRuntimeIngestion", () => {
   });
 
   it("accepts a conflicting turn.started for a pending turn start when the provider expects that turn", async () => {
-    // Steering a running turn: the server requests a new turn while the old
-    // one is still active, and providers like opencode open the new turn
-    // without ever completing the superseded one. The new turn.started must
-    // replace the active turn instead of being rejected as stale.
     const harness = await createHarness();
     const threadId = asThreadId("thread-1");
     const oldTurnId = asTurnId("turn-steered-over");
@@ -2367,7 +2350,6 @@ describe("ProviderRuntimeIngestion", () => {
       threadId,
     );
 
-    // The steer: a user-requested turn start while the old turn still runs.
     await Effect.runPromise(
       harness.engine.dispatch({
         type: "thread.turn.start",
@@ -2385,8 +2367,6 @@ describe("ProviderRuntimeIngestion", () => {
       }),
     );
 
-    // The provider session tracks the new turn before emitting turn.started
-    // (sendTurn updates the session first).
     harness.setProviderSession({
       provider: ProviderDriverKind.make("codex"),
       status: "running",
@@ -3517,7 +3497,6 @@ describe("ProviderRuntimeIngestion", () => {
       (thread) => thread.session?.status === "running" && thread.session?.activeTurnId === turnId,
     );
 
-    // Each delta lands well outside the pacing window of the one before.
     const emitDelta = (eventId: string, delta: string) => {
       harness.advanceClock(1_000);
       harness.emit({
@@ -3545,7 +3524,6 @@ describe("ProviderRuntimeIngestion", () => {
       streaming: true,
     });
 
-    // An open code block holds the whole block until its closing fence lands.
     emitDelta("evt-paragraph-2", "graph.\n\n```ts\nconst a = 1;\n\nconst b = 2;\n");
     await harness.drain();
     expect(
@@ -3617,7 +3595,6 @@ describe("ProviderRuntimeIngestion", () => {
       (await harness.readModel()).threads
         .find((t) => t.id === threadId)
         ?.messages.find((m: ProviderRuntimeTestMessage) => m.id === `assistant:${itemId}`)?.text;
-    // Paragraph mode would have delivered both paragraphs by now.
     expect(await messageText()).toBeUndefined();
 
     await harness.emitAndDrain([
@@ -3641,8 +3618,6 @@ describe("ProviderRuntimeIngestion", () => {
     const threadId = asThreadId("thread-1");
     const turnId = asTurnId("turn-paced");
     const itemId = asItemId("item-paced");
-    // Every delta carries the same event time, like OpenCode does for one
-    // part. Pacing must follow the server clock, not the event stamp.
     const now = "2026-01-01T00:00:00.000Z";
 
     harness.emit({
@@ -3657,8 +3632,6 @@ describe("ProviderRuntimeIngestion", () => {
       harness.readModel,
       (thread) => thread.session?.status === "running" && thread.session?.activeTurnId === turnId,
     );
-    // Emit is fire-and-forget, so drain after each delta before moving the
-    // clock. Otherwise the worker reads a clock that has already advanced.
     let clockMs = 0;
     const emitDelta = async (eventId: string, delta: string, offsetMs: number) => {
       harness.advanceClock(offsetMs - clockMs);
@@ -3684,7 +3657,6 @@ describe("ProviderRuntimeIngestion", () => {
     await emitDelta("evt-paced-1", "One.\n\n", 0);
     await emitDelta("evt-paced-2", "Two.\n\n", 100);
     await emitDelta("evt-paced-3", "Three.\n\n", 200);
-    // The first paragraph lands right away. The next two are inside the window.
     expect(await messageText()).toBe("One.\n\n");
 
     await emitDelta("evt-paced-4", "Four.\n\n", 500);
@@ -4150,7 +4122,6 @@ describe("ProviderRuntimeIngestion", () => {
         eventId: asEventId("evt-blocked-turn-completed"),
         payload: { state: "failed" },
       });
-      // Resolves only if turn.completed is processed while detection is still blocked.
       yield* Fiber.join(settled);
       const blocked = yield* Effect.promise(harness.readModel);
       expect(blocked.threads[0]?.session).toMatchObject({ status: "error", activeTurnId: null });
@@ -4159,9 +4130,6 @@ describe("ProviderRuntimeIngestion", () => {
       );
       expect(blocked.threads[0]?.checkpoints).toEqual([]);
 
-      // A newer turn starts before detection returns. The late placeholder
-      // must neither settle the failed turn as completed nor move the
-      // latest-turn pointer back to it.
       const nextTurnId = asTurnId("next-turn");
       const nextTurnStarted = yield* harness.engine.streamDomainEvents.pipe(
         Stream.filter(
@@ -4929,7 +4897,6 @@ describe("ProviderRuntimeIngestion", () => {
         payload: { taskId: "swept-task-1", description: "Watch round-3 CI and bots" },
       },
     ]);
-    // Older saved progress rows can have no title even when the start has one.
     await harness.dispatch({
       type: "thread.activity.append",
       commandId: CommandId.make("cmd-swept-task-progress"),
@@ -5167,8 +5134,6 @@ describe("splitBufferedAssistantText", () => {
   it("keeps a partial list marker and list-like code buffered", () => {
     expect(splitBufferedAssistantText("intro\n-")).toEqual({ ready: "", rest: "intro\n-" });
     expect(splitBufferedAssistantText("intro\n1.")).toEqual({ ready: "", rest: "intro\n1." });
-    // `intro\n- \n` would parse as a setext heading, so a bare marker with only
-    // trailing whitespace is not a boundary on the partial line either.
     expect(splitBufferedAssistantText("intro\n- ")).toEqual({ ready: "", rest: "intro\n- " });
     expect(splitBufferedAssistantText("- one\n")).toEqual({ ready: "", rest: "- one\n" });
     expect(splitBufferedAssistantText("```\n- one\n- two\n")).toEqual({
@@ -5195,7 +5160,6 @@ describe("splitBufferedAssistantText", () => {
       ready: "para\n",
       rest: "## Setup\n\nInstall",
     });
-    // A bold line there continues the paragraph, so both stay buffered.
     expect(splitBufferedAssistantText("para\n**Setup**\n\nInstall")).toEqual({
       ready: "",
       rest: "para\n**Setup**\n\nInstall",

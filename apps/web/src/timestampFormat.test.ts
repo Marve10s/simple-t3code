@@ -23,9 +23,6 @@ describe("resolveTimestampLocale", () => {
   });
 
   it("defers to the runtime default rather than throwing on an unusable tag", () => {
-    // The desktop bridge normalizes POSIX identifiers before reporting them, so
-    // anything Intl still rejects here falls back instead of breaking every
-    // timestamp in the UI.
     expect(resolveTimestampLocale("not a locale")).toBeUndefined();
     expect(resolveTimestampLocale("en_GB")).toBeUndefined();
   });
@@ -45,7 +42,6 @@ describe("formatShortTimestamp", () => {
     vi.resetModules();
     const { formatShortTimestamp: format } = await import("./timestampFormat");
     const date = new Date(2026, 3, 7, 15, 44).toISOString();
-    // ICU can separate the day period with a narrow no-break space.
     expect(format(date, "locale").replace(/[  ]/g, " ")).toBe(localTime);
     expect(format(date, "12-hour").replace(/[  ]/g, " ")).toMatch(/^3:44 [ap]m$/i);
     expect(format(date, "24-hour")).toBe("15:44");
@@ -127,8 +123,6 @@ describe("formatExpiresInLabel", () => {
 });
 
 describe("formatDayAwareTimestamp", () => {
-  // Instants are built with the local-time Date constructor so the
-  // calendar-day boundaries hold in any test timezone or locale.
   const iso = (y: number, monthIndex: number, d: number, h: number, mi: number) =>
     new Date(y, monthIndex, d, h, mi).toISOString();
   const now = new Date(2026, 7, 14, 12, 0).getTime();

@@ -34,11 +34,6 @@ export const orchestrationHttpApiLayer = HttpApiBuilder.group(
         Effect.fn("environment.orchestration.snapshot")(function* (args) {
           yield* annotateEnvironmentRequest(args.endpoint.name);
           yield* requireEnvironmentScope(AuthOrchestrationReadScope);
-          // Serve the lightweight command read model (thread bodies empty)
-          // instead of the fully hydrated snapshot. Hydrating every message
-          // and activity payload in the database has OOM-killed servers, and
-          // the route's only consumer (the project CLI) reads projects alone —
-          // UI clients load the shell and per-thread snapshots instead.
           return yield* projectionSnapshotQuery
             .getCommandReadModel()
             .pipe(

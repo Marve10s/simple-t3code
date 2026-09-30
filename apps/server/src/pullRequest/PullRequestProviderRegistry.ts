@@ -23,13 +23,11 @@ import type { PullRequestProviderApi } from "./PullRequestProvider.ts";
 export class PullRequestProviderRegistry extends Context.Service<
   PullRequestProviderRegistry,
   {
-    /** Null for a host with no implementation, which the service reports as unsupported. */
     readonly get: (kind: SourceControlProviderKind) => PullRequestProviderApi | null;
     readonly kinds: ReadonlyArray<SourceControlProviderKind>;
   }
 >()("t3/pullRequest/PullRequestProviderRegistry") {}
 
-/** Exported for tests, which stand a registry up from providers they supply themselves. */
 export function fromProviders(
   providers: ReadonlyArray<PullRequestProviderApi>,
 ): PullRequestProviderRegistry["Service"] {
@@ -40,12 +38,7 @@ export function fromProviders(
   };
 }
 
-/**
- * The hosts this build can read change requests from. A host with no entry here still shows up
- * in the provider list as unimplemented, so its projects are explained rather than missing.
- *
- * @public Service construction is part of the canonical Effect module API.
- */
+/** @public */
 export const make = Effect.map(
   Effect.all([
     GitHubPullRequestProvider.make,

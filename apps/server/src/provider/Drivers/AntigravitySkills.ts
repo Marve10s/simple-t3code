@@ -9,12 +9,6 @@ import * as Schema from "effect/Schema";
 import * as Stream from "effect/Stream";
 import { parse as parseYamlDocument } from "yaml";
 
-/**
- * The home directory the agent expands `~` against, matching Python's
- * `os.path.expanduser` in the launch environment T3 hands the process:
- * `USERPROFILE`, then `HOMEDRIVE` + `HOMEPATH`, on Windows and `HOME`
- * elsewhere. Values are used verbatim; a path may contain spaces.
- */
 export function resolveAntigravityUserHome(
   platform: NodeJS.Platform,
   environment: NodeJS.ProcessEnv,
@@ -29,15 +23,6 @@ export function resolveAntigravityUserHome(
   return environment.HOME || NodeOS.homedir();
 }
 
-/**
- * The agent's two user-global skill directories under a Gemini home, in
- * native precedence order: `config/skills` is shared with the Antigravity IDE
- * and CLI, and `antigravity-cli/skills` is where the `agy` CLI installs
- * skills. The agent resolves both under `GEMINI_HOME`, which T3 points at a
- * private profile, so the profile links these back to the user's `~/.gemini`.
- * `~/.agents/skills` is not read: the agent only treats `.agents/skills` as a
- * project directory.
- */
 export function antigravityUserSkillDirectories(
   path: Path.Path,
   geminiHome: string,
@@ -104,7 +89,6 @@ function parseSkillFrontmatter(contents: string, fileName: string) {
     );
     const name = frontmatter.name || fileName.slice(0, -3);
     const description = frontmatter.description?.trim();
-    // Native names are not trimmed. Do not rename one to fit the picker contract.
     if (!name || name !== name.trim()) return undefined;
     return { name, ...(description ? { description } : {}) };
   } catch {
@@ -112,7 +96,6 @@ function parseSkillFrontmatter(contents: string, fileName: string) {
   }
 }
 
-/** The native loader orders child paths with Go's URL.EscapedPath encoding. */
 function skillPathSortKey(entry: string) {
   return encodeURI(entry).replace(
     /[!'()*?#]/g,
@@ -120,7 +103,6 @@ function skillPathSortKey(entry: string) {
   );
 }
 
-/** Read only regular skill files, with a byte limit that applies during the read. */
 const readSkill = Effect.fn("readAntigravitySkill")(function* (
   skillPath: string,
   budget: ScanBudget,
@@ -152,11 +134,6 @@ const readSkill = Effect.fn("readAntigravitySkill")(function* (
   return bytes.toString("utf8");
 });
 
-/**
- * Match the official ACP's explicit skill roots. The first valid same-name skill
- * wins. Each root loads its own SKILL.md or those in its immediate subdirectories.
- * Read failures remain typed so workspace snapshots do not cache partial results.
- */
 export const discoverAntigravitySkills = Effect.fn("discoverAntigravitySkills")(function* (input: {
   readonly cwd: string;
   readonly userHome: string;

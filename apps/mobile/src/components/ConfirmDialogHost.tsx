@@ -14,12 +14,6 @@ type DialogRequest =
 
 let presentRequest: ((request: DialogRequest) => void) | null = null;
 
-/**
- * Imperative confirm dialog, Alert.alert-shaped. Native iOS alerts already
- * match the app (and support per-button destructive red), so this is for
- * Android, where the native dialog can only theme all confirm buttons at
- * once. Requires ConfirmDialogHost to be mounted at the app root.
- */
 export function showConfirmDialog(request: ConfirmDialogRequest): void {
   presentRequest?.({ kind: "confirm", request });
 }
@@ -28,12 +22,6 @@ export function showTextInputDialog(request: TextInputDialogRequest): void {
   presentRequest?.({ kind: "text-input", request });
 }
 
-/**
- * Android-style alert dialog matching the native one themed by
- * withAndroidModernAlertDialog — left-aligned text, right-aligned text
- * buttons — with what the native theme can't do: a per-dialog destructive
- * button color and a dimmer message than the title.
- */
 export function ConfirmDialogHost() {
   const [presented, setPresented] = useState<DialogRequest | null>(null);
   const [inputValue, setInputValue] = useState("");

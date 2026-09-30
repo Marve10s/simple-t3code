@@ -77,8 +77,6 @@ import * as MobileRegistrations from "../agentActivity/MobileRegistrations.ts";
 import { withSpanAttributes } from "../observability.ts";
 import * as RelayDb from "../db.ts";
 
-// Delegated thread IDs carry escaped command provenance and exceed the router's
-// default 100-character path parameter limit. Match the environment server.
 export const RELAY_HTTP_ROUTER_CONFIG = {
   maxParamLength: 512,
 } as const;
@@ -174,13 +172,6 @@ export const relayDocsRedirectRoute = HttpRouter.add(
   HttpServerResponse.redirect("/docs"),
 );
 
-// Shorter than the mobile client's 10s request timeout on purpose: when a
-// request hangs (e.g. a stuck upstream query), the client would otherwise
-// abort first, the invocation would die with the request span still open, and
-// the batched spans would never export — leaving no server-side trace at all.
-// Failing server-side first turns the hang into a completed 504 whose trace
-// contains the exact child span that stalled, and the response still carries
-// the traceparent back to the client.
 export const RELAY_REQUEST_DEADLINE_MS = 9_000;
 
 const relayRequestDeadline = <E, R>(
@@ -222,7 +213,6 @@ export const traceRelayHttpRequest = <E, R>(
     HttpServerRequest.HttpServerRequest | R
   >,
 ) =>
-  // HttpMiddleware finalizes its span on the dispatcher; do not close a request-scoped exporter first.
   HttpMiddleware.tracer(
     appendRelayTraceContextResponseHeader.pipe(Effect.andThen(relayRequestDeadline(httpEffect))),
   ).pipe(Effect.ensuring(Effect.yieldNow));
@@ -244,7 +234,6 @@ export const withoutCapturedParentSpan = <A, E, R>(
 ): Effect.Effect<A, E, R> =>
   Effect.withFiber((fiber) => {
     const context = fiber.context;
-    // HttpApiBuilder captures its build context for route handlers; an event parent would outlive export.
     fiber.setContext(Context.omit(Tracer.ParentSpan)(context));
     return effect.pipe(Effect.ensuring(Effect.sync(() => fiber.setContext(context))));
   });
@@ -364,7 +353,6 @@ function isDpopAuthorizationHeader(value: string | undefined): boolean {
 }
 
 function readHttpAuthorizationCredential(credential: Redacted.Redacted<string>): string {
-  // Effect beta.73 leaves the scheme separator in decoded HTTP credentials.
   return Redacted.value(credential).trimStart();
 }
 
@@ -468,10 +456,6 @@ export const unlinkEnvironmentRecord = Effect.fn("relay.api.client.unlinkEnviron
             environmentPublicKey: link.environmentPublicKey,
           });
 
-    // External teardown cannot share the SQL transaction. Run it only after
-    // revocation commits so a database failure leaves a fully usable active
-    // link. Still run teardown when the link is already revoked, allowing a
-    // retry to finish cleanup after an earlier Cloudflare failure.
     const deprovisioned = yield* managedEndpointProvider.deprovision({
       userId: input.userId,
       environmentId: input.environmentId,
@@ -895,9 +879,6 @@ export const clientApi = HttpApiBuilder.group(
         Effect.fn("relay.api.client.releaseEnvironmentTunnel")(function* (args) {
           const { params } = args;
           const { userId } = yield* RelayClientPrincipal;
-          // ok mirrors whether the connector token is now dead: false means a
-          // concurrent provision kept the recorded tunnel alive, so the caller
-          // must not discard its runtime config.
           const released = yield* managedEndpointProvider
             .release({
               userId,

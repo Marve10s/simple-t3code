@@ -624,7 +624,6 @@ describe("OrchestrationEngine", () => {
           originalUpdatedAt,
         );
 
-        // Automatic settlement stamps the last activity, never the sweep time.
         const lastActivityAt = "2025-12-20T00:00:00.000Z";
         const staleError = yield* engine
           .dispatch({
@@ -1043,7 +1042,6 @@ describe("OrchestrationEngine", () => {
             },
           }),
       });
-      // Same-tick links must replace the old PR, not rely on timestamp ordering.
       const clock = vi.spyOn(Date, "now").mockReturnValue(Date.parse(now()));
       try {
         const projectId = ProjectId.make("pr-race-project");

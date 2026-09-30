@@ -630,7 +630,6 @@ describe("buildCodexAdditionalContext", () => {
   it("keeps every entry under Codex's 1,000 token cap per entry", () => {
     const context = buildCodexAdditionalContext(runtime, { browser: true, device: true });
     for (const entry of Object.values(context)) {
-      // Codex estimates 4 bytes per token and truncates the middle of longer values.
       NodeAssert.ok(Buffer.byteLength(entry.value) < 4_000);
     }
   });
@@ -657,8 +656,6 @@ describe("T3 tool instructions", () => {
   });
 
   it("omits the tool entry entirely when no tools are attached", () => {
-    // Steering away from other browser automation must go with the tools;
-    // keeping it would leave the model talked out of its only option.
     const context = buildCodexAdditionalContext(runtime, false);
     NodeAssert.deepStrictEqual(Object.keys(context), ["t3_code_runtime"]);
   });

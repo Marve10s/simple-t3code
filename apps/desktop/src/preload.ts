@@ -34,8 +34,6 @@ exposeClerkBridge({ passkeys: true });
 const clientPlatform = process.platform;
 
 if (clientPlatform === "darwin") {
-  // Native window buttons do not scale with Chromium zoom. Keep their reserved
-  // space in native points, including when a zoomed page is reloaded.
   const syncWindowControlInset = () => {
     document.documentElement.style.setProperty(
       "--desktop-window-controls-inset",

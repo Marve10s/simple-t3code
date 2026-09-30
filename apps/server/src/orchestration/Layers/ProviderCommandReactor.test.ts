@@ -532,7 +532,6 @@ describe("ProviderCommandReactor", () => {
       }),
     );
     if (input?.unreadableHistory === true) {
-      // Metadata commands must not decode this unrelated message body.
       await runtime.runPromise(
         Effect.gen(function* () {
           const sql = yield* SqlClient.SqlClient;
@@ -4475,7 +4474,6 @@ describe("ProviderCommandReactor", () => {
           commandId: CommandId.make("cmd-settle-first"),
           threadId,
         });
-        // The reactor is busy with the first settle while the user changes their mind.
         yield* Deferred.await(firstCloseStarted);
         yield* harness.engine.dispatch({
           type: "thread.unsettle",

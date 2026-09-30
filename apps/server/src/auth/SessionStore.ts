@@ -374,10 +374,6 @@ export class SessionStore extends Context.Service<
       readonly scopes?: ReadonlyArray<AuthEnvironmentScope>;
       readonly client?: AuthClientMetadata;
       readonly proofKeyThumbprint?: string;
-      /**
-       * Atomically revoke active sessions with the same subject and method
-       * before storing this session.
-       */
       readonly replaceActiveForSubjectAndMethod?: boolean;
     }) => Effect.Effect<IssuedSession, SessionCredentialInternalError>;
     readonly verify: (token: string) => Effect.Effect<VerifiedSession, SessionCredentialError>;
@@ -597,7 +593,6 @@ export const make = Effect.gen(function* () {
       Effect.withSpan("SessionStore.markConnected"),
     );
 
-  // Best-effort: connection metadata must never block or fail a connect.
   const recordClientConnection: SessionStore["Service"]["recordClientConnection"] = (
     sessionId,
     client,

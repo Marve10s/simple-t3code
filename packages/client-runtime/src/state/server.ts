@@ -53,7 +53,6 @@ import {
   withoutEnvironmentThemes,
 } from "./serverConfigProjection.ts";
 
-// Exported server state includes this type in its inferred public return type.
 export type { ServerConfigProjection } from "./serverConfigProjection.ts";
 
 export type ServerUpdateStage = "downloading" | "installing" | "resuming";
@@ -125,8 +124,6 @@ export class ServerUpdateTerminalError extends Schema.TaggedError<ServerUpdateTe
   }
 }
 
-// Covers the 120-second trial deadline and a final restart of the previous
-// version when the trial rolls back.
 const SERVER_UPDATE_RESUME_TIMEOUT = Duration.minutes(4);
 
 export function matchesServerUpdateReadyEvent(
@@ -173,24 +170,6 @@ export function validateServerUpdateReadyEvent(
   );
 }
 
-/**
- * Keeps reconnect attempts ~1s apart for the whole update restart.
- *
- * A restart takes the server down for ~15 seconds, but the supervisor's normal
- * backoff ladder (1/2/4/8/16s) assumes an unexpected failure and lands attempts
- * at ~3, 5, 9, 17 and 33 seconds — so a 15-second restart is observed as a
- * 33-second "Resuming". Nudging on every backoff entry (not just the first)
- * holds the retry cadence flat until the server answers again. The sleep before
- * each nudge is the pacer: a connection that fails instantly re-enters backoff
- * immediately and would otherwise spin a tight retry loop.
- *
- * A newly restarted server can also reject the first environment credential.
- * Authentication blocks need the same paced retry during this known restart;
- * permission and configuration failures remain blocked.
- *
- * Callers fork this as a child of the update command so it is interrupted as
- * soon as the update settles, whether it succeeds, fails, or times out.
- */
 export function nudgeReconnectDuringUpdateRestart(input: {
   readonly stateChanges: Stream.Stream<
     {
@@ -380,8 +359,6 @@ export const makeEnvironmentServerConfigState = Effect.fn("EnvironmentServerConf
       ),
     );
     const state = yield* SubscriptionRef.make<Option.Option<ServerConfigProjection>>(
-      // Stripped on load as well as on save: a cache written by an earlier
-      // build can still carry published themes.
       Option.map(cachedConfig, (cached) => ({
         config: withoutEnvironmentThemes(cached),
         latestEvent: cachedConfigSnapshotEvent(withoutEnvironmentThemes(cached)),
@@ -617,19 +594,12 @@ export function createServerEnvironmentAtoms<R, E>(
     readonly initialConfigValueAtom: (
       environmentId: EnvironmentId,
     ) => Atom.Atom<ServerConfig | null>;
-    /**
-     * Whether this surface renders themes the environment publishes. Mobile
-     * keeps its own appearance settings, so it neither asks for the stream nor
-     * receives the payload.
-     */
     readonly environmentThemes?: boolean;
-    /** Whether this surface renders quota from configured usage-limit sources. */
     readonly usageLimitSources?: boolean;
     readonly usageLimitsCommand?: boolean;
   },
 ) {
   const configScheduler = createAtomCommandScheduler();
-  // Updates stay serial end-to-end, but only their handoff phase occupies the config lane.
   const updateScheduler = createAtomCommandScheduler();
   const configConcurrency = {
     mode: "serial" as const,
@@ -785,9 +755,6 @@ export function createServerEnvironmentAtoms<R, E>(
                     (selfUpdateMethod === "boot-service" || selfUpdateMethod === "respawn") &&
                     isLegacyUpdateHandoffLoss(exit.cause)
                   ) {
-                    // Older servers can tear down the transport before their
-                    // unary acknowledgement arrives. Treat only that transport
-                    // loss as a handoff, then prove it by waiting for target ready.
                     return { targetVersion, method: selfUpdateMethod };
                   }
                   return yield* Effect.failCause(exit.cause);
@@ -826,9 +793,6 @@ export function createServerEnvironmentAtoms<R, E>(
           }),
         );
 
-        // The update restart is intentional and the server stays unreachable
-        // for the whole restart, so hold the retry cadence flat instead of
-        // letting the supervisor climb its backoff ladder.
         yield* nudgeReconnectDuringUpdateRestart({
           stateChanges: environmentRegistry.stateChanges(target.environmentId),
           retryNow: environmentRegistry.retryNow(target.environmentId),
@@ -916,8 +880,6 @@ export function createServerEnvironmentAtoms<R, E>(
   const usagePricesAtom = Atom.family((environmentId: EnvironmentId) =>
     Atom.make((get) => {
       const overrides = get(settingsValueAtom(environmentId))?.usagePriceOverrides ?? {};
-      // Only changed prices should trigger another transcript scan. Settings
-      // snapshots can recreate the same mapping in a different property order.
       return JSON.stringify(
         Object.keys(overrides)
           .sort()
@@ -1006,7 +968,6 @@ export function createServerEnvironmentAtoms<R, E>(
     chatGptHandoffState: createEnvironmentSubscriptionAtomFamily(runtime, {
       label: "environment-data:chatgpt:handoff",
       sensitiveInput: true,
-      // OAuth must not be replayed when the connection recovers.
       subscribe: (input: EnvironmentRpcInput<typeof WS_METHODS.chatGptHandoffSubscribe>) =>
         runStream(WS_METHODS.chatGptHandoffSubscribe, input),
       idleTtlMs: 0,
@@ -1074,8 +1035,6 @@ export function createServerEnvironmentAtoms<R, E>(
       tag: WS_METHODS.serverGetResourceTelemetryHistory,
       staleTimeMs: 5_000,
     }),
-    // A cold transcript scan is measured in seconds, so keep the result around
-    // long enough that switching windows or re-rendering does not rescan.
     usageSummary: createEnvironmentRpcQueryAtomFamily(runtime, {
       label: "environment-data:server:usage-summary",
       tag: WS_METHODS.serverGetUsageSummary,
@@ -1089,7 +1048,6 @@ export function createServerEnvironmentAtoms<R, E>(
       tag: WS_METHODS.providerConsumeResetCredit,
       concurrency: {
         mode: "singleFlight",
-        // Both ids are free-form strings; a delimiter could collide.
         key: ({ environmentId, input }) => JSON.stringify([environmentId, input]),
       },
     }),

@@ -235,9 +235,6 @@ export const make = Effect.fn("EnvironmentSupervisor.make")(function* (
   const intent = yield* Ref.make(initialIntent);
   const signals = yield* Queue.unbounded<SupervisorSignal>();
   const resetRetryState = yield* Ref.make(false);
-  // Set when a foreground wake probe fails or times out: the user is actively
-  // returning to the app on a dead transport, so the follow-up reconnect skips
-  // the first backoff rung instead of sleeping.
   const wakeProbeFailed = yield* Ref.make(false);
   const state = yield* SubscriptionRef.make<SupervisorConnectionState>(
     !initialIntent.desired
@@ -412,9 +409,6 @@ export const make = Effect.fn("EnvironmentSupervisor.make")(function* (
             return false;
           }
           if (next.reason === "application-active-reconnect") {
-            // Mobile operating systems commonly suspend sockets without
-            // delivering a close event. A long background resume deliberately
-            // replaces that lease and starts a fresh attempt without backoff.
             return true;
           }
           if (next.reason === "application-active" || next.reason === "application-active-probe") {
@@ -672,8 +666,6 @@ export const make = Effect.fn("EnvironmentSupervisor.make")(function* (
       const outcome: AttemptOutcome = yield* Effect.scoped(
         runAttempt(attempt, nextGeneration, latestFailure, pendingRetry),
       );
-      // Consumed on every iteration so a stale marker can never leak into a
-      // later, unrelated failure.
       const failedWakeProbe = yield* Ref.getAndSet(wakeProbeFailed, false);
       if (outcome.established) {
         generation = nextGeneration;
@@ -712,10 +704,6 @@ export const make = Effect.fn("EnvironmentSupervisor.make")(function* (
       }
 
       if (failedWakeProbe) {
-        // The wake probe found a dead transport while the user is returning to
-        // the app, so reconnect immediately instead of sleeping the first
-        // backoff rung. Only this first attempt skips the ladder; if it fails
-        // too, normal backoff resumes.
         resetRetryLadder();
         yield* setState(connectingState(yield* Ref.get(intent), generation, 1, error));
         continue;

@@ -412,7 +412,6 @@ export const makeCodexAppServerPatchedProtocol = Effect.fn("makeCodexAppServerPa
             remainder.length = 0;
             start = newline + 1;
           }
-          // Keep unfinished lines in fragments so each chunk is scanned only once.
           if (start < chunk.length) {
             remainder.push(chunk.slice(start));
           }

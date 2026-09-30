@@ -176,8 +176,6 @@ function ThreadHeader(
           layout.usesSplitView
             ? undefined
             : () => {
-                // A deep link or cold start has no previous route; Home is the way out.
-                // Read the history at press time: it changes without re-rendering this screen.
                 if (navigation.canGoBack()) navigation.goBack();
                 else navigation.dispatch(StackActions.replace("Home"));
               }
@@ -222,7 +220,6 @@ interface ThreadRouteScreenProps extends ThreadRouteScreenRouteProps {
   readonly renderInspector?: (headerInset: number) => ReactNode;
 }
 
-/** Shows recovery only after the target route has reached a terminal unavailable state. */
 function ThreadUnavailableScreen(props: {
   readonly actionLabel: string;
   readonly onAction: () => void;
@@ -276,11 +273,6 @@ export function ThreadRouteScreen(props: ThreadRouteScreenProps) {
     return <OpeningThreadLoadingScreen />;
   }
 
-  // Render the full thread chrome (header, feed, composer) as soon as the
-  // thread SHELL is known — no blocking on message detail. The feed shows a
-  // loading placeholder while messages fetch, the floating pill above the
-  // composer reports loading/syncing, and the composer's connection pill
-  // reports connecting/reconnecting status.
   if (selectedThread !== null && selectedThreadKey === routeThreadKey) {
     return <ThreadRouteContent {...props} selectedThreadDetailState={selectedThreadDetailState} />;
   }
@@ -336,7 +328,6 @@ function ThreadRouteContent(
   } = useThreadSelection();
   const selectedThreadDetailState = props.selectedThreadDetailState;
   const selectedThreadDetail = Option.getOrNull(selectedThreadDetailState.data);
-  // "Load earlier turns" header state for windowed (paginated) thread loads.
   const loadEarlierTurns = useMemo(() => {
     if (selectedThread === null || !threadHasOlderTurns(selectedThreadDetailState)) {
       return null;
@@ -413,9 +404,6 @@ function ThreadRouteContent(
     useCallback(() => {
       return () => {
         if (props.renderInspector === undefined) {
-          // Inspectors are contextual to this chat destination. Clear the
-          // hidden chat copy after a native push so returning from Files,
-          // Review, or Terminal cannot reserve an empty trailing pane.
           setInspectorSelection(null);
         }
       };
@@ -438,7 +426,6 @@ function ThreadRouteContent(
     [composer.interactionMode, composer.modelSelection, composer.runtimeMode, selectedThread],
   );
 
-  /* ─── Native header theming ──────────────────────────────────────── */
   const usesNativeHeaderGlass = NATIVE_LIQUID_GLASS_SUPPORTED;
   const headerSubtitle = [
     selectedThreadProject?.title ?? null,
@@ -446,7 +433,6 @@ function ThreadRouteContent(
   ]
     .filter(Boolean)
     .join(" · ");
-  /* ─── Git status for native header trigger ───────────────────────── */
   const gitStatus = useEnvironmentQuery(
     selectedThread !== null && selectedThreadCwd !== null
       ? vcsEnvironment.status({
@@ -475,7 +461,6 @@ function ThreadRouteContent(
     onReconnectEnvironment(environmentId);
   }, [environmentId, onReconnectEnvironment]);
 
-  /* ─── Git action progress (for overlay banner) ──────────────────── */
   const gitActionProgressTarget = useMemo(
     () => ({
       environmentId: selectedThread?.environmentId ?? null,
@@ -560,9 +545,6 @@ function ThreadRouteContent(
     },
     [fileInspector.supported, navigation, selectedThread],
   );
-  // The workspace inspector column spans the full window height. On iOS the
-  // panes bring their own nested native headers (which underlap the status
-  // bar); elsewhere the pane content pads itself below the top inset.
   const safeAreaInsets = useSafeAreaInsets();
   const inspectorHeaderInset = Platform.OS === "ios" ? 0 : safeAreaInsets.top;
   const GitInspector = useCallback(
@@ -621,9 +603,6 @@ function ThreadRouteContent(
     ],
   );
   const activeInspectorRenderer = inspectorMode === null ? undefined : renderInspectorStack;
-  // Hand the inspector to the workspace so it renders beside the navigator,
-  // outside this screen's native header — the terminal/git/files toolbar
-  // stays anchored to the chat pane instead of floating above the inspector.
   useRegisterWorkspaceInspector(activeInspectorRenderer);
 
   const handleOpenConnectionEditor = useCallback(() => {
@@ -796,9 +775,6 @@ function ThreadRouteContent(
     if (!creation?.creation || routeThreadIdentity === null) {
       return;
     }
-    // The drain restored the prompt and attachments into the recovery draft
-    // the rejected creation owns. Open that draft by id: without it the sheet
-    // mints a fresh empty one and the restored content is unreachable.
     try {
       await recoverFailedThreadDraft(creation);
     } catch (error) {
@@ -857,7 +833,6 @@ function ThreadRouteContent(
       setLocalResendMessageId(selectedThreadCreation.message.messageId);
     }
   }, [cancelWorktreeSetup, selectedThread, selectedThreadCreation]);
-  // Wait for the outbox to restore the cancelled send before queuing its replacement.
   useEffect(() => {
     const pending = selectedThreadCreation;
     if (
@@ -887,7 +862,6 @@ function ThreadRouteContent(
       .then(() => {
         const draftKey = restoredNewTaskDraftKey(original.messageId);
         const restored = getComposerDraftSnapshot(draftKey);
-        // Leave any edits made during cancellation in their recovery draft.
         if (
           restored.text === original.text &&
           JSON.stringify(restored.context) === JSON.stringify(original.context) &&
@@ -939,9 +913,6 @@ function ThreadRouteContent(
     return <OpeningThreadLoadingScreen />;
   }
 
-  // A queued creation renders as ready content: its prompt is the whole
-  // conversation until the server creates the thread. The subscription's
-  // not-found error for that window is expected, not a load failure.
   const contentPresentation =
     creationState !== null
       ? { kind: "ready" as const }

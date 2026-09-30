@@ -19,14 +19,6 @@ export interface EnvironmentHttpAuthHeaders {
   readonly dpop?: string;
 }
 
-/**
- * Primary/local environments with no bearer or DPoP credential authenticate the
- * browser via a session cookie. A cross-origin `fetch` does not send cookies by
- * default, so those requests must opt into credentialed mode; bearer/DPoP
- * connections carry their credential in a header and need no cookies. Applied
- * per-request via `FetchHttpClient.RequestInit`, which the fetch client reads
- * from the fiber context at request time.
- */
 const withEnvironmentCredentials = <A, E, R>(
   authorization: PreparedHttpAuthorization | null,
   request: Effect.Effect<A, E, R>,
@@ -35,17 +27,6 @@ const withEnvironmentCredentials = <A, E, R>(
     ? request.pipe(Effect.provideService(FetchHttpClient.RequestInit, { credentials: "include" }))
     : request;
 
-/**
- * Build request-bound headers from the current environment credential:
- * - primary/local connections carry no credential,
- * - bearer connections send a static `Bearer` token,
- * - relay connections send a `DPoP` access token with a freshly signed proof
- *   bound to this request's method and URL.
- *
- * The DPoP signer is passed in (not resolved from context) and is only required
- * for relay/DPoP connections, so bearer/primary connections work even when no
- * signer is available.
- */
 const buildEnvironmentAuthHeaders = (
   authorization: PreparedHttpAuthorization | null,
   method: HttpMethod.HttpMethod,
@@ -79,11 +60,6 @@ const buildEnvironmentAuthHeaders = (
     return { authorization: `DPoP ${authorization.accessToken}`, dpop: proof };
   });
 
-/**
- * Resolve relay credentials at request time without replacing the live socket.
- * A rejected credential gets one refresh and retry, with a new request-bound
- * proof. Cookie and bearer requests keep their existing authentication behavior.
- */
 export const executeAuthenticatedEnvironmentHttpRequest = Effect.fn(
   "clientRuntime.state.executeAuthenticatedEnvironmentHttpRequest",
 )(function* <
@@ -103,7 +79,6 @@ export const executeAuthenticatedEnvironmentHttpRequest = Effect.fn(
     readonly client: Effect.Success<ReturnType<typeof makeEnvironmentHttpApiGroupClient<Group>>>;
     readonly headers: EnvironmentHttpAuthHeaders;
   }) => Effect.Effect<A, E, R>;
-  /** Some endpoints report rejected credentials in a successful response. */
   readonly isUnauthorizedResponse?: (response: NoInfer<A>) => boolean;
 }): Effect.fn.Return<
   A,

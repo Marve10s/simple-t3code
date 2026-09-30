@@ -317,9 +317,6 @@ it.effect("accepts inline images, uploaded images, and uploaded files from clien
   }),
 );
 
-// Attachments ride on persisted events and thread streams with no client
-// version negotiation. A type this build does not know must decode instead of
-// failing the whole message.
 it.effect("tolerates attachment types from newer builds when decoding messages", () =>
   Effect.gen(function* () {
     const futureAttachment = {
@@ -358,9 +355,6 @@ it.effect("tolerates attachment types from newer builds when decoding messages",
   }),
 );
 
-// The tolerant member must not catch malformed known attachments: a file over
-// the size cap or an image with a bad mime has to fail its own schema, not
-// slide through the open one with those constraints unchecked.
 it.effect("rejects malformed known attachment types instead of tolerating them", () =>
   Effect.gen(function* () {
     const base = {
@@ -650,8 +644,6 @@ it.effect("decodes thread settle and unsettle commands", () =>
     assert.strictEqual(settle.type, "thread.settle");
     assert.strictEqual(unsettle.type, "thread.unsettle");
 
-    // "activity" is server-owned: it exists on the event, never on the
-    // command, so a client cannot forge the neutral reset.
     const forged = yield* decodeOrchestrationCommand({
       type: "thread.unsettle",
       commandId: "cmd-unsettle-2",
@@ -699,7 +691,6 @@ it.effect("defaults settled fields when decoding historical thread data", () =>
     assert.strictEqual(thread.settledAt, null);
     assert.strictEqual(shell.settledOverride, null);
     assert.strictEqual(shell.settledAt, null);
-    // Pre-link servers omit the array entirely.
     assert.deepStrictEqual(thread.pullRequests, []);
     assert.deepStrictEqual(shell.pullRequests, []);
 
@@ -720,8 +711,6 @@ it.effect("defaults settled fields when decoding historical thread data", () =>
     assert.deepStrictEqual(oldServerShell.pullRequests, []);
     assert.deepStrictEqual(oldServerShell.linkedPullRequest, legacyLink);
 
-    // A decoder from before the array must still read its single-link field
-    // after a new server encodes the expanded snapshot.
     const oldLinkFields = Schema.Struct({
       linkedPullRequest: Schema.optional(ThreadLinkedPullRequest),
     });
@@ -812,8 +801,6 @@ it.effect("decodes thread pull request links with snapshot and stack", () =>
   }),
 );
 
-// A stored event that fails to decode stops the event store read, and with it
-// server startup, so rows written before `turnId` existed must still load.
 it.effect("decodes a legacy message-sent event persisted without turnId", () =>
   Effect.gen(function* () {
     const event = yield* decodeOrchestrationEvent({
@@ -969,7 +956,6 @@ it.effect("normalizes legacy object-shaped modelSelection.options on decode", ()
         options: {
           effort: "max",
           fastMode: true,
-          // Falsy/garbage entries are dropped, matching migration 026.
           emptyStr: "   ",
           nullish: null,
           nested: { foo: 1 },
@@ -1396,20 +1382,6 @@ it.effect("preserves proposed plan implementation metadata when present", () =>
   }),
 );
 
-// ── ModelSelection: instance-keyed wire shape + legacy decoder ────────
-//
-// `ModelSelection` is routing-keyed on `instanceId` — never a driver kind.
-// Persisted and in-flight payloads from pre-instance builds carry a
-// `provider` field whose value was a driver kind; those payloads are migrated
-// at the wire boundary by
-// promoting `provider` to the default instance id for that driver
-// (built-in drivers use the driver kind slug as their default instance id, so
-// the migration is a 1:1 rename).
-//
-// These tests pin the rollback/fork tolerance invariant: legacy payloads
-// decode cleanly for fork-provided drivers, and the decoded form uses
-// `instanceId` uniformly regardless of origin.
-
 const decodeModelSelection = Schema.decodeUnknownEffect(ModelSelection);
 const encodeModelSelection = Schema.encodeUnknownEffect(ModelSelection);
 
@@ -1481,7 +1453,7 @@ it.effect("ModelSelection rejects malformed instance ids", () =>
   Effect.gen(function* () {
     const result = yield* Effect.exit(
       decodeModelSelection({
-        instanceId: "1invalid", // must start with a letter
+        instanceId: "1invalid",
         model: "x",
       }),
     );
@@ -1603,7 +1575,6 @@ it("isProviderSendTurnSupportedImageMimeType accepts raster formats and rejects 
 const decodeProjectIcon = Schema.decodeUnknownEffect(ProjectIconOverride);
 const encodeProjectIcon = Schema.encodeEffect(ProjectIconOverride);
 
-// Pre-monogram clients reject unknown variants; nightly clients additionally validate monogram.
 const decodeOldIcon = Schema.decodeUnknownEffect(
   Schema.Union([
     Schema.Struct({ kind: Schema.Literal("lucide"), name: Schema.String, color: Schema.String }),
@@ -1616,7 +1587,6 @@ const decodeNightlyIcon = Schema.decodeUnknownEffect(
       kind: Schema.Literal("lucide"),
       name: Schema.String,
       color: Schema.String,
-      // Fail if this field is ever sent; old validators must never see the new text.
       monogram: Schema.optional(Schema.Never),
     }),
     Schema.Struct({ kind: Schema.Literal("emoji"), emoji: Schema.String }),

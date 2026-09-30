@@ -22,7 +22,6 @@ export type ThreadDetailReducerResult =
   | { readonly kind: "deleted" }
   | { readonly kind: "unchanged" };
 
-/** Keep only a legacy route supplied by the server; detail events cannot resolve project hosts. */
 function withPullRequests(
   thread: OrchestrationThread,
   pullRequests: ReadonlyArray<ThreadPullRequestLink>,
@@ -62,21 +61,11 @@ const activityOrder = O.combineAll<OrchestrationThreadActivity>([
   O.mapInput(O.String, (a) => a.id),
 ]);
 
-// Per-array id index so the streaming append path can reject a re-delivered
-// id without rescanning the history. Only arrays this reducer produced are
-// indexed: presence also proves the array is activityOrder-sorted, which
-// snapshot-loaded arrays (DB order, null sequences first) are not.
 const activityIdIndex = new WeakMap<
   ReadonlyArray<OrchestrationThreadActivity>,
   Set<OrchestrationThreadActivity["id"]>
 >();
 
-/**
- * Matches the validity rule in `deriveLatestContextWindowSnapshot` (and the
- * server's snapshot-side `dropStaleContextWindowActivities`): rows without a
- * finite, non-negative `usedTokens` are skipped during the consumer's backward
- * walk, so they must not replace an earlier resolvable row here.
- */
 function isResolvableContextWindowActivity(activity: OrchestrationThreadActivity): boolean {
   if (activity.kind !== "context-window.updated") {
     return false;
@@ -89,27 +78,16 @@ function isResolvableContextWindowActivity(activity: OrchestrationThreadActivity
   return typeof usedTokens === "number" && Number.isFinite(usedTokens) && usedTokens >= 0;
 }
 
-/**
- * Apply a single orchestration event to an `OrchestrationThread`, returning
- * the updated thread, a deletion signal, or an "unchanged" marker when the
- * event doesn't affect this thread.
- *
- * This is a pure reducer operating on contract types. UI-specific mapping
- * (e.g. resolving attachment preview URLs, normalising model slugs, adding
- * scoped fields like `environmentId`) is the caller's responsibility.
- */
 export function applyThreadDetailEvent(
   thread: OrchestrationThread,
   event: OrchestrationEvent,
 ): ThreadDetailReducerResult {
   switch (event.type) {
-    // ── Project events (irrelevant to thread detail) ────────────────
     case "project.created":
     case "project.meta-updated":
     case "project.deleted":
       return { kind: "unchanged" };
 
-    // ── Thread lifecycle ────────────────────────────────────────────
     case "thread.created":
       return {
         kind: "updated",
@@ -184,8 +162,6 @@ export function applyThreadDetailEvent(
           ...thread,
           settledOverride: event.payload.reason === "user" ? "active" : null,
           settledAt: null,
-          // A thread already pinned active keeps its re-entry stamp: the
-          // activity reset that clears the pin must not reorder the list.
           unsettledAt:
             thread.settledOverride === "active"
               ? (thread.unsettledAt ?? null)
@@ -260,7 +236,6 @@ export function applyThreadDetailEvent(
         },
       };
 
-    // ── Thread metadata ─────────────────────────────────────────────
     case "thread.meta-updated":
       return {
         kind: "updated",
@@ -347,7 +322,6 @@ export function applyThreadDetailEvent(
         },
       };
 
-    // ── Turn lifecycle ──────────────────────────────────────────────
     case "thread.turn-start-requested":
       return {
         kind: "updated",
@@ -385,7 +359,6 @@ export function applyThreadDetailEvent(
       };
     }
 
-    // ── Messages ────────────────────────────────────────────────────
     case "thread.message-sent": {
       const message: OrchestrationMessage = {
         id: event.payload.messageId,
@@ -420,12 +393,6 @@ export function applyThreadDetailEvent(
         };
       });
       if (!found) messages.push(message);
-      // Update latestTurn for assistant messages bound to a turn. A completed
-      // assistant message only settles the turn once the session is no longer
-      // running it — providers may emit several assistant messages per turn
-      // (commentary between tool calls), and the turn must stay unsettled
-      // until the provider reports turn end. Streaming deltas recompute the
-      // same record, so the previous reference is kept when nothing changed.
       const turnStillRunning =
         event.payload.turnId !== null &&
         thread.session?.status === "running" &&
@@ -463,8 +430,6 @@ export function applyThreadDetailEvent(
           : thread.latestTurn,
       );
 
-      // Rebind checkpoint assistant message IDs for assistant messages. The
-      // helper hands back the same array when the entry is already bound.
       const checkpoints =
         event.payload.role === "assistant" && event.payload.turnId !== null
           ? rebindCheckpointAssistantMessage(
@@ -486,10 +451,7 @@ export function applyThreadDetailEvent(
       };
     }
 
-    // ── Session ─────────────────────────────────────────────────────
     case "thread.session-set": {
-      // Leaving the "running" session status is the turn-end signal: settle a
-      // still-running latest turn so its duration reflects the whole turn.
       const settledTurnState = settledTurnStateForSessionStatus(event.payload.session.status);
       const latestTurn = reuseLatestTurn(
         thread.latestTurn,
@@ -517,9 +479,6 @@ export function applyThreadDetailEvent(
             ? {
                 ...thread.latestTurn,
                 state: settledTurnState,
-                // A running turn's completedAt can only hold a mid-turn
-                // placeholder checkpoint timestamp — the session leaving
-                // "running" is the authoritative turn end.
                 completedAt: event.payload.session.updatedAt,
               }
             : thread.latestTurn,
@@ -553,7 +512,6 @@ export function applyThreadDetailEvent(
             },
           };
 
-    // ── Proposed plans ──────────────────────────────────────────────
     case "thread.proposed-plan-upserted": {
       const proposedPlan = event.payload.proposedPlan;
 
@@ -570,7 +528,6 @@ export function applyThreadDetailEvent(
       };
     }
 
-    // ── Checkpoints / turn diffs ────────────────────────────────────
     case "thread.turn-diff-completed": {
       const checkpoint: OrchestrationCheckpointSummary = {
         turnId: event.payload.turnId,
@@ -583,7 +540,6 @@ export function applyThreadDetailEvent(
       };
 
       const existing = thread.checkpoints.find((entry) => entry.turnId === checkpoint.turnId);
-      // Don't overwrite a non-missing checkpoint with a missing one.
       if (existing && existing.status !== "missing" && checkpoint.status === "missing") {
         return { kind: "unchanged" };
       }
@@ -595,8 +551,6 @@ export function applyThreadDetailEvent(
         Arr.sort(checkpointOrder),
       );
 
-      // Mid-turn diff updates produce placeholder checkpoints; record the
-      // checkpoint, but don't settle a turn its session is still running.
       const diffTurnStillRunning =
         thread.session?.status === "running" &&
         thread.session.activeTurnId === event.payload.turnId;
@@ -622,7 +576,6 @@ export function applyThreadDetailEvent(
       };
     }
 
-    // ── Revert ──────────────────────────────────────────────────────
     case "thread.reverted": {
       const checkpoints = pipe(
         thread.checkpoints,
@@ -676,22 +629,9 @@ export function applyThreadDetailEvent(
       };
     }
 
-    // ── Activities ──────────────────────────────────────────────────
     case "thread.activity-appended": {
       const activity = event.payload.activity;
-      // A resolvable context-window update supersedes earlier resolvable ones
-      // for the same turn: consumers only read the latest value (walking the
-      // array backwards), and providers stream these updates continuously, so
-      // retaining the history grows the thread by thousands of rows over a
-      // long session. Mirrors the server-side snapshot rule in
-      // dropStaleContextWindowActivities; retention stays per turn so a
-      // thread.reverted that discards turns can still resolve a value from
-      // the turns that survive.
       const supersedesContextWindow = isResolvableContextWindowActivity(activity);
-      // Live streams append in order: an unseen id sorting at/after the tail
-      // of a known-sorted array appends without re-filtering and re-sorting
-      // the whole history on every event. The id set moves forward to the new
-      // array; a superseded array falls back to the sorting path.
       const ids = activityIdIndex.get(thread.activities);
       const lastActivity = thread.activities.at(-1);
       if (
@@ -735,24 +675,15 @@ export function applyThreadDetailEvent(
       };
     }
 
-    // ── Events that don't mutate thread state directly ──────────────
     case "thread.approval-response-requested":
     case "thread.user-input-response-requested":
     case "thread.checkpoint-revert-requested":
       return { kind: "unchanged" };
   }
 
-  // Forward-compatible: ignore unrecognized event types.
   return { kind: "unchanged" };
 }
 
-// ── Helpers ──────────────────────────────────────────────────────────
-
-/**
- * Turn state to settle a still-running latest turn with when its session
- * leaves the "running" status, or null while the session is (re)starting or
- * running and the turn must stay unsettled.
- */
 function settledTurnStateForSessionStatus(
   status: OrchestrationSession["status"],
 ): "completed" | "interrupted" | "error" | null {
@@ -784,11 +715,6 @@ function checkpointStatusToTurnState(
   }
 }
 
-/**
- * Returns `previous` when `next` matches it field for field, otherwise `next`.
- * Streaming cases recompute the latest turn on every delta, and keeping the
- * old reference lets selectors and memos keyed on `latestTurn` skip work.
- */
 function reuseLatestTurn(
   previous: OrchestrationLatestTurn | null,
   next: OrchestrationLatestTurn | null,
@@ -808,11 +734,6 @@ function reuseLatestTurn(
     : next;
 }
 
-/**
- * Points the checkpoint for `turnId` at `messageId`. Returns the input array
- * untouched when no checkpoint needs rebinding, so streaming deltas for an
- * already-bound message do not allocate a new `checkpoints` reference.
- */
 function rebindCheckpointAssistantMessage(
   checkpoints: ReadonlyArray<OrchestrationCheckpointSummary>,
   turnId: TurnId,
@@ -858,8 +779,6 @@ function retainMessagesAfterRevert(
           !retainedMessageIds.has(message.id) &&
           (message.turnId === null || retainedTurnIds.has(message.turnId)),
       )
-      // `.sort()`, not `.toSorted()`: `.filter()` above already returned a fresh array, and
-      // this is shared with mobile, which runs on Hermes and has no ES2023 array methods.
       .sort(
         (left, right) =>
           compareDateTimeStrings(left.createdAt, right.createdAt) ||

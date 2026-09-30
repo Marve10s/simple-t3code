@@ -401,8 +401,6 @@ it.layer(NodeServices.layer)("checkGrokProviderStatus", (it) => {
     }),
   );
 
-  // A stand-in for the Grok CLI: `--version` and `models` print canned text,
-  // and `agent stdio` execs the mock ACP agent so `initialize` returns model metadata.
   const writeFakeGrokCli = (input: { readonly modelsOutput: string; readonly acp: boolean }) =>
     Effect.gen(function* () {
       const fs = yield* FileSystem.FileSystem;
@@ -450,7 +448,6 @@ it.layer(NodeServices.layer)("checkGrokProviderStatus", (it) => {
         type: "cached_token",
         label: "Grok account",
       });
-      // The mock agent advertises grok-4.6 with reasoning options in initialize._meta.
       expect(snapshot.models.map((model) => model.slug)).toEqual(["grok-4.6", "grok-mock-alt"]);
       expect(snapshot.models[0]?.isDefault).toBe(true);
       expect(
@@ -564,9 +561,6 @@ describe("Grok usage limits", () => {
     for (const response of [{}, { config: {} }, { config: { creditUsagePercent: NaN } }]) {
       const limits = grokUsageResponseToLimits(response, checkedAt);
       expect(limits.windows).toEqual([]);
-      // Nothing metered yet, which xAI reports by omitting the field until
-      // usage registers. Marking it `unsupported` would drop the account from
-      // the Limits view for good; leaving the marker off keeps it listed.
       expect(limits.unavailable).toBeUndefined();
     }
     expect(

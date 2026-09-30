@@ -46,8 +46,6 @@ const runNode = <A, E>(
   >,
 ): Promise<A> => Effect.runPromise(effect.pipe(Effect.provide(NodeServices.layer)));
 
-// Closing the probe kills the agent with SIGTERM; Windows terminates the
-// process instead, so the mock never sees a signal to log.
 const windowsHost = HostProcessPlatform.defaultValue() === "win32";
 
 const resolveMockAgentPath = Effect.fn("resolveMockAgentPath")(function* () {
@@ -425,9 +423,6 @@ describe("Cursor skills", () => {
           yield* fileSystem.writeFileString(path.join(directory, "SKILL.md"), contents);
         });
 
-        // A skill package managed in a config repo and installed by symlink.
-        // Its own SKILL.md must be discovered under the link name, but nothing
-        // below the target may be walked.
         yield* writeSkill(path.join(library, "shared-review"), "---\ndescription: shared\n---\n");
         yield* writeSkill(path.join(library, "shared-review", "hidden"), "---\n---\n");
         const root = path.join(workspace, ".cursor", "skills");
@@ -479,7 +474,6 @@ describe("Cursor skills", () => {
 
   it("detects and invokes digit-leading Cursor skills without rewriting money", () => {
     const names = new Set(["2spec", "20k", "100M", "1e6"]);
-    // Repeated presence checks must not carry a global-regex cursor.
     expect(hasCursorSkillMention("use $2spec here")).toBe(true);
     expect(hasCursorSkillMention("use $2spec here")).toBe(true);
     expect(rewriteCursorSkillMentions("use $2spec here", names)).toBe("use /2spec here");

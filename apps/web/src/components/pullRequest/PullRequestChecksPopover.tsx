@@ -21,11 +21,6 @@ import {
   summarizePullRequestChecks,
 } from "./pullRequestPresentation";
 
-/**
- * The checks behind the rollup, for a row that only carries the rollup. Mounted by the popup, so
- * the read starts when somebody opens it rather than once per row of a listing — the detail read
- * is a request per pull request, and a page of them at rest would be a hundred.
- */
 function LazyChecksBody({
   environmentId,
   reference,
@@ -64,8 +59,6 @@ function ChecksBody({
   }
   return (
     <ul className="flex flex-col gap-1">
-      {/* Keyed by position as well as by name: the host is the one that decides how many runs
-          share a name, and a repeated key is a rendering fault rather than a wrong list. */}
       {checks.map((check, index) => (
         <li key={`${index}:${check.name}`} className="flex items-center gap-2 text-xs">
           <PullRequestCheckStatusIcon status={check.status} />
@@ -99,13 +92,6 @@ function ChecksBody({
   );
 }
 
-/**
- * The checks indicator and what it opens, in both places a change request is shown: a listing
- * row, which knows only the rollup, and the detail header, which is already holding every check.
- *
- * `checks` decides between the two. Given them, nothing is read; without them, the popup reads
- * the detail itself, which is why the row must also say which environment it came from.
- */
 export function PullRequestChecksPopover({
   checksState,
   checks,
@@ -116,23 +102,17 @@ export function PullRequestChecksPopover({
   className,
 }: {
   checksState: PullRequestChecksState;
-  /** The checks already in hand, for the detail header. Absent on a listing row. */
   checks?: ReadonlyArray<PullRequestCheck>;
   stale?: boolean;
   environmentId?: EnvironmentId;
   reference?: PullRequestRef;
-  /** Thread the popover sits beside; a listing row has none. */
   threadRef?: ScopedThreadRef | null;
   className?: string;
 }) {
   const presentation = pullRequestChecksStatePresentation(checksState);
-  // Counts beat the rollup's own wording where they are known, the way GitHub's own header reads.
   const summary = checks === undefined || stale ? null : summarizePullRequestChecks(checks);
   return (
     <Popover>
-      {/* A listing row is itself a button, so the trigger renders as a span: a nested button is
-          not valid inside one. The click is stopped here so opening the checks does not also
-          select the row it sits on. */}
       <PopoverTrigger
         nativeButton={false}
         render={

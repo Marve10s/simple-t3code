@@ -128,14 +128,10 @@ describe("ssh tunnel scripts", () => {
     assert.notInclude(script, "npm exec");
     assert.notInclude(script, "t3@latest");
     assert.notInclude(script, 'exec t3 "$@"');
-    // Concurrent launches serialize on a per-version mkdir lock and recheck
-    // the completion marker after acquiring it.
     assert.include(
       script,
       'T3_LOCK="$HOME/.t3/runtime/versions/.$T3_ARCHIVE_VERSION.install.lock"',
     );
-    // mkdir is the exclusive create; the pid follows atomically. A dead owner
-    // is reclaimed at once, a never-published owner after a short grace.
     assert.include(script, 'while ! mkdir "$T3_LOCK" 2>/dev/null; do');
     assert.include(script, 'mv "$T3_LOCK/pid.tmp" "$T3_LOCK/pid"');
     assert.include(script, 'if ! kill -0 "$T3_LOCK_OWNER" 2>/dev/null; then');
@@ -150,8 +146,6 @@ describe("ssh tunnel scripts", () => {
       script.indexOf('"$T3_STAGING/t3" --version'),
       script.indexOf('> "$T3_STAGING/.install-complete"'),
     );
-    // Node discovery is defined for the dev path but only ever invoked inside
-    // the node-script branch, which the archive path skips entirely.
     assert.equal(script.split("ensure_remote_node_path || true").length - 1, 1);
     assert.isBelow(
       script.indexOf("ensure_remote_node_path || true"),
@@ -694,9 +688,6 @@ describe("ssh tunnel scripts", () => {
   );
 });
 
-// The archive runner is generated shell; string assertions cannot prove the
-// lock excludes concurrent installers. Run the real script against a tiny
-// fake archive served from a file:// mirror.
 describe("archive runner script", () => {
   const hostPlatform = HostProcessPlatform.defaultValue();
   const hostArch = HostProcessArchitecture.defaultValue();
@@ -735,9 +726,6 @@ describe("archive runner script", () => {
       return { stdout, stderr, exitCode };
     });
 
-  // A fake "executable" that answers --version, packed the way the release
-  // workflow packs the real archive: one top-level directory named after the
-  // stem, checksummed in SHA256SUMS.
   const makeMirror = Effect.fn("makeMirror")(function* (root: string) {
     const spawner = yield* ChildProcessSpawner.ChildProcessSpawner;
     const platform = hostPlatform === "darwin" ? "darwin" : "linux";
@@ -788,8 +776,6 @@ describe("archive runner script", () => {
           archiveVersion,
         );
 
-        // A lock left by a crashed installer (dead pid) must not block the
-        // next launch, and neither must one that never published a pid.
         const lock = `${versionsDir}/.${archiveVersion}.install.lock`;
         yield* fs.remove(`${versionsDir}/${archiveVersion}`, { recursive: true });
         yield* fs.makeDirectory(lock);

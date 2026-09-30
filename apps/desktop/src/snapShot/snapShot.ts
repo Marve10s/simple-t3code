@@ -25,7 +25,6 @@ interface AccessibilityTreeNode {
 const MAX_ACCESSIBILITY_TREE_NODES = 10_000;
 const WINDOW_BLUR_TIMEOUT_MS = 1_000;
 
-/** Win32 virtual-key codes for the left and right key of each modifier pair. */
 export const WINDOWS_MODIFIER_PAIR_VIRTUAL_KEYS: Record<
   SnapShotModifier,
   readonly [number, number]
@@ -484,13 +483,11 @@ export function findAccessibleWindow<
 ): T | undefined {
   const normalizeTitle = (value: string) => {
     const title = value.trim();
-    // Terminal apps can animate a leading CLI spinner between capture and AT-SPI lookup.
     return matchMode === "wayland" ? title.replace(/^[⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏](?:\s+|$)/u, "") : title;
   };
   const titles = new Set(
     [captured.title, captured.sourceTitle ?? ""].map(normalizeTitle).filter(Boolean),
   );
-  // Wayland accessibility providers can expose window size without a screen position.
   const boundsKeys =
     matchMode === "wayland"
       ? (["width", "height"] as const)
@@ -517,8 +514,6 @@ export function findAccessibleWindow<
     if (activeMatches.length === 1) return activeMatches[0];
     if (matches.length > 1) return undefined;
   }
-  // GTK4/libadwaita often exposes the frame as an unnamed group. A PID-scoped
-  // lookup can accept the one window whose bounds match; size-only guesses cannot.
   if (!options.allowUntitledUniqueBounds) return undefined;
   const boundsMatches = windows.filter(
     (window) => normalizeTitle(window.name ?? "") === "" && matchesBounds(window),
@@ -536,7 +531,6 @@ const ELECTRON_KEY_NAMES: Readonly<Record<string, string>> = {
   Escape: "Esc",
 };
 
-/** Two shortcuts are the same when they would register the same listener. */
 export function sameSnapShotShortcut(left: SnapShotShortcut, right: SnapShotShortcut): boolean {
   if (isModifierPairShortcut(left) || isModifierPairShortcut(right)) {
     return (

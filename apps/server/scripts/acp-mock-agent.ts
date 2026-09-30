@@ -333,8 +333,6 @@ function modeState(): AcpSchema.SessionModeState {
   };
 }
 
-// Mirrors the real Grok ACP: it advertises versioned model ids, never the CLI's own
-// "grok-build" product name, and it rejects unknown ids in session/set_model.
 const grokAcpModels: ReadonlyArray<AcpSchema.ModelInfo> = [
   {
     modelId: "grok-4.6",
@@ -411,15 +409,11 @@ const program = Effect.gen(function* () {
       return {
         protocolVersion: 1,
         agentCapabilities: { loadSession: true, sessionCapabilities: { resume: {} } },
-        // Grok advertises model state before any session exists; the provider
-        // health check reads it from here without authenticating.
         _meta: { modelState: modelState() },
       };
     }),
   );
 
-  // Mirrors the real agent: the API key method reads GEMINI_API_KEY from the
-  // process environment and rejects when it is missing.
   yield* agent.handleAuthenticate((request) =>
     !antigravityProfile || request.methodId === "oauth-personal"
       ? Effect.succeed({})
@@ -950,8 +944,6 @@ const program = Effect.gen(function* () {
       }
 
       if (emitBackgroundToolDuringAnswer) {
-        // A command backgrounded earlier reports progress and then finishes
-        // while the next answer is still streaming.
         const toolCallId = "background-1";
         const say = (text: string) =>
           agent.client.sessionUpdate({
@@ -984,7 +976,6 @@ const program = Effect.gen(function* () {
         yield* say("| x |\n");
         yield* progress("completed", "done");
         yield* say("| 2 | y |\n");
-        // Agents can repeat a terminal update after the call finished.
         yield* progress("completed", "done");
         yield* say("| 3 | z |");
         return { stopReason: "end_turn" };
@@ -1246,11 +1237,9 @@ const program = Effect.gen(function* () {
       }
 
       if (emitXAiPlanMdWrite) {
-        // Match Grok's real session layout so isGrokPlanMarkdownPath accepts it.
         const planRoot = process.env.T3_ACP_PLAN_ROOT ?? "/tmp/mock-home/.grok";
         const planPath = `${planRoot}/sessions/${requestedSessionId}/plan.md`;
         const planBody = "# Mock plan\n\n- Write the feature\n- Add a test\n- Ship it\n";
-        // enter_plan_mode first so the adapter arms planModeActive.
         yield* agent.client.sessionUpdate({
           sessionId: requestedSessionId,
           update: {

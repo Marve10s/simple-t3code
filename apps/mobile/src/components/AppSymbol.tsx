@@ -1,8 +1,4 @@
 import type { Icon } from "@tabler/icons-react-native/types";
-/*
- * Keep these as per-icon exports. Importing the package root eagerly registers
- * the entire Tabler icon set in Metro.
- */
 import IconAdjustmentsHorizontal from "@tabler/icons-react-native/IconAdjustmentsHorizontal";
 import IconAlignLeft from "@tabler/icons-react-native/IconAlignLeft";
 import IconAlertCircle from "@tabler/icons-react-native/IconAlertCircle";
@@ -174,7 +170,6 @@ const ANDROID_ICON_BY_SF_SYMBOL = {
   "line.3.horizontal.decrease": IconFilter,
   "line.3.horizontal.decrease.circle": IconFilter,
   "line.3.horizontal.decrease.circle.fill": IconFilterFilled,
-  // Tabler has no Apple desktops; the closest silhouettes stand in on Android.
   macmini: IconServer,
   macstudio: IconDeviceDesktop,
   magnifyingglass: IconSearch,
@@ -220,10 +215,6 @@ const ANDROID_ICON_BY_SF_SYMBOL = {
 } satisfies Partial<Record<SFSymbol, Icon>>;
 const SF_ICON_LOOKUP: Partial<Record<SFSymbol, Icon>> = ANDROID_ICON_BY_SF_SYMBOL;
 
-// Callers can pass `{ ios, android }` names where `android` is a Material
-// icon name (the raw expo-symbols contract). Resolve those here too so the
-// android key keeps working through this wrapper — it wins over the SF map
-// when both match (e.g. folder vs folder_open for expanded project groups).
 const ANDROID_ICON_BY_MATERIAL_NAME = {
   auto_awesome: IconSparkles,
   bolt: IconBolt,
@@ -289,10 +280,4 @@ function AppSymbolView(props: AppSymbolViewProps) {
   );
 }
 
-/**
- * expo-symbols and the Android Tabler fallback both expose tint as a native
- * prop rather than a React Native style. Keep that third-party boundary here
- * so callers can use Uniwind's `tintColorClassName` instead of subscribing to
- * theme variables in every parent component.
- */
 export const SymbolView = withUniwind(AppSymbolView);

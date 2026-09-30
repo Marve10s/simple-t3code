@@ -1,9 +1,5 @@
 #!/usr/bin/env node
-// This CLI uses Node argument parsing and random ordering at the application boundary.
 // @effect-diagnostics nodeBuiltinImport:off
-// Run with --model <configured-model> --out /tmp/title-eval.
-// Pass --baseline /tmp/previous-eval/results.json to compare two generation runs.
-// Add --initial to evaluate only the opening request.
 import * as NodeUtil from "node:util";
 import * as NodeCrypto from "node:crypto";
 import * as FetchHttpClient from "effect/unstable/http/FetchHttpClient";
@@ -156,7 +152,6 @@ await Effect.runPromise(
               GitLabCli.layer,
               ForgejoCli.layer,
               AzureDevOpsCli.layer,
-              // No saved credentials here; Bitbucket falls back to T3CODE_BITBUCKET_* variables.
               BitbucketApi.layer.pipe(Layer.provide(ServerSettings.layerTest())),
             ),
           ),

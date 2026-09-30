@@ -175,16 +175,10 @@ import * as RelayClient from "@t3tools/shared/relayClient";
 import { disableTailscaleServe, ensureTailscaleServe } from "@t3tools/tailscale";
 import { forkParked, ServerActivation } from "./serverActivation.ts";
 
-// MCP handoff thread IDs include escaped provenance and can exceed find-my-way's
-// 100-character default for one path segment.
 export const HTTP_ROUTER_CONFIG = {
   maxParamLength: 512,
 } as const;
 
-// Effect's default preemptive shutdown waits 20s before finalizing request scopes.
-// T3's primary transport is long-lived WebSocket RPC, whose Effect scope finalizer
-// already closes the websocket gracefully. Do not add an artificial drain before
-// those finalizers get a chance to run.
 const HTTP_PREEMPTIVE_SHUTDOWN_GRACE_MS = 0;
 const ResourceAttributionLayerLive = ResourceAttribution.layer;
 const ApplicationObservabilityLive = EventLoopMonitor.layer.pipe(
@@ -215,8 +209,6 @@ const HostPowerMonitorLayerLive = HostPowerMonitor.layer.pipe(
   Layer.provide(DesktopTelemetryReceiverLayerLive),
 );
 
-// Reuses DesktopTelemetryReceiverLayerLive: a fresh receiver layer here
-// would open a second reader on the desktop telemetry fd.
 const DesktopAppUpdateLayerLive = DesktopAppUpdate.layer.pipe(
   Layer.provide(DesktopTelemetryReceiverLayerLive),
 );
@@ -249,12 +241,6 @@ const HttpServerLive = Layer.unwrap(
       host: config.host ?? "127.0.0.1",
       port: config.port,
       gracefulShutdownTimeout: HTTP_PREEMPTIVE_SHUTDOWN_GRACE_MS,
-      // Negotiate permessage-deflate with clients that offer it; clients
-      // that don't still get uncompressed frames on their connection.
-      // Context takeover stays enabled (ws default) so the compression
-      // window is shared across frames — that also makes small frames cheap
-      // to compress, so no size threshold is set (ws only honors
-      // `threshold` when context takeover is disabled).
       websocket: { perMessageDeflate: true },
     });
   }),
@@ -280,12 +266,6 @@ const ProviderSessionDirectoryLayerLive = ProviderSessionDirectoryLive.pipe(
   Layer.provide(ProviderSessionRuntime.layer),
 );
 
-// `ProviderAdapterRegistryLive` is now a facade that resolves kind → adapter
-// by looking up the default `ProviderInstance` per driver in the instance
-// registry. Adapter construction itself moved inside each driver's
-// `create()`; `ProviderEventLoggers.layer` owns the shared native/canonical
-// NDJSON writers and is provided at the outer runtime layer so both
-// `ProviderService` and the per-instance drivers read the same logger pair.
 const ProviderLayerLive = ProviderServiceLive.pipe(
   Layer.provide(ProviderAdapterRegistryLive),
   Layer.provideMerge(ProviderSessionDirectoryLayerLive),
@@ -349,7 +329,6 @@ const RepositoryIdentityResolverLayerLive = Layer.effect(
 
 const PullRequestServiceLive = PullRequestService.layer.pipe(
   Layer.provide(PullRequestProviderRegistry.layer),
-  // Where the viewed-file marks live for a host that keeps none of its own.
   Layer.provide(PullRequestFilesViewed.layer),
   Layer.provide(PullRequestReadCache.layer),
   Layer.provide(SourceControlProviderRegistryLayerLive),
@@ -469,8 +448,6 @@ const CloudManagedEndpointRuntimeLive = Layer.mergeAll(
 );
 
 const ProviderRuntimeLayerLive = ProviderSessionReaperLive.pipe(
-  // Subscribes to `account.rate-limits.updated` so usage bars track live
-  // telemetry instead of waiting for the next status probe.
   Layer.provideMerge(ProviderUsageLimitsIngestionLive),
   Layer.provideMerge(ProviderLayerLive),
   Layer.provideMerge(OrchestrationLayerLive),
@@ -512,11 +489,8 @@ const RuntimeCoreDependenciesLive = ReactorLayerLive.pipe(
   Layer.provideMerge(ProviderInstallationRefreshLive),
   Layer.provideMerge(ReplayMarkers.layer),
   Layer.provideMerge(ProviderAuthServiceLive),
-  // Core Services
   Layer.provideMerge(ServerSettingsLayerLive),
   Layer.provideMerge(CheckpointingLayerLive),
-  // `GitHubCli` is the registry's own instance, exposed because the asset route fetches
-  // GitHub-hosted pull request media with the repository's credential.
   Layer.provideMerge(
     Layer.mergeAll(SourceControlProviderRegistryLayerLive, PullRequestServiceLive, GitHubCli.layer),
   ),
@@ -525,36 +499,16 @@ const RuntimeCoreDependenciesLive = ReactorLayerLive.pipe(
   Layer.provideMerge(ProviderRuntimeLayerLive),
   Layer.provideMerge(Layer.mergeAll(TerminalLayerLive, PreviewLayerLive, DeviceLayerLive)),
   Layer.provideMerge(PersistenceLayerLive),
-  // Both read a user-owned file out of the state directory and stream changes
-  // to clients; neither depends on the other.
   Layer.provideMerge(
     Layer.mergeAll(Keybindings.layer, EnvironmentTheme.layer, UsageLimitSources.layer),
   ),
   Layer.provideMerge(ProviderRegistryLive),
-  // The instance registry is the new routing keystone — text generation,
-  // adapter lookup, and runtime ingestion all resolve `ProviderInstanceId`
-  // through this layer. Built-in drivers come from `BUILT_IN_DRIVERS`;
-  // `providerInstances` hydration merges `settings.providers.<kind>`
-  // with explicit `providerInstances` entries on boot.
   Layer.provideMerge(ProviderInstanceRegistryHydrationLive),
 ).pipe(
   Layer.provideMerge(Layer.mergeAll(AntigravityInstallation.layer, CodexInstallation.layer)),
-  // Shared native/canonical NDJSON writers used by both the per-instance
-  // drivers (native stream, written from inside each `<X>Adapter`) and
-  // `ProviderService` (canonical stream, written after event normalization).
-  // Provided once at the runtime level so every consumer sees the same
-  // logger instances.
-  // `ModelManifest.layer` is the legacy-model classification data, refreshed
-  // from the repo's `model-manifest.json` on `main` and applied by the
-  // Codex/Claude drivers.
   Layer.provideMerge(
     Layer.mergeAll(ProviderEventLoggers.layer, ModelManifest.layer, ResetCreditCoordinator.layer),
   ),
-  // `OpenCodeDriver.create()` yields `OpenCodeRuntime`; previously the old
-  // `ProviderRegistryLive` pulled `OpenCodeRuntimeLive` in for itself, but
-  // the rewritten registry reads snapshots off the instance registry and
-  // no longer transitively provides it. Exposing it at the runtime level
-  // keeps a single Live for all opencode consumers.
   Layer.provideMerge(OpenCodeRuntime.OpenCodeRuntimeLive),
   Layer.provideMerge(WorkspaceLayerLive),
   Layer.provideMerge(Layer.mergeAll(NativeAppIconResolver.layer, ProjectFaviconResolverLayerLive)),
@@ -574,7 +528,6 @@ const RuntimeCoreDependenciesLive = ReactorLayerLive.pipe(
 );
 
 const RuntimeDependenciesLive = RuntimeCoreDependenciesLive.pipe(
-  // Misc.
   Layer.provideMerge(BackgroundLayerLive),
   Layer.provideMerge(ResourceDiagnosticsLayerLive),
   Layer.provideMerge(UsageLayerLive),
@@ -612,11 +565,8 @@ export const makeRoutesLayer = Layer.mergeAll(
     websocketRpcRouteLayer,
   ),
   McpHttpServer.layer.pipe(Layer.provide(McpSessionRegistry.layer)),
-  // Last, so no route layer can replace the server's one TracerDisabledWhen.
   untracedRequestsLayer,
 ).pipe(
-  // Both transports consume the same service instance, so caches single-flight across clients
-  // and mutations observed on WebSocket invalidate patches subsequently read over HTTP.
   Layer.provide(PullRequestServiceLive),
   Layer.provide(PreviewAutomationBroker.layer),
   Layer.provide(ServerSelfUpdate.layer.pipe(Layer.provide(DesktopAppUpdateLayerLive))),
@@ -748,12 +698,6 @@ const makeServerLayer = Layer.unwrap(
           ),
           Effect.asVoid,
         );
-        // A launcher trial can be stopped before activation. The previous
-        // server is already gone, so the trial owns cleanup immediately; the
-        // pending-state check keeps the tunnel for normal commit or rollback,
-        // while the launcher's explicit-stop marker allows it to be released.
-        // Other runtimes wait for activation so a failed standby cannot tear
-        // down the active runtime's tunnel.
         const cleanupBeforeActivation = yield* pendingServiceUpdateExists;
         if (cleanupBeforeActivation) {
           yield* Effect.addFinalizer(() => releaseManagedTunnel);
@@ -810,12 +754,6 @@ const makeServerLayer = Layer.unwrap(
               Stream.runForEach(recoverManagedTunnel),
               Effect.forkScoped,
             );
-            // No settling delay before the first attempt: routes are already
-            // serving by the time activation opens this gate (the startup
-            // sequence awaits routesReady), and the retry schedule below
-            // covers anything this sleep used to hedge against. Every
-            // millisecond here is dead time on the path to remote
-            // reachability after a restart.
             const wantsCliLink = hasCloudPublicConfig
               ? yield* CloudCliState.readCliDesiredCloudLink.pipe(
                   Effect.catch((cause) =>
@@ -825,9 +763,6 @@ const makeServerLayer = Layer.unwrap(
                   ),
                 )
               : false;
-            // A failed read must not end this fiber before it registers
-            // recovery and starts consuming recovery requests. "managed" is
-            // what a missing value means, so it is the safe fallback.
             const desiredCliLinkMode = wantsCliLink
               ? yield* CloudCliState.readCliDesiredLinkMode.pipe(
                   Effect.catch((cause) =>
@@ -837,8 +772,6 @@ const makeServerLayer = Layer.unwrap(
                   ),
                 )
               : null;
-            // A publish-only link must not expose the host, even if a managed
-            // config from an earlier link is still stored.
             const startedConfirmed =
               desiredCliLinkMode === "publish_only"
                 ? false
@@ -886,9 +819,6 @@ const makeServerLayer = Layer.unwrap(
                     }).pipe(Effect.as({ status: "unavailable" as const })),
               ),
             );
-            // A host without a confirmed marker is on its first boot after the
-            // upgrade. Spread those registrations so an auto-update wave does
-            // not hit the relay all at once.
             if (!startedConfirmed && desiredCliLinkMode !== "publish_only") {
               const jitter = yield* Random.nextIntBetween(
                 0,
@@ -900,9 +830,6 @@ const makeServerLayer = Layer.unwrap(
               desiredCliLinkMode === "publish_only"
                 ? { status: "not_linked" as const }
                 : yield* registerManagedTunnel;
-            // A terminal registration failure also allows the stored config
-            // to start. Transient outages use the fallback above and keep
-            // registration retrying in this scoped startup fiber.
             if (registration.status === "unavailable" && !startedConfirmed) {
               yield* startStoredManagedTunnel;
             }
@@ -981,12 +908,10 @@ const makeServerLayer = Layer.unwrap(
       Layer.provideMerge(HttpServerLive),
       Layer.provide(ApplicationObservabilityLive),
       Layer.provideMerge(FetchHttpClient.layer),
-      // PR reads, Git operations, and WebSocket discovery share one process limiter.
       Layer.provide(VcsProcess.layer),
       Layer.provideMerge(PlatformServicesLive),
     );
   }),
 );
 
-// The CLI supplies configuration.
 export const runServer = Layer.launch(makeServerLayer);

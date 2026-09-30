@@ -40,10 +40,6 @@ import { getCodexServiceTierOptionValue } from "../codexModelOptions.ts";
 
 const CODEX_TIMEOUT_MS = 180_000;
 const encodeJsonString = Schema.encodeEffect(Schema.fromJsonString(Schema.Unknown));
-/**
- * Build a Codex text-generation closure bound to a specific `CodexSettings`
- * payload. See `makeCodexAdapter` for the overall per-instance rationale.
- */
 export const makeCodexTextGeneration = Effect.fn("makeCodexTextGeneration")(function* (
   codexConfig: CodexSettings,
   environment?: NodeJS.ProcessEnv,

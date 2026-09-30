@@ -40,16 +40,9 @@ export interface DeviceViewControls {
 export interface DeviceStreamHandle {
   readonly pressButton: (button: DeviceHardwareButton) => void;
   readonly rotate: () => void;
-  /** False while the input socket is down; controls should disable. */
   readonly inputConnected: boolean;
 }
 
-/**
- * The live device screen. Pointer events map onto normalized coordinates in
- * the displayed frame and go to the device; keyboard input is forwarded while
- * the surface is focused. `visible=false` tears the stream down so a hidden
- * panel decodes nothing.
- */
 export function DeviceStreamView(props: {
   readonly environmentId: EnvironmentId;
   readonly platform: DevicePlatform;
@@ -58,10 +51,8 @@ export function DeviceStreamView(props: {
   readonly deviceDescription?: string;
   readonly visible: boolean;
   readonly hostId: string;
-  /** The full panel opts into the phone spike; compact viewers retain their flat presentation. */
   readonly allowPhoneView?: boolean;
   readonly renderControls?: (view: DeviceViewControls) => ReactNode;
-  /** Draw accessibility element frames over the screen. */
   readonly axOverlay?: boolean;
   readonly onHandle?: (handle: DeviceStreamHandle | null) => void;
   readonly onScreen?: (screen: DeviceScreenSize | null) => void;
@@ -131,7 +122,6 @@ export function DeviceStreamView(props: {
           onScreen?.(next);
         },
         onUnauthorized: () => {
-          // A fresh ticket re-runs this effect through the access dependency.
           refreshDeviceHubAccess(props.environmentId);
         },
         onMjpegFallback: (url) => {
@@ -174,7 +164,6 @@ export function DeviceStreamView(props: {
     props.visible,
   ]);
 
-  // Displayed aspect ratio (width / height) of the device as the user sees it.
   const aspect = useMemo(() => {
     if (!screen) return props.platform === "ios" ? 9 / 19.5 : 9 / 20;
     const landscape =
@@ -188,8 +177,6 @@ export function DeviceStreamView(props: {
     return w / h;
   }, [props.platform, screen]);
 
-  // Android restarts its encoder when a fold changes the framebuffer size.
-  // Keep the last decoded frame and viewer mounted while the next keyframe arrives.
   const retainingAndroidFrame =
     props.platform === "android" &&
     status === "connecting" &&
@@ -211,10 +198,6 @@ export function DeviceStreamView(props: {
   }, [retainingAndroidFrame, showPhone]);
   const controlsInset = props.renderControls && !showPhone ? CONTROLS_RAIL_WIDTH : 0;
 
-  // The frame is the largest box at `aspect` that fits the container, so a
-  // narrow panel shows a shorter phone rather than a squeezed one. CSS
-  // `aspect-ratio` alone cannot do this: with the height pinned to 100% the
-  // width clamp wins and distorts the drawn frame.
   const hostRef = useRef<HTMLDivElement | null>(null);
   const [host, setHost] = useState({ width: 0, height: 0 });
   useEffect(() => {
@@ -237,8 +220,6 @@ export function DeviceStreamView(props: {
     return fitDeviceFrame(aspect, host.width, host.height, controlsInset);
   }, [aspect, controlsInset, host]);
 
-  // serve-sim streams the raw framebuffer; rotate the display for a device
-  // that reports landscape while its frames stay portrait.
   const rotation = useMemo(() => {
     if (props.platform !== "ios" || !screen || screen.width > screen.height) return 0;
     switch (screen.orientation) {
@@ -253,9 +234,6 @@ export function DeviceStreamView(props: {
     }
   }, [props.platform, screen]);
 
-  // A sideways rotation draws the raw portrait frame into a landscape box:
-  // the media element takes the transposed size and is rotated about the
-  // box's center.
   const sideways = rotation === 90 || rotation === -90;
   const mediaStyle: React.CSSProperties = sideways
     ? {
@@ -271,8 +249,6 @@ export function DeviceStreamView(props: {
         ...(rotation ? { transform: `rotate(${rotation}deg)` } : {}),
       };
 
-  // The accessibility tree is polled while the overlay is on; each poll is
-  // one JSON fetch, so there is nothing to repaint between polls.
   const [axElements, setAxElements] = useState<ReadonlyArray<DeviceAxElement>>([]);
   useEffect(() => {
     if (!props.axOverlay || !access || !props.visible) return;
@@ -285,9 +261,7 @@ export function DeviceStreamView(props: {
       try {
         const tree = await fetchDeviceAxTree(target, controller.signal);
         if (!stopped) setAxElements(tree.elements);
-      } catch {
-        // Keep the last good tree; the next poll retries.
-      }
+      } catch {}
       if (!stopped) timer = setTimeout(() => void poll(), AX_POLL_INTERVAL_MS);
     };
     void poll();
@@ -553,8 +527,6 @@ export function DeviceStreamView(props: {
                   size="sm"
                   variant="outline"
                   onClick={() => {
-                    // An expired ticket surfaces as unauthorized on restart and
-                    // refreshes access through the effect; no need to mint one here.
                     clientRef.current?.stop();
                     clientRef.current?.start();
                   }}

@@ -550,8 +550,6 @@ it.layer(BaseTestLayer)("OrchestrationProjectionPipeline", (it) => {
       yield* sql`DROP TRIGGER count_thread_shell_updates`;
       yield* sql`DROP TABLE thread_shell_updates`;
 
-      // Replayed order events must survive later lifecycle upserts, whose
-      // complete SQL row writes otherwise risk dropping the placement.
       const orderUpdatedAt = "2026-01-01T00:00:00.200Z";
       const orderEvents = [
         { type: "thread.meta-updated", payload: { activeOrderKey: "gm" } },
@@ -592,8 +590,6 @@ it.layer(BaseTestLayer)("OrchestrationProjectionPipeline", (it) => {
         assert.deepEqual(rows, [{ activeOrderKey: "gm", updatedAt: orderUpdatedAt }]);
       }
 
-      // Settled lifecycle through the DB pipeline: thread.settled writes the
-      // override + timestamp, thread.unsettled(user) flips to the active pin.
       yield* eventStore.append({
         type: "thread.settled",
         eventId: EventId.make("evt-settle-1"),
@@ -667,8 +663,6 @@ it.layer(BaseTestLayer)("OrchestrationProjectionPipeline", (it) => {
         FROM projection_threads
         WHERE thread_id = 'thread-1'
       `;
-      // The un-settle stamps the active-list re-entry time so clients can
-      // surface the thread at the top of the list.
       assert.deepEqual(unsettledRows, [
         {
           settledOverride: "active",
@@ -816,7 +810,6 @@ it.layer(Layer.fresh(makeProjectionPipelinePrefixedTestLayer("t3-projection-pull
           },
         });
 
-        // Legacy single-link event replays into a manual row with the URL host.
         yield* eventStore.append({
           ...base("2026-01-01T00:00:01.000Z"),
           type: "thread.meta-updated",
@@ -873,8 +866,6 @@ it.layer(Layer.fresh(makeProjectionPipelinePrefixedTestLayer("t3-projection-pull
         ]);
         assert.deepEqual(yield* readThreadUpdatedAt(), [{ updatedAt: "2026-01-01T00:00:02.000Z" }]);
 
-        // Sync fills snapshot/stack on the matching row; a sync for an unknown
-        // link is ignored.
         const snapshot: ThreadPullRequestSnapshot = {
           state: "open",
           title: "Add links",
@@ -919,7 +910,6 @@ it.layer(Layer.fresh(makeProjectionPipelinePrefixedTestLayer("t3-projection-pull
         assert.deepEqual(JSON.parse(synced[1]?.snapshotJson ?? "null"), snapshot);
         assert.deepEqual(yield* readThreadUpdatedAt(), [{ updatedAt: "2026-01-01T00:00:03.000Z" }]);
 
-        // A legacy null clears only the manual row; created/agent/stack rows stay.
         yield* eventStore.append({
           ...base("2026-01-01T00:00:04.000Z"),
           type: "thread.meta-updated",
@@ -950,7 +940,6 @@ it.layer(Layer.fresh(makeProjectionPipelinePrefixedTestLayer("t3-projection-pull
         assert.deepEqual(yield* readLinks(), []);
         assert.deepEqual(yield* readThreadUpdatedAt(), [{ updatedAt: "2026-01-01T00:00:05.000Z" }]);
 
-        // Older Forgejo rows stored a portless host; unlink by their URL's authority.
         yield* eventStore.append({
           ...base("2026-01-01T00:00:05.100Z"),
           type: "thread.pull-request-linked",
@@ -983,7 +972,6 @@ it.layer(Layer.fresh(makeProjectionPipelinePrefixedTestLayer("t3-projection-pull
         yield* projectionPipeline.bootstrap;
         assert.deepEqual(yield* readLinks(), []);
 
-        // Deleting the thread clears whatever links it still had.
         yield* eventStore.append({
           ...base("2026-01-01T00:00:06.000Z"),
           type: "thread.pull-request-linked",
@@ -1828,7 +1816,6 @@ it.layer(
             },
           });
           assert.isTrue(yield* exists(removePath));
-          // Return the cleanup effect so the caller runs it after the outer transaction commits.
           // @effect-diagnostics-next-line returnEffectInGen:off
           return cleanup;
         }),
@@ -1844,7 +1831,6 @@ it.layer(
       assert.isTrue(yield* exists(laterPath));
       assert.isTrue(yield* exists(otherThreadPath));
 
-      // Replay message and activity history from different cursors, as during a projection rebuild.
       yield* sql`DELETE FROM projection_thread_messages WHERE thread_id = ${threadId}`;
       yield* sql`DELETE FROM projection_thread_activities WHERE thread_id = ${threadId}`;
       yield* sql`UPDATE projection_state SET last_applied_sequence = 0
@@ -2139,16 +2125,12 @@ it.layer(Layer.fresh(makeProjectionPipelinePrefixedTestLayer("t3-projection-atta
             updatedAt: now,
           },
         });
-        // A failed first send: create, roll back, then the draft retries the id.
         yield* threadCreated(retriedThreadId, "retried-1");
         yield* threadDeleted(retriedThreadId, "retried");
         yield* threadCreated(retriedThreadId, "retried-2");
-        // A thread that was deleted for good.
         yield* threadCreated(goneThreadId, "gone");
         yield* threadDeleted(goneThreadId, "gone");
 
-        // Files on disk are not event-sourced: by the time anything replays,
-        // the retried thread's attachments already belong to its second life.
         yield* fileSystem.makeDirectory(attachmentsDir, { recursive: true });
         yield* fileSystem.writeFileString(retriedAttachmentPath, "second incarnation");
         yield* fileSystem.writeFileString(goneAttachmentPath, "gone");
@@ -2474,8 +2456,6 @@ it.layer(BaseTestLayer)("OrchestrationProjectionPipeline", (it) => {
         },
       });
 
-      // Interim assistant message completes mid-turn (commentary between
-      // tool calls) — the turn must stay running and unsettled.
       yield* eventStore.append({
         type: "thread.message-sent",
         eventId: EventId.make("evt-tl3"),
@@ -2510,7 +2490,6 @@ it.layer(BaseTestLayer)("OrchestrationProjectionPipeline", (it) => {
       `;
       assert.deepEqual(runningRows, [{ state: "running", completedAt: null }]);
 
-      // The session leaving "running" is the turn-end signal.
       yield* eventStore.append({
         type: "thread.session-set",
         eventId: EventId.make("evt-tl4"),
@@ -2620,8 +2599,6 @@ it.layer(BaseTestLayer)("OrchestrationProjectionPipeline", (it) => {
         });
 
       yield* appendRunningSessionSet("evt-ts2", oldTurnId, "2026-01-01T00:00:01.000Z");
-      // A steer: a new turn becomes active without the provider ever
-      // completing the previous one.
       yield* appendRunningSessionSet("evt-ts3", newTurnId, "2026-01-01T00:00:30.000Z");
 
       yield* projectionPipeline.bootstrap;
@@ -3125,7 +3102,6 @@ it.layer(BaseTestLayer)("OrchestrationProjectionPipeline", (it) => {
         },
       });
 
-      // Invalid JSON proves the summary query filters tool rows before decoding payloads.
       yield* sql`
         INSERT INTO projection_thread_activities (
           activity_id,
@@ -3212,8 +3188,6 @@ it.layer(BaseTestLayer)("OrchestrationProjectionPipeline", (it) => {
           )
       `;
 
-      // A user-input lifecycle activity is one of the events that still
-      // refreshes the shell summary, so it forces the read under test.
       yield* appendAndProject({
         type: "thread.activity-appended",
         eventId: EventId.make("evt-stale-user-input-3"),
@@ -3353,8 +3327,6 @@ it.layer(BaseTestLayer)("OrchestrationProjectionPipeline", (it) => {
         },
       ]);
 
-      // Streaming assistant deltas bump updatedAt but must not disturb
-      // latestUserMessageAt or the pending counters.
       yield* appendAndProject({
         type: "thread.message-sent",
         eventId: EventId.make("evt-shell-summary-4"),
@@ -3385,8 +3357,6 @@ it.layer(BaseTestLayer)("OrchestrationProjectionPipeline", (it) => {
         },
       ]);
 
-      // Ordinary tool activities bump updatedAt without touching the
-      // user-input counter; user-input lifecycle activities update it.
       yield* appendAndProject({
         type: "thread.activity-appended",
         eventId: EventId.make("evt-shell-summary-5"),
@@ -3461,7 +3431,6 @@ it.layer(BaseTestLayer)("OrchestrationProjectionPipeline", (it) => {
         },
       ]);
 
-      // Summary refreshes must not decode message bodies or attachment metadata.
       yield* sql`
         UPDATE projection_thread_messages
         SET attachments_json = '{not-json'
@@ -3478,7 +3447,6 @@ it.layer(BaseTestLayer)("OrchestrationProjectionPipeline", (it) => {
           ('summary-other-thread', 'thread-shell-summary-other', NULL, 'pending', NULL,
            '2026-03-01T08:00:06.000Z', NULL)
       `;
-      // Empty markdown must not be decoded when the shell only needs plan status.
       yield* sql`
         INSERT INTO projection_thread_proposed_plans (
           plan_id, thread_id, turn_id, plan_markdown, implemented_at,
@@ -4631,8 +4599,6 @@ engineLayer("OrchestrationProjectionPipeline via engine dispatch", (it) => {
         createdAt,
       });
 
-      // First attempt: the thread gets a turn, a message, an activity, and a
-      // running session before its bootstrap fails and the server rolls back.
       yield* createThread("cmd-retry-create-1", "First attempt");
       yield* engine.dispatch({
         type: "thread.turn.start",
@@ -4707,7 +4673,6 @@ engineLayer("OrchestrationProjectionPipeline via engine dispatch", (it) => {
       });
       assert.isTrue(Option.isNone(yield* snapshotQuery.getThreadShellById(threadId)));
 
-      // Retry from the same draft reuses the thread id.
       yield* createThread("cmd-retry-create-2", "Second attempt");
 
       const shell = Option.getOrThrow(yield* snapshotQuery.getThreadShellById(threadId));
@@ -4833,7 +4798,6 @@ engineLayer("OrchestrationProjectionPipeline via engine dispatch", (it) => {
         { status: "accepted", resultSequence: result.sequence },
       ]);
 
-      // Removing a nonempty directory as a file fails after the command commits.
       yield* fileSystem.makeDirectory(blockedAttachmentPath);
       yield* fileSystem.writeFileString(path.join(blockedAttachmentPath, "keep.txt"), "keep");
       const cleanupFailureCommandId = CommandId.make("cmd-cleanup-failure-delete");

@@ -13,24 +13,8 @@ import { ManagedRelayDpopSigner } from "../relay/managedRelay.ts";
 import type { RemoteEnvironmentRequestError } from "../rpc/http.ts";
 import { executeAuthenticatedEnvironmentHttpRequest } from "./environmentHttpAuth.ts";
 
-// Long enough for a slow but alive server to finish. On a cold open a timeout
-// makes the socket ask the same server for the same snapshot again, and older
-// turn pages have no fallback, so a short deadline only drops work. The socket
-// fallback is for setups where /api fails but /ws works, such as a proxy that
-// blocks /api. A dead server drops the socket session, which interrupts a
-// cold-open load. Older turn pages wait for this deadline.
 const DEFAULT_THREAD_SNAPSHOT_TIMEOUT_MS = 20_000;
 
-/**
- * Load a thread's detail snapshot over HTTP instead of embedding it in the
- * WebSocket subscription's first frame. The response is gzip-compressible by
- * the transport and keeps the (potentially multi-KB) snapshot off the socket.
- */
-/**
- * Optional turn window for a snapshot fetch. Only send a window to servers
- * that advertise `threadSnapshotPagination`; older servers reject unknown
- * query parameters.
- */
 export interface ThreadSnapshotWindow {
   readonly turnLimit: number;
   readonly beforeCursor?: string;
@@ -71,12 +55,6 @@ export const fetchEnvironmentThreadSnapshot = Effect.fn(
 
 export type FetchEnvironmentThreadSnapshotError = RemoteEnvironmentRequestError;
 
-/**
- * Loads a thread's detail snapshot over HTTP, returning `Option.none()` when it
- * cannot be loaded (so the caller falls back to the socket-embedded snapshot).
- * Decouples the thread state machine from the underlying HTTP + DPoP details and
- * keeps them out of test contexts.
- */
 export class ThreadSnapshotLoader extends Context.Service<
   ThreadSnapshotLoader,
   {
@@ -97,9 +75,6 @@ export const threadSnapshotLoaderLayer: Layer.Layer<
   ThreadSnapshotLoader,
   Effect.gen(function* () {
     const httpClient = yield* HttpClient.HttpClient;
-    // Resolve the DPoP signer optionally: it is only needed for relay/DPoP
-    // connections, so the loader must not hard-require it (bearer/primary
-    // connections work without one).
     const signer = yield* Effect.serviceOption(ManagedRelayDpopSigner);
     const remoteAuthorization = yield* Effect.serviceOption(RemoteEnvironmentAuthorization);
     return ThreadSnapshotLoader.of({
@@ -119,10 +94,6 @@ export const threadSnapshotLoaderLayer: Layer.Layer<
         }).pipe(
           Effect.map(Option.some<OrchestrationThreadDetailSnapshot>),
           Effect.provideService(HttpClient.HttpClient, httpClient),
-          // A genuinely missing thread (404) is expected — the socket
-          // subscription is the source of truth for thread existence and will
-          // surface the deletion — so don't treat it as an error worth warning
-          // about; just defer to the socket path.
           Effect.catchTags({
             EnvironmentResourceNotFoundError: () =>
               Effect.logDebug(

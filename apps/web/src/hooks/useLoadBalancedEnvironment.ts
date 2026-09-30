@@ -6,7 +6,6 @@ import { useCallback, useContext, useMemo } from "react";
 
 import { serverEnvironment } from "../state/server";
 
-/** Only mounted for unresolved automatic drafts, so idle clients do not poll hosts. */
 export function useLoadBalancedEnvironment(
   environmentIds: readonly EnvironmentId[],
   weights: Readonly<Record<string, number>>,

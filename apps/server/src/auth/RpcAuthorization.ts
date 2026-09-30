@@ -16,11 +16,6 @@ import type * as RpcGroup from "effect/unstable/rpc/RpcGroup";
 
 type WsRpcMethod = RpcGroup.Rpcs<typeof WsRpcGroup>["_tag"];
 
-/**
- * Keep authorization coverage coupled to the RPC group itself. Adding an RPC to
- * `WsRpcGroup` without choosing a scope is a type error instead of a production
- * runtime failure.
- */
 export const RPC_REQUIRED_SCOPES = {
   [ORCHESTRATION_WS_METHODS.dispatchCommand]: AuthOrchestrationOperateScope,
   [ORCHESTRATION_WS_METHODS.getWorkflowScript]: AuthOrchestrationReadScope,
@@ -93,12 +88,8 @@ export const RPC_REQUIRED_SCOPES = {
   [WS_METHODS.pullRequestsSetThreadResolution]: AuthOrchestrationOperateScope,
   [WS_METHODS.pullRequestsSetReaction]: AuthOrchestrationOperateScope,
   [WS_METHODS.pullRequestsSetFilesViewed]: AuthOrchestrationOperateScope,
-  // Read scope like the reads it un-caches: refreshing is part of reading, and a read-only
-  // client pressing refresh must not be told it may not look again.
   [WS_METHODS.pullRequestsInvalidate]: AuthOrchestrationReadScope,
   [WS_METHODS.pullRequestsSubscribeRefreshes]: AuthOrchestrationReadScope,
-  // The candidate list is a read like the detail beside it; asking somebody for a review is a
-  // write like every other one.
   [WS_METHODS.pullRequestsReviewerCandidates]: AuthOrchestrationReadScope,
   [WS_METHODS.pullRequestsRequestReviewers]: AuthOrchestrationOperateScope,
   [WS_METHODS.pullRequestsLabelCandidates]: AuthOrchestrationReadScope,
@@ -187,7 +178,6 @@ export function requiredScopeForRpcMethod(method: string): AuthEnvironmentScope 
   return requiredScope;
 }
 
-/** Retrying can install or restart tools even though ordinary listing is readable. */
 export const requiredScopeForDeviceList = (input: DeviceListInput): AuthEnvironmentScope =>
   input.retryHostId || input.updateTool
     ? AuthOrchestrationOperateScope

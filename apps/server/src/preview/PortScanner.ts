@@ -1,21 +1,3 @@
-/**
- * In-process PortScanner implementation.
- *
- * macOS/Linux: parses `lsof -iTCP -sTCP:LISTEN -P -n -F pcn` (-F output is a
- * stable line-prefixed field format; this is the only `lsof` flag set we rely
- * on).
- *
- * Windows / lsof missing: checks a curated list of common dev ports through
- * the shared Net service.
- *
- * Listening ports are published only after a bounded HTTP(S) probe finds a
- * successful HTML document or a redirect to one.
- * Positive and negative results are cached briefly by candidate URL and listener identity,
- * limiting repeated requests without leaving stale classifications around.
- *
- * Polling is reference-counted via scoped `retain`. A single layer-scoped fiber
- * polls forever, but each tick is a no-op when the retain count is zero.
- */
 import {
   CONFIGURED_LOCAL_SERVER_URLS_MAX_ITEMS,
   PREVIEW_URL_MAX_LENGTH,
@@ -225,8 +207,6 @@ const parseLsofOutput = (
 };
 
 const parsePortFromLsofName = (name: string): number | null => {
-  // Examples: "*:5173", "127.0.0.1:5173", "[::1]:5173", "localhost:5173",
-  //           "192.168.1.10:5173 (LISTEN)" — we only care if the host part is local.
   const trimmed = name.split(" ", 1)[0]?.trim() ?? "";
   if (trimmed.length === 0) return null;
   const lastColon = trimmed.lastIndexOf(":");
@@ -289,7 +269,7 @@ const serversEqual = (
   return true;
 };
 
-/** @public Service construction is part of the canonical Effect module API. */
+/** @public */
 export const make = Effect.gen(function* PortDiscoveryMake() {
   const net = yield* Net.NetService;
   const processRunner = yield* ProcessRunner.ProcessRunner;
@@ -578,8 +558,6 @@ export const make = Effect.gen(function* PortDiscoveryMake() {
     ),
   );
 
-  // Single layer-scoped polling fiber. Ticks skip the scan and its span when no
-  // client is currently retained, so the cost is one Ref.get every POLL_INTERVAL.
   const pollIfRetained = Ref.get(stateRef).pipe(
     Effect.flatMap((state) => (state.retainCount > 0 ? pollTick() : Effect.void)),
   );
@@ -591,8 +569,6 @@ export const make = Effect.gen(function* PortDiscoveryMake() {
       { ...state, retainCount: state.retainCount + 1 },
     ]);
     if (wasIdle) {
-      // Run an immediate scan + broadcast so the new retainer doesn't have
-      // to wait up to POLL_INTERVAL for the first emission.
       yield* pollTick();
     }
   });

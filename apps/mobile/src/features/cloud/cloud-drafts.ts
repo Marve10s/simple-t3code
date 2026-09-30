@@ -30,8 +30,6 @@ export const removeCloudEnvironments = createRuntimeCommand(connectionAtomRuntim
         .filter((entry) => entry.target._tag === "RelayConnectionTarget")
         .map((entry) => entry.target.environmentId),
     );
-    // Credentials are already revoked. A failed backup must leave the local
-    // owners intact so a later sign-in can retry without losing their files.
     yield* Effect.tryPromise({
       try: () => archiveCloudComposerDrafts(accountId, environmentIds),
       catch: (cause) =>

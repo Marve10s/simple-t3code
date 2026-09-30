@@ -464,7 +464,6 @@ it.effect.each(["shutdown", "close"] as const)(
             capture = null;
             booted = false;
           } else if (path === "/api/devices/shutdown") {
-            // This route powers off without releasing serve-sim's cached capture.
             booted = false;
           } else if (path === "/api/devices/boot") booted = true;
           else throw new Error(`Unexpected hub path: ${path}`);
@@ -500,7 +499,6 @@ it.effect.each([
     Effect.gen(function* () {
       const deviceId = DeviceId.make("22222222-2222-2222-2222-222222222222");
       const paths: string[] = [];
-      // The device list is stale until shutdown re-reads it from the hub.
       let listed: "booted" | "off" | "missing" = "booted";
       const ready: DeviceHost.DeviceHostReady = {
         nodePath: process.execPath,
@@ -547,13 +545,11 @@ it.effect.each([
                           booted: listed === "booted",
                         },
                       ],
-                // A partial listing still decodes; it must not read as "off".
                 errors: listed === "missing" ? [{ message: "simctl list failed" }] : [],
               }),
             );
           }
           if (path === "/vendor/serve-sim/grid/api/shutdown") {
-            // serve-sim runs `simctl shutdown` bare and returns its failure as-is.
             listed = hubReports;
             return HttpClientResponse.fromWeb(
               request,

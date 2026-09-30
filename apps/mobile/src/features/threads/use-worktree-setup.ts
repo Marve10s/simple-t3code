@@ -7,7 +7,6 @@ import { useEffect, useState } from "react";
 import { useEnvironmentQuery } from "../../state/query";
 import { vcsEnvironment } from "../../state/vcs";
 
-/** Retain the last live snapshot when its subscription closes after setup. */
 export function useWorktreeSetup(input: {
   environmentId: EnvironmentId | null;
   threadId: ThreadId | null;

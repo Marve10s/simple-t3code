@@ -22,11 +22,6 @@ const dependencies = [
 const REGISTER_EVERY_PR =
   "Register every pull request you open for this thread, including each layer of a stack, right after creating it.";
 
-/**
- * Either the pull request's URL or its repository and number. Both forms
- * resolve to the same host-level identity, so the agent can pass whichever
- * the host CLI handed back.
- */
 export const PullRequestTargetInput = Schema.Struct({
   url: Schema.optional(
     TrimmedNonEmptyString.annotate({
@@ -165,7 +160,6 @@ export const ThreadPullRequestEntry = Schema.Struct({
   stack: Schema.NullOr(
     Schema.Struct({
       kind: Schema.Literals(["native", "derived"]),
-      /** 1-based, bottom of the stack first. */
       position: Schema.Int,
       size: Schema.Int,
     }),
@@ -178,7 +172,6 @@ export const ListThreadPullRequestsResult = Schema.Struct({
   chains: Schema.Array(
     Schema.Struct({
       kind: Schema.Literals(["native", "derived"]),
-      /** Bottom to top. */
       numbers: Schema.Array(Schema.Int),
     }),
   ),

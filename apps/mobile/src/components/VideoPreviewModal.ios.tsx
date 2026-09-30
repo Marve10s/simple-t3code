@@ -35,7 +35,6 @@ function NativeVideoPreview(props: {
   const assetUrl = useAssetUrlState(environmentId, resource);
   const refreshAssetUrl = useEffectEvent(useRefreshAssetUrl(environmentId, resource));
   const name = source.type === "media" ? source.name : source.attachment.name;
-  // The first minted URL is kept so a background refresh does not restart playback.
   const resolvedUrl =
     source.type === "media"
       ? mediaVideoPreviewUri(source, assetUrl._tag === "Success" ? assetUrl.url : null)
@@ -81,12 +80,10 @@ function NativeVideoPreview(props: {
         );
         if (!controller.signal.aborted) onRequestClose();
       } finally {
-        // Native completion follows dismissal, so local playback keeps its file lease.
         file?.dispose();
       }
     })().catch((error: unknown) => {
       if (controller.signal.aborted) return;
-      // AVKit gives no retry, so re-mint now; the cached URL may simply have expired.
       if (ready) void refreshAssetUrl();
       Alert.alert(
         "Could not open video",

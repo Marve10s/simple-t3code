@@ -17,7 +17,6 @@ type SnapShotAnimationDetails = {
 
 export type SnapShotAnimationDestination = {
   readonly frame: Electron.Rectangle;
-  /** Unit coordinates in T3's content area; GNOME supplies the real compositor origin. */
   readonly relativeFrame?: Electron.Rectangle | undefined;
   readonly backgroundColor: string;
   readonly borderColor: string;
@@ -306,8 +305,6 @@ export class SnapShotTransition {
         }
       }
       if (this.waitForCompositorFrame) {
-        // Cover the source with a composited snapshot before the caller reveals T3.
-        // Decoding and renderer animation frames alone can leave a transparent gap.
         await Promise.all(
           overlays.map(async (overlay) => {
             if (this.active !== active || overlay.window.isDestroyed()) return;
@@ -402,15 +399,12 @@ export class SnapShotTransition {
         );
         if (this.active !== active || overlay.window.isDestroyed()) return;
         if (this.waitForCompositorFrame) {
-          // Read back one pixel after preparation to flush queued compositor work
-          // before the animation clock starts on any of the display surfaces.
           await overlay.window.webContents.capturePage({ x: 0, y: 0, width: 1, height: 1 });
         }
         return overlay;
       }),
     );
     if (this.active !== active) return;
-    // One display failing must not cut the flight short on the others.
     await Promise.allSettled(
       prepared.map((result) => {
         if (result.status !== "fulfilled" || !result.value || result.value.window.isDestroyed()) {

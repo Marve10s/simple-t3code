@@ -36,7 +36,6 @@ export function kdeCaptureDesktopEntry(executable: string): string {
     "Name=T3 Code SnapShots",
     "NoDisplay=true",
     `Exec=${escapeDesktopEntryExecArgument(executable)} check`,
-    // KService reads this custom property as a KConfig list, not an XDG ';' list.
     "X-KDE-DBUS-Restricted-Interfaces=org.kde.KWin.ScreenShot2",
     MARKER,
     "",
@@ -95,7 +94,6 @@ async function regularFile(path: string): Promise<Buffer | undefined> {
   return NodeFSP.readFile(path);
 }
 
-/** No install on launch: writes happen only after the user chooses Install helper. */
 export class KdeCaptureSetup {
   private readonly paths: KdeCapturePaths;
   constructor(paths: KdeCapturePaths) {
@@ -144,7 +142,6 @@ export class KdeCaptureSetup {
       throw new Error(
         "Another desktop entry uses the capture helper's name. Rename it before continuing.",
       );
-    // Never overwrite/follow a symlink, including the installation directory itself.
     const directory = NodePath.dirname(executable);
     const existing = await NodeFSP.lstat(directory).catch((error: NodeJS.ErrnoException) => {
       if (error.code !== "ENOENT") throw error;
@@ -182,11 +179,7 @@ export class KdeCaptureSetup {
         await NodeFSP.rm(staging, { recursive: true, force: true });
       }
     }
-    // KService must see the new desktop entry before KWin checks the executable.
     await run("kbuildsycoca6", ["--noincremental"]);
-    // AppImages change XDG search paths, and KService caches are also locale-specific.
-    // Refresh Plasma's cache in its session environment, not just the app's cache.
-    // Non-systemd sessions use the direct refresh and atomic directory notification above.
     await run("systemd-run", [
       "--user",
       "--quiet",

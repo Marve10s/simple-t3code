@@ -11,7 +11,6 @@ import * as Schema from "effect/Schema";
 
 export const PROJECT_FAVICON_THUMBNAIL_SIZE = 96;
 export const PROJECT_FAVICON_MAX_DATA_URL_LENGTH = 32 * 1024;
-/** Larger sources are not worth decoding for an icon and are left to the remote URL. */
 export const PROJECT_FAVICON_MAX_SOURCE_BYTES = 4 * 1024 * 1024;
 export const PROJECT_FAVICON_CACHE_MAX_BYTES = 1024 * 1024;
 export const PROJECT_FAVICON_CACHE_MAX_ENTRIES = 128;
@@ -44,7 +43,6 @@ function keyFor(target: ProjectFaviconTarget) {
 }
 
 export interface ProjectFaviconStorage {
-  /** Every persisted record; entries that fail validation are ignored. */
   readonly list: () => Promise<ReadonlyArray<unknown>>;
   readonly put: (key: string, entry: ProjectFaviconEntry) => Promise<void>;
   readonly remove: (key: string, entry: ProjectFaviconEntry) => Promise<void>;
@@ -81,12 +79,6 @@ async function readBounded(response: Response, maxBytes: number) {
   return bytes;
 }
 
-/**
- * Fetches an icon and inlines its bytes when they fit the cache limit, so SVGs
- * and small bitmaps are stored exactly as served. Larger bitmaps go through the
- * platform downscaler; larger SVGs stay remote because rasterizing them without
- * intrinsic dimensions is unreliable.
- */
 export function createProjectFaviconImageLoader(input: {
   readonly fetch?: typeof fetch;
   readonly downscale: (
@@ -118,7 +110,6 @@ export function createProjectFaviconImageLoader(input: {
   };
 }
 
-/** Stores small, self-contained images so startup never needs an old signed URL. */
 export function createProjectFaviconCache(input: {
   readonly storage: ProjectFaviconStorage;
   readonly load: (url: string, signal: AbortSignal) => Promise<string>;
@@ -132,9 +123,7 @@ export function createProjectFaviconCache(input: {
 
   const persist = (operation: () => Promise<void>) => {
     const task: Promise<void> = operation()
-      .catch(() => {
-        // Keep the in-memory image if local storage is full or unavailable.
-      })
+      .catch(() => {})
       .finally(() => pending.delete(task));
     pending.add(task);
   };
@@ -168,9 +157,7 @@ export function createProjectFaviconCache(input: {
           if (Option.isSome(entry)) entries.set(keyFor(entry.value), entry.value);
         }
         trim();
-      } catch {
-        // A missing, corrupt, or unavailable cache must not prevent startup.
-      }
+      } catch {}
     })());
 
   const peek = (target: ProjectFaviconTarget) => entries.get(keyFor(target))?.dataUrl ?? null;
@@ -219,9 +206,7 @@ export function createProjectFaviconCache(input: {
         trim();
         return dataUrl;
       }
-    } catch {
-      // An outage or failed decode leaves the last successful image visible.
-    }
+    } catch {}
     return peek(target) ?? url;
   };
 
@@ -229,8 +214,6 @@ export function createProjectFaviconCache(input: {
     await Promise.all(pending);
   };
 
-  // A download that started before the clear sees the revision change and is discarded;
-  // one that starts during the clear waits for it, so it cannot repopulate storage.
   const clear = async (environmentId?: EnvironmentId) => {
     if (environmentId === undefined) generation += 1;
     else

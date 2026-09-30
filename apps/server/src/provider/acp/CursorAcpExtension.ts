@@ -1,7 +1,3 @@
-/**
- * Public Docs: https://cursor.com/docs/cli/acp#cursor-extension-methods
- * Additional reference provided by the Cursor team: https://anysphere.enterprise.slack.com/files/U068SSJE141/F0APT1HSZRP/cursor-acp-extension-method-schemas.md
- */
 import type { UserInputQuestion } from "@t3tools/contracts";
 import * as AcpSchema from "effect-acp/schema";
 import * as Schema from "effect/Schema";
@@ -94,9 +90,6 @@ export function extractTodosAsPlan(params: typeof CursorUpdateTodosRequest.Type)
   }>;
 } {
   const plan = params.todos.flatMap((todo) => {
-    // Fall back to the title when content is missing OR blank. `??` only
-    // covers a missing content, so a present-but-empty content ("" or
-    // whitespace) would shadow a real title and drop the step below.
     const step = todo.content?.trim() || todo.title?.trim() || "";
     if (step === "") {
       return [];

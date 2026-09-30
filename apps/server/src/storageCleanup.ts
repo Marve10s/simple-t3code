@@ -78,7 +78,6 @@ function sameProjectWorktreePolicies(left: ServerSettings, right: ServerSettings
   );
 }
 
-/** Live sessions keep their cwd even when no turn is currently running. */
 function storageCleanupThreadIdle(thread: OrchestrationThreadShell, now: number): boolean {
   return (
     thread.branch !== null &&
@@ -92,7 +91,6 @@ function storageCleanupThreadIdle(thread: OrchestrationThreadShell, now: number)
   );
 }
 
-/** PR metadata refreshes must not reset the inactivity clock. */
 function storageCleanupActivityAt(thread: OrchestrationThreadShell): number {
   return Math.max(
     ...[
@@ -154,7 +152,6 @@ export const make = Effect.gen(function* () {
     return { projects: active.projects, threads: [...active.threads, ...archived.threads] };
   });
 
-  // Local threads under another project need not have a worktreePath of their own.
   const containsProjectRoot = Effect.fn("StorageCleanup.containsProjectRoot")(function* (
     worktreePath: string,
     projects: ReadonlyArray<{ readonly workspaceRoot: string }>,
@@ -183,8 +180,6 @@ export const make = Effect.gen(function* () {
         )
       : [];
     if (deletedThreads.length > 0) {
-      // Read tombstones before taking this fence. A later deletion waits for the
-      // next sweep; every captured deletion must finish stopping its resources.
       const { snapshotSequence } = yield* snapshots.getSnapshotSequence();
       yield* threadDeletion.drainThrough(snapshotSequence);
     }
@@ -217,7 +212,6 @@ export const make = Effect.gen(function* () {
         if (!inside(root, worktreePath) || !(yield* fs.exists(worktreePath))) return;
         if ((yield* fs.realPath(worktreePath)) !== worktreePath) return;
         if (yield* containsProjectRoot(worktreePath, [project, ...snapshot.projects])) return;
-        // A linked worktree has a .git file. Never remove a main checkout.
         if ((yield* fs.stat(path.join(worktreePath, ".git"))).type !== "File") return;
         const status = yield* git.statusDetailsLocal(worktreePath);
         if (!status.isRepo || status.branch !== thread.branch || status.hasWorkingTreeChanges)
@@ -229,8 +223,6 @@ export const make = Effect.gen(function* () {
           args: ["ls-files", "--others", "--ignored", "--exclude-standard", "--directory", "-z"],
           maxOutputBytes: 64 * 1024,
         });
-        // Ignored files can contain secrets or local datasets. Dependency installs
-        // are reproducible; every other ignored path prevents automatic removal.
         if (
           ignored.stdoutTruncated ||
           ignored.stdout
@@ -280,8 +272,6 @@ export const make = Effect.gen(function* () {
           }
         }
         if (!eligible) return;
-        // Re-read after Git/host calls so a queued turn, resumed session or new
-        // thread sharing this path cancels the removal.
         const latestSnapshot = yield* readThreads();
         if (yield* containsProjectRoot(worktreePath, [project, ...latestSnapshot.projects])) return;
         const latest = latestSnapshot.threads.filter(
@@ -296,8 +286,6 @@ export const make = Effect.gen(function* () {
               .worktreeOnDelete
           )
             return;
-          // A failed session stop is logged by the deletion reactor. Its drain
-          // alone is not proof that a provider released this checkout.
           if (
             (yield* providers.listSessions()).some(
               (session) =>
@@ -354,8 +342,6 @@ export const make = Effect.gen(function* () {
           return;
         yield* git.removeWorktree({ cwd: project.workspaceRoot, path: worktreePath, force: false });
         yield* gitManager.invalidateStatus(project.workspaceRoot);
-        // Preserve branch and path: ProviderCommandReactor recreates the checkout
-        // from that branch when the thread is resumed.
         yield* Effect.logInfo("storage cleanup removed worktree", { threadId: thread.id });
       }).pipe(
         (effect) => withWorkspaceLease(worktreePath, effect),

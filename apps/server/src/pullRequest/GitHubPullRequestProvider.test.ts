@@ -94,7 +94,6 @@ it.effect("uses one narrow read for a linked pull request summary", () =>
 
     expect(summary.state).toBe("open");
     expect(summaryReads).toBe(1);
-    // The author's avatar comes from the login-shaped URL, not a second request.
     expect(summary.author?.avatarUrl).toBe("https://github.com/octocat.png?size=80");
   }),
 );
@@ -167,7 +166,6 @@ describe("gitHubViewerPermissions", () => {
         didAuthor: false,
       }),
     ).toEqual({
-      // Arming a merge for later is the merge, so it travels with it.
       actions: [
         "merge",
         "enable-auto-merge",
@@ -189,8 +187,6 @@ describe("gitHubViewerPermissions", () => {
   });
 
   it("leaves a passer-by on a repository they can only read nothing but the review", () => {
-    // Every open-source pull request somebody else opened: GitHub says no to all five actions
-    // and to resolving, and yes to commenting and to every verdict.
     expect(
       gitHubViewerPermissions({
         canWrite: false,
@@ -203,7 +199,6 @@ describe("gitHubViewerPermissions", () => {
       comment: true,
       resolve: false,
       verdicts: ["comment", "approve", "request-changes"],
-      // Asking somebody else to review is the one thing read access never stretches to.
       requestReviewers: false,
       labels: false,
     });
@@ -230,11 +225,9 @@ describe("gitHubViewerPermissions", () => {
         didAuthor: true,
       }),
     ).toEqual({
-      // Merging is the one thing writing is needed for, now or later; the rest an author may do.
       actions: ["ready", "draft", "close", "reopen"],
       comment: true,
       resolve: true,
-      // GitHub refuses an author's approval of their own change, so the page does not offer one.
       verdicts: ["comment"],
       requestReviewers: false,
       labels: false,
@@ -749,7 +742,6 @@ describe("getViewerPermissions", () => {
 
       expect(permissions.actions).not.toContain("update-branch");
       expect(permissions.updateMethods).toBeUndefined();
-      // The rest of the answer survives a comparison nobody could make.
       expect(permissions.actions).toContain("merge");
     }).pipe(
       Effect.provide(
@@ -922,8 +914,6 @@ describe("getChangeRequestActivity dismissed reviews", () => {
   });
 
   it.effect("fills a marker-only dismissed review with the timeline's reason", () =>
-    // Macroscope's approvals carry only an HTML comment, which markdown renders as nothing —
-    // an empty-string check misses them and the card opens onto nothing.
     readActivity.pipe(
       Effect.map((activity) => {
         expect(activity.comments[0]?.body).toBe("Dismissing prior approval to re-evaluate 9b66581");
@@ -1006,8 +996,6 @@ describe("loginAvatarUrl", () => {
   });
 
   it("has nothing for an app, which names no page", () => {
-    // `dependabot[bot]` has a picture, but not at `/dependabot[bot].png` — a guess that 404s is
-    // worse than the initials it would replace.
     expect(loginAvatarUrl("dependabot[bot]", "github.com")).toBeNull();
   });
 

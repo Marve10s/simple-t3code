@@ -13,10 +13,6 @@ export interface UsageDailyChartProps {
   readonly height: number;
 }
 
-/**
- * Stacked daily bars drawn with plain views. Android and any platform without
- * Swift Charts land here; iOS resolves `UsageDailyChart.ios.tsx` instead.
- */
 export function UsageDailyChart({ days, daily, metric, height }: UsageDailyChartProps) {
   const colors = useProviderColors();
   const chartDays = useMemo(() => buildChartDays(days, daily, metric), [days, daily, metric]);
@@ -24,8 +20,6 @@ export function UsageDailyChart({ days, daily, metric, height }: UsageDailyChart
 
   return (
     <View style={{ height }} className="flex-row items-end gap-px">
-      {/* column-reverse stacks the bottom-first provider values upward
-          without reversing the array (Hermes lacks Array#toReversed). */}
       {chartDays.map((day) => (
         <View key={day.day} className="h-full flex-1 flex-col-reverse overflow-hidden rounded-sm">
           {day.values.map((entry) => (

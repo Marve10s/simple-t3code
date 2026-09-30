@@ -22,8 +22,6 @@ export function statusForPhase(phase: RelayAgentActivityState["phase"]): string 
     case "failed":
       return "Failed";
     case "starting":
-      // Matches the web sidebar's pill wording (Sidebar.logic.ts) so the same
-      // thread reads the same across surfaces.
       return "Connecting";
     case "running":
       return "Working";
@@ -56,9 +54,6 @@ function terminalAggregateState(state: RelayAgentActivityState): RelayAgentActiv
   });
 }
 
-// How long a finished thread keeps its Done/Failed row in the aggregate while
-// other agents are still active. Long enough to be seen on the lock screen,
-// short enough that the activity list stays about live work.
 export const TERMINAL_AGENT_ACTIVITY_DISPLAY_TTL_MS = 15 * 60 * 1_000;
 
 function isRecentTerminalState(state: RelayAgentActivityState, nowMs: number): boolean {
@@ -87,11 +82,6 @@ export function makeAggregateState(input: {
     if (input.terminalState !== null) {
       return terminalAggregateState(input.terminalState);
     }
-    // With no live work, recently finished threads keep the card showing
-    // Done/Failed content (an armed card never renders an empty state). The
-    // newly-terminal alert rules key off the previously delivered aggregate,
-    // so replays repaint this without buzzing. Once the terminal rows age
-    // out, the aggregate is null and the delivery layer ends the card.
     const recentTerminal = input.activeStates
       .filter((state) => isRecentTerminalState(state, input.nowMs))
       .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
@@ -107,9 +97,6 @@ export function makeAggregateState(input: {
       activities: recentTerminal.slice(0, MAX_ACTIVITY_ROWS).map(aggregateRowForState),
     });
   }
-  // Recently finished threads ride along after the active ones (display slots
-  // permitting) so a completion is visible as Done/Failed instead of the row
-  // silently vanishing while other agents keep the activity alive.
   const recentTerminalStates = input.activeStates
     .filter((state) => isRecentTerminalState(state, input.nowMs))
     .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));

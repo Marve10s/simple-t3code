@@ -1,11 +1,3 @@
-/**
- * ExternalLauncher - external application launch service interface.
- *
- * Owns process launch helpers for browser URLs and workspace paths
- * in configured editor integrations.
- *
- * @module ExternalLauncher
- */
 import {
   EDITORS,
   ExternalLauncherError,
@@ -38,10 +30,6 @@ import * as Ref from "effect/Ref";
 import * as Stream from "effect/Stream";
 import * as ChildProcess from "effect/unstable/process/ChildProcess";
 import * as ChildProcessSpawner from "effect/unstable/process/ChildProcessSpawner";
-
-// ==============================
-// Definitions
-// ==============================
 
 export {
   ExternalLauncherError,
@@ -187,10 +175,6 @@ function resolveWslPowerShellPath(): string {
   return "/mnt/c/Windows/System32/WindowsPowerShell/v1.0/powershell.exe";
 }
 
-// File reveals from WSL resolve PowerShell through the interop PATH rather
-// than the fixed /mnt/c mount: the automount root is configurable, and a
-// PATH-resolved command keeps the advertised capability aligned with the
-// availability check `launchEditor` performs before spawning.
 const WSL_POWERSHELL_COMMAND = "powershell.exe";
 
 function shouldUseWindowsHostFromWsl(
@@ -246,16 +230,6 @@ function fileManagerCommandForPlatform(
   }
 }
 
-// A graphical session variable plus an executable `xdg-open` does not prove
-// that opening a directory does anything: without an `inode/directory` MIME
-// handler, `xdg-open` exits nonzero after the launcher has already detached,
-// so the client would see a silent no-op. Require the handler before
-// advertising the file manager on Linux.
-//
-// The probe carries its own timeout well inside the scan timeout
-// `server.getConfig` applies to editor discovery: that outer timeout degrades
-// to an empty editor list, so a hung `xdg-mime` (broken D-Bus or desktop
-// session) must cost only the file manager, not every discovered editor.
 const LINUX_DIRECTORY_HANDLER_PROBE_TIMEOUT = "2 seconds";
 
 const hasUsableLinuxDirectoryHandler = Effect.fn("externalLauncher.hasUsableLinuxDirectoryHandler")(
@@ -308,11 +282,6 @@ const isUsableFileManagerCommand = Effect.fn("externalLauncher.isUsableFileManag
   },
 );
 
-// The file-manager command a launch can actually run, not just the platform
-// preference. WSL hosts prefer the Windows Explorer bridge, but interop can
-// exist without `explorer.exe` on PATH (appendWindowsPath=false) or without a
-// distro name while WSLg still provides a working Linux file manager, so they
-// keep the `xdg-open` fallback instead of losing the editor entirely.
 const resolveUsableFileManagerCommand = Effect.fn(
   "externalLauncher.resolveUsableFileManagerCommand",
 )(function* (
@@ -337,13 +306,6 @@ const resolveUsableFileManagerCommand = Effect.fn(
   return undefined;
 });
 
-// Reveal on Windows and WSL runs through PowerShell (see
-// resolveFileManagerRevealLaunch), not the `explorer` command that gates the
-// file-manager editor itself, so the capability must probe the executables the
-// reveal actually spawns. Callers gate on file-manager availability first;
-// the Linux "files" kind relies on that gate for the directory-handler probe,
-// while the WSL fallback re-probes because its availability may have come
-// from the Explorer bridge instead.
 const fileManagerRevealKindForPlatform = Effect.fn(
   "externalLauncher.fileManagerRevealKindForPlatform",
 )(function* (
@@ -457,21 +419,6 @@ const resolveFileManagerRevealKind = Effect.fn("externalLauncher.resolveFileMana
   },
 );
 
-// Editor discovery walks PATH for every known editor and runs for every
-// client connect (the server config embeds the available editors). Memoize
-// the discovered set for a bounded window so repeat connects skip even the
-// per-command cache lookups in @t3tools/shared/shell.
-//
-// This deliberately does not use `Effect.cachedWithTTL`: that memoizes the
-// first caller's Exit whatever it is, including an interrupt. Callers run this
-// on the connection fiber under a timeout (`resolveAvailableEditorsForConfig`),
-// so one client disconnecting mid-scan would cache the interrupt and replay it
-// to every later connect for the whole TTL, breaking `server.getConfig`
-// permanently. Storing only on success means an interrupted scan leaves the
-// cache untouched and the next connect simply rescans.
-// Expiry uses the monotonic clock (Clock.currentTimeNanos), matching the
-// command-resolution cache in @t3tools/shared/shell, so a backward wall-clock
-// adjustment cannot keep an expired entry alive.
 const EDITOR_DISCOVERY_CACHE_TTL_NANOS = 60_000_000_000n;
 
 interface EditorDiscoveryCacheEntry {
@@ -479,35 +426,15 @@ interface EditorDiscoveryCacheEntry {
   readonly expiresAtNanos: bigint;
 }
 
-/**
- * ExternalLauncher - Service tag for browser/editor launch operations.
- */
 export class ExternalLauncher extends Context.Service<
   ExternalLauncher,
   {
     readonly resolveAvailableEditors: () => Effect.Effect<ReadonlyArray<EditorId>>;
-    /**
-     * Reveal kind for the host, or undefined when the executable a reveal
-     * actually spawns is unavailable. Only meaningful when
-     * `resolveAvailableEditors` includes "file-manager": on Linux that
-     * availability check also carries the directory-handler probe this
-     * capability relies on.
-     */
     readonly resolveFileManagerRevealKind: () => Effect.Effect<FileManagerRevealKind | undefined>;
-    /** Launch a URL target in the default browser. */
     readonly launchBrowser: (target: string) => Effect.Effect<void, ExternalLauncherError>;
-    /**
-     * Launch a workspace path in a selected editor integration.
-     *
-     * Launches the editor as a detached process so server startup is not blocked.
-     */
     readonly launchEditor: (input: LaunchEditorInput) => Effect.Effect<void, ExternalLauncherError>;
   }
 >()("t3/process/externalLauncher") {}
-
-// ==============================
-// Implementations
-// ==============================
 
 const resolveEditorLaunch = Effect.fn("resolveEditorLaunch")(function* (
   input: LaunchEditorInput,
@@ -568,17 +495,6 @@ const resolveEditorLaunch = Effect.fn("resolveEditorLaunch")(function* (
   };
 });
 
-/**
- * PowerShell source that launches File Explorer with its raw selection
- * switch. Explorer's contract is the single argument `/select,"<path>"` with
- * only the path quoted; Node's default spawn quoting wraps the whole argument
- * when the path has spaces and Explorer misparses it, silently opening a
- * fallback folder. A single `-ArgumentList` string in Windows PowerShell 5.1
- * reaches the child's command line verbatim, preserving the raw switch.
- *
- * Exported so the Windows smoke test can drive the identical source through a
- * real PowerShell against a recording stub instead of Explorer.
- */
 export function buildFileExplorerRevealPowerShellSource(
   explorerCommand: string,
   target: string,
@@ -610,8 +526,6 @@ const resolveFileManagerRevealLaunch = Effect.fn("resolveFileManagerRevealLaunch
   target: string,
   platform: NodeJS.Platform,
   env: NodeJS.ProcessEnv,
-  // The command resolveUsableFileManagerCommand picked; a WSL host that fell
-  // back to the Linux file manager must reveal through it as well.
   command: string,
 ): Effect.fn.Return<
   EditorLaunch,
@@ -637,10 +551,6 @@ const resolveFileManagerRevealLaunch = Effect.fn("resolveFileManagerRevealLaunch
   ) {
     const explorerTarget = resolveWslFileManagerPath(target, env.WSL_DISTRO_NAME);
     if (yield* isCommandAvailable(WSL_POWERSHELL_COMMAND, { env })) {
-      // Explorer's raw switch cannot express a double quote, and unlike
-      // Windows paths a WSL path may legally contain one: open the containing
-      // directory in File Explorer instead, matching the advertised
-      // "file-explorer" kind.
       if (explorerTarget.includes('"')) {
         const path = yield* Path.Path;
         return {
@@ -652,15 +562,10 @@ const resolveFileManagerRevealLaunch = Effect.fn("resolveFileManagerRevealLaunch
       }
       return fileExplorerRevealLaunch(target, explorerTarget, WSL_POWERSHELL_COMMAND);
     }
-    // Without interop PowerShell the capability advertised the Linux "files"
-    // kind when it advertised anything at all, so the reveal must open the
-    // Linux file manager the label promised, not File Explorer.
     if (hasGraphicalLinuxSession(env) && (yield* isUsableFileManagerCommand("xdg-open", env))) {
       const path = yield* Path.Path;
       return { editor: "file-manager", target, command: "xdg-open", args: [path.dirname(target)] };
     }
-    // Nothing was advertised here; open the parent in File Explorer as the
-    // best remaining effort for a stale client.
     const path = yield* Path.Path;
     return {
       editor: "file-manager",
@@ -670,8 +575,6 @@ const resolveFileManagerRevealLaunch = Effect.fn("resolveFileManagerRevealLaunch
     };
   }
 
-  // Linux file managers have no portable "select this file" flag, so open
-  // the containing directory instead.
   const path = yield* Path.Path;
   return { editor: "file-manager", target, command, args: [path.dirname(target)] };
 });
@@ -746,7 +649,7 @@ const launchEditorProcess = Effect.fn("externalLauncher.launchEditorProcess")(fu
   );
 });
 
-/** @public Service construction is part of the canonical Effect module API. */
+/** @public */
 export const make = Effect.gen(function* () {
   const spawner = yield* ChildProcessSpawner.ChildProcessSpawner;
   const fileSystem = yield* FileSystem.FileSystem;

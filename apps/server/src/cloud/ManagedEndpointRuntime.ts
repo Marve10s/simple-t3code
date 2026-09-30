@@ -59,33 +59,18 @@ interface ActiveConnector {
   readonly startedAtMillis: number;
 }
 
-// A connector that exits before running this long is treated as part of a
-// crash loop; one that stays up at least this long earns an immediate restart
-// again. Without the backoff below, a relay client that fails instantly (a
-// stale version-manager shim, a bad binary) respawns ~100 times per second
-// until the accumulated tracing exhausts the V8 heap.
 const RELAY_RESTART_STABLE_UPTIME_MS = 30_000;
 const RELAY_RESTART_BACKOFF_BASE_MS = 1_000;
 const RELAY_RESTART_BACKOFF_MAX_MS = 60_000;
-// Newly created tunnels can fail authorization briefly while Cloudflare propagates their token.
 const TUNNEL_AUTHORIZATION_FAILURES_BEFORE_RECOVERY = 4;
 
 export function classifyRelayClientOutput(line: string): "connected" | "warning" | "debug" {
   if (/\bRegistered tunnel connection\b/iu.test(line)) {
     return "connected";
   }
-  // cloudflared uses zerolog level tokens. FTL (fatal) and PNC (panic) are more
-  // severe than ERR, so they must surface at least as loudly — without them a
-  // fatal connector failure would be logged at debug and hidden.
   return /\b(?:ERR|WRN|FTL|PNC)\b/u.test(line) ? "warning" : "debug";
 }
 
-/**
- * Cloudflare's edge rejects a connector whose tunnel was deleted or whose
- * token no longer matches. Current edge output is
- * `error="Failed to get tunnel"` with no prefix; older edges prefixed the
- * same messages with `Unauthorized:`. Match both so recovery fires on either.
- */
 export function isRejectedRelayClientTunnelOutput(line: string): boolean {
   return (
     /\bRegister tunnel error from server side\b/iu.test(line) &&
@@ -95,7 +80,6 @@ export function isRejectedRelayClientTunnelOutput(line: string): boolean {
   );
 }
 
-/** Connector startup failures can clear after installation or a later spawn attempt. */
 export function isRetryableManagedEndpointRuntimeStatus(status: unknown): boolean {
   if (typeof status !== "object" || status === null || !("status" in status)) {
     return false;
@@ -127,7 +111,7 @@ const stopConnector = (connector: ActiveConnector | null) =>
       )
     : Effect.void;
 
-/** @public Service construction is part of the canonical Effect module API. */
+/** @public */
 export const make = Effect.gen(function* () {
   const spawner = yield* ChildProcessSpawner.ChildProcessSpawner;
   const relayClient = yield* RelayClient.RelayClient;
@@ -155,10 +139,6 @@ export const make = Effect.gen(function* () {
         return;
       }
       const uptimeMillis = (yield* Clock.currentTimeMillis) - connector.startedAtMillis;
-      // The first crash restarts immediately; every further crash inside the
-      // stable-uptime window doubles the wait, up to the cap. The delay runs
-      // before the semaphore so a user config change is never blocked behind
-      // it, and reconcileConfig re-checks the desired config afterwards.
       const restartDelayMillis = yield* Ref.modify(restartDelayRef, (current) => {
         if (uptimeMillis >= RELAY_RESTART_STABLE_UPTIME_MS) {
           return [0, 0];
@@ -391,9 +371,6 @@ export const make = Effect.gen(function* () {
     (config: RelayManagedEndpointRuntimeConfig | null) =>
       reconcileSemaphore.withPermits(1)(
         Effect.gen(function* () {
-          // A real config change starts over with a fresh backoff. Recovery
-          // that hands back the same tunnel and token must keep the delay, or
-          // a crash-looping connector respawns on every recovery round trip.
           const desired = yield* Ref.get(desiredConfigRef);
           const unchanged =
             desired !== null &&

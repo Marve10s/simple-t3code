@@ -1,11 +1,3 @@
-/*
- * SimpleT3Code: Codex desktop look.
- *
- * Loaded after index.css and kept unlayered, so these rules win over Tailwind
- * utilities without touching upstream component markup. Keep fork styling in
- * this file so upstream merges stay conflict-free.
- */
-
 :root {
   --codex-chrome-height: 44px;
   --codex-rail-width: 52px;
@@ -41,7 +33,6 @@
   --codex-danger-access: #f0864f;
 }
 
-/* Default palette only: user-selected themes keep their own colors. */
 html:not([data-theme-id]):root,
 html[data-theme-id=""]:root {
   --background: #ffffff;
@@ -106,10 +97,6 @@ html[data-theme-id=""].dark [data-app-sidebar] {
   --sidebar: #141415;
 }
 
-/* ---------------------------------------------------------------------------
- * App shell: gray window chrome, icon rail, and inset rounded cards.
- * ------------------------------------------------------------------------- */
-
 [data-codex-part="chrome-bar"],
 [data-codex-part="icon-rail"] {
   display: none;
@@ -167,7 +154,6 @@ html[data-theme-id=""].dark [data-app-sidebar] {
     stroke-width: 1.75;
   }
 
-  /* The upstream sidebar toggle sits right after the history arrows. */
   [data-sidebar-control] {
     top: 0 !important;
     left: calc(var(--workspace-controls-left) + 68px) !important;
@@ -265,9 +251,6 @@ html[data-theme-id=""].dark [data-app-sidebar] {
   }
 }
 
-/* Thread status: a 7px dot per state, colors matching upstream's pills
-   (sky working, amber approval, indigo input). Only "working" animates, via
-   upstream's stepped animate-status-pulse (opacity only, compositor-drawn). */
 [data-codex-part="thread-mark"] {
   display: block;
   width: 7px;
@@ -310,10 +293,6 @@ html[data-theme-id=""].dark [data-app-sidebar] {
   }
 }
 
-/* ---------------------------------------------------------------------------
- * Draft hero: headline above the centered new-chat composer.
- * ------------------------------------------------------------------------- */
-
 [data-codex-hero-headline] h1,
 [data-codex-hero-headline] h2 {
   color: var(--codex-text);
@@ -321,10 +300,6 @@ html[data-theme-id=""].dark [data-app-sidebar] {
   font-weight: 400;
   letter-spacing: -0.02em;
 }
-
-/* ---------------------------------------------------------------------------
- * Composer: white card with a tray for project, machine, and worktree.
- * ------------------------------------------------------------------------- */
 
 :root {
   --chat-max-width: 46rem;
@@ -339,9 +314,6 @@ html[data-theme-id=""].dark [data-app-sidebar] {
   display: none;
 }
 
-/* The composer's solid fill is a ::before layer so the centered (new-chat)
-   composer can be frosted glass and fade to solid by opacity alone, which the
-   compositor animates without repainting. */
 [data-slot="composer-host"] {
   isolation: isolate;
   border-radius: 24px;
@@ -366,8 +338,6 @@ html[data-theme-id=""].dark [data-app-sidebar] {
   opacity: 0;
 }
 
-/* The tray tucks 20px under the composer; while the composer is see-through
-   that tucked part is clipped so it does not show as a band. */
 [data-chat-composer-overlay="true"][data-draft-hero="true"] [data-slot="composer-context-strip"] {
   -webkit-mask-image: linear-gradient(black calc(100% - 20px), transparent calc(100% - 20px));
   mask-image: linear-gradient(black calc(100% - 20px), transparent calc(100% - 20px));
@@ -474,7 +444,6 @@ html[data-codex-animations="motion"] [data-slot="composer-host"]::before {
   color: var(--codex-placeholder) !important;
 }
 
-/* Footer order: + and access mode on the left; model, effort, send on the right. */
 [data-chat-composer-footer="true"] {
   gap: 4px;
 }
@@ -487,8 +456,6 @@ html[data-codex-animations="motion"] [data-slot="composer-host"]::before {
   order: 1;
 }
 
-/* A pseudo-element spacer: real margins would count toward the measured
-   control widths and push the labels into icon-only mode. */
 [data-chat-composer-controls="left"]::after {
   order: 1;
   flex: 1 1 0;
@@ -550,7 +517,6 @@ html[data-codex-animations="motion"] [data-slot="composer-host"]::before {
   margin-left: 16px;
 }
 
-/* Model and effort read as one control: "GPT-5 Codex High ⌄". */
 [data-chat-composer-controls="left"] [data-chat-provider-model-picker="true"] {
   color: var(--codex-text);
 }
@@ -566,8 +532,6 @@ html[data-codex-animations="motion"] [data-slot="composer-host"]::before {
   color: var(--muted-foreground);
 }
 
-/* A new chat is an empty canvas, as in Codex: the thread header appears once
-   the thread exists. */
 main[data-slot="sidebar-inset"]:has([data-draft-hero="true"]) [data-chat-header] > * {
   visibility: hidden;
 }
@@ -577,19 +541,10 @@ main[data-slot="sidebar-inset"]:has([data-draft-hero="true"]) [data-chat-header]
   background-color: transparent;
 }
 
-/* ---------------------------------------------------------------------------
- * Views (components/codex/codexView.ts): Activity, Projects, Tabs.
- * ------------------------------------------------------------------------- */
-
-/* The top bar already carries window controls; the upstream brand row would
-   repeat them inside the sidebar card. */
 [data-app-sidebar] [class*="@container/sidebar-header"] {
   display: none;
 }
 
-/* Activity: keep upstream's status pills but drop the "Working" word. The
-   dashed icon turns in 8 discrete steps per second-and-a-half: a transform
-   the compositor applies without repainting, a few times a second. */
 [data-app-sidebar] span:has(> svg.lucide-circle-dashed) > span[role="status"] {
   display: none;
 }
@@ -612,7 +567,6 @@ main[data-slot="sidebar-inset"]:has([data-draft-hero="true"]) [data-chat-header]
 }
 
 @media (min-width: 768px) {
-  /* Tabs: no sidebar outside Settings, whose navigation lives there. */
   html[data-codex-view="tabs"][data-codex-settings="false"] [data-slot="sidebar"],
   html[data-codex-view="tabs"][data-codex-settings="false"] [data-sidebar-control] {
     display: none !important;
@@ -656,7 +610,6 @@ main[data-slot="sidebar-inset"]:has([data-draft-hero="true"]) [data-chat-header]
     background: var(--codex-chrome-hover);
   }
 
-  /* The active tab is cut from the same card as the chat below it. */
   [data-codex-part="tab"][data-active="true"] {
     z-index: 1;
     background: var(--background);
@@ -726,8 +679,6 @@ main[data-slot="sidebar-inset"]:has([data-draft-hero="true"]) [data-chat-header]
   }
 }
 
-/* One search: the top bar's. Projects (upstream's legacy sidebar) repeats it
-   as a row above the list. */
 [data-app-sidebar]
   [data-slot="sidebar-group"]:has(
     > [data-slot="sidebar-menu"] [data-testid="command-palette-trigger"]
@@ -735,8 +686,6 @@ main[data-slot="sidebar-inset"]:has([data-draft-hero="true"]) [data-chat-header]
   display: none;
 }
 
-/* Motion animation style (components/codex/motion): one moving surface per
-   selection. Until Motion's chunk mounts, the static backgrounds above stay. */
 [data-codex-part="rail-button"] {
   position: relative;
 }
@@ -777,12 +726,6 @@ main[data-slot="sidebar-inset"]:has([data-draft-hero="true"]) [data-chat-header]
     0.5px 0 0 var(--codex-hairline),
     -0.5px 0 0 var(--codex-hairline);
 }
-
-/* ---------------------------------------------------------------------------
- * New-chat background (components/codex/CodexHeroBackground.tsx). The image
- * sits under a theme-colored scrim, so the same pictures work in light and
- * dark themes and the headline and composer stay readable.
- * ------------------------------------------------------------------------- */
 
 main[data-slot="sidebar-inset"]:has([data-draft-hero="true"]) {
   isolation: isolate;
@@ -826,8 +769,6 @@ html[data-codex-animations="motion"][data-codex-hero-background]
   }
 }
 
-/* The chat view's full-bleed containers paint the theme background; on a new
-   chat they stay see-through so the image shows. */
 html[data-codex-hero-background]
   main[data-slot="sidebar-inset"]:has([data-draft-hero="true"])
   :is([data-chat-header], [class~="bg-background"]) {
@@ -912,13 +853,10 @@ html[data-codex-hero-background]
   height: 12px;
 }
 
-/* Projects view (upstream LegacySidebar). A collapsed project keeps an empty
-   thread list whose left border draws a short tick under the row. */
 [data-app-sidebar] [data-slot="sidebar-menu-sub"]:empty {
   display: none;
 }
 
-/* The "Projects" heading reads like Codex's section labels. */
 [data-app-sidebar] [data-slot="sidebar-group"] > div[class~="justify-between"]:first-child {
   height: 32px;
   margin: 6px 0 2px;
@@ -931,7 +869,6 @@ html[data-codex-hero-background]
   font-weight: 400;
 }
 
-/* Tab labels: the project's icon, or its name when it has none, then the chat. */
 [data-codex-part="tab-project-icon"] {
   display: inline-flex;
   flex-shrink: 0;
@@ -976,8 +913,6 @@ html[data-codex-hero-background]
   stroke-width: 1.75;
 }
 
-/* Motion drives the sidebar's open and close (CodexMotion.tsx), so upstream's
-   left/width transition stays off; it would relayout the chat every frame. */
 html[data-codex-animations="motion"]
   :is([data-slot="sidebar-container"], [data-slot="sidebar-gap"]) {
   transition: none !important;

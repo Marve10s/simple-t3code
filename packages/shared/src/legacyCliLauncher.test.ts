@@ -13,7 +13,6 @@ const hostPlatform = NodeOS.platform();
 // oxlint-disable-next-line t3code/no-global-process-runtime -- Match the real executable used by the subprocess.
 const hostArch = NodeOS.arch();
 
-// The fixture executable uses a POSIX shebang. The wrapper itself also runs on Windows.
 it.skipIf(hostPlatform === "win32")(
   "keeps service IPC, arguments, and termination connected",
   async () => {

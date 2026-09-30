@@ -909,8 +909,6 @@ describe("ManagedEndpointProvider", () => {
         return;
       }
 
-      // A relink refreshes the allocation generation after unlink captured its
-      // target but before unlink begins external teardown.
       yield* provider.provision(request);
       const tunnelCallCount = tunnelCalls.length;
       const dnsCallCount = dnsCalls.length;
@@ -947,20 +945,16 @@ describe("ManagedEndpointProvider", () => {
       expect(released).toBe(true);
       expect(second.endpoint).toEqual(first.endpoint);
       expect(tunnelCalls.map((call) => call.operation)).toEqual([
-        // first provision
         "list",
         "create",
         "putConfiguration",
         "getToken",
-        // release deletes only the tunnel...
         "delete",
-        // ...and the next provision recreates it under the same name
         "list",
         "create",
         "putConfiguration",
         "getToken",
       ]);
-      // The DNS record survives the release and is repointed, never deleted.
       expect(dnsCalls.map((call) => call.operation)).toEqual([
         "listRecords",
         "createRecord",
@@ -992,8 +986,6 @@ describe("ManagedEndpointProvider", () => {
   it.effect("keeps the tunnel alive when a concurrent provision outdates the release claim", () => {
     const tunnelCalls: TunnelCall[] = [];
     const allocations = makeAllocations();
-    // Simulates a provision racing the release: the allocation generation no
-    // longer matches what the release loaded, so the claim fails.
     const outdated = ManagedEndpointAllocations.ManagedEndpointAllocations.of({
       ...allocations,
       claimRelease: () => Effect.succeed(null),
@@ -1009,8 +1001,6 @@ describe("ManagedEndpointProvider", () => {
       });
       const released = yield* provider.release(key);
 
-      // false tells the caller its connector token is still live, so it must
-      // keep its runtime config.
       expect(released).toBe(false);
       expect(tunnelCalls.map((call) => call.operation)).toEqual([
         "list",

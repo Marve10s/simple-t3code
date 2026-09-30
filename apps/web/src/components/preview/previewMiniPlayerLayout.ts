@@ -11,19 +11,12 @@ import type { DeviceScreenSize } from "@t3tools/client-runtime/device/stream";
 
 export const PREVIEW_MINI_PLAYER_EDGE_GAP = 12;
 export const PREVIEW_MINI_PLAYER_CORNER_RADIUS = 12;
-// The mini-player shell straddles this webview at 47 and 49: above --z-sheet, under dialogs (50).
 export const PREVIEW_MINI_PLAYER_WEBVIEW_Z_INDEX = 48;
-// A fresh player is the largest box at the source aspect ratio that fits here.
 const PREVIEW_MINI_PLAYER_DEFAULT_BOX = { width: 320, height: 320 } as const;
 const PREVIEW_MINI_PLAYER_MIN_SIZE = { width: 240, height: 150 } as const;
 
 export interface PreviewMiniPlayerFrame extends PreviewMiniPlayerPosition, PreviewMiniPlayerSize {}
 
-/**
- * The rendered size of what the floating player mirrors: the device viewport
- * when one is set, otherwise the size the webview had when it was floated
- * (`fittedSourceContent`), which the hosted webview keeps as its CSS viewport.
- */
 export function resolvePreviewMiniPlayerSourceSize(
   viewport: PreviewViewportSetting,
   fittedSourceContent: BrowserSurfaceContentPresentation | null,
@@ -37,12 +30,6 @@ export function resolvePreviewMiniPlayerSourceSize(
   };
 }
 
-/**
- * The device screen as the user sees it, so a rotated phone floats as a
- * landscape box. Before the stream reports its size the platform's usual phone
- * shape stands in, matching the stream view's own placeholder aspect; the
- * nominal width only keeps the source cap above any sensible player width.
- */
 export function resolveDeviceMiniPlayerSourceSize(
   platform: DevicePlatform,
   screen: DeviceScreenSize | null,
@@ -58,14 +45,6 @@ export function resolveDeviceMiniPlayerSourceSize(
   return landscape ? { width: long, height: short } : { width: short, height: long };
 }
 
-/**
- * The Android emulator composites the skin's rounded corners into its
- * framebuffer as black wedges (measured at ~13% of the short side on a
- * Pixel 9), so its player clips at a matching phone-like radius; the sliver
- * lost under the curve is status-bar padding. iOS simulators stream an
- * edge-to-edge rectangle and keep the frame radius, which matters for iPads
- * whose real corners are far tighter than a phone's.
- */
 export function resolveDeviceMiniPlayerCornerRadius(
   platform: DevicePlatform,
   player: PreviewMiniPlayerSize,
@@ -82,11 +61,6 @@ interface HorizontalSpan {
   readonly right: number;
 }
 
-/**
- * The composer stack docked to the bottom edge, in container coordinates. It
- * only reserves the columns it covers, so the margins beside it stay open all
- * the way down.
- */
 export interface PreviewMiniPlayerObstacles {
   readonly composer: (HorizontalSpan & { readonly height: number }) | null;
 }
@@ -97,7 +71,6 @@ const spanOf = (x: number, width: number): HorizontalSpan => ({ left: x, right: 
 
 const spansOverlap = (a: HorizontalSpan, b: HorizontalSpan) => a.left < b.right && a.right > b.left;
 
-/** The lowest row (before the edge gap) open to a player covering these columns. */
 function floorFor(
   span: HorizontalSpan,
   container: PreviewMiniPlayerSize,
@@ -109,12 +82,6 @@ function floorFor(
     : container.height;
 }
 
-/**
- * The box a stored size is fitted into. A player with a position keeps the
- * rows its own columns have, so a tall frame parked beside the composer
- * survives the next layout pass; without one it takes the rows above the
- * composer, which every column has.
- */
 const availableArea = (
   container: PreviewMiniPlayerSize,
   obstacles: PreviewMiniPlayerObstacles,
@@ -128,12 +95,6 @@ const availableArea = (
     PREVIEW_MINI_PLAYER_EDGE_GAP * 2,
 });
 
-/**
- * Width is the player's only free dimension; height always follows the source
- * aspect ratio so the webview fills the box without letterboxing. The player
- * never grows past the source's own size (the guest keeps its CSS viewport, so
- * going bigger would only upscale), and a tight container wins over the minimum.
- */
 function fitPreviewMiniPlayerWidth(
   desiredWidth: number,
   source: PreviewMiniPlayerSize,
@@ -187,12 +148,6 @@ const overlapsObstacle = (
 ): boolean =>
   position.y + player.height > floorFor(spanOf(position.x, player.width), container, obstacles);
 
-/**
- * Keeps the player inside the container and off the composer. An overlapping
- * player is pushed out along whichever side needs the smaller move, so a drag
- * slides along the composer into the margin beside it instead of stopping at
- * its top edge; when no side leaves it fully clear it sits above the composer.
- */
 export function clampPreviewMiniPlayerPosition(
   position: PreviewMiniPlayerPosition,
   container: PreviewMiniPlayerSize,
@@ -224,12 +179,6 @@ export function clampPreviewMiniPlayerPosition(
   return best;
 }
 
-/**
- * Resolves the on-screen frame from the stored width and position. Clamping
- * happens here on every layout pass instead of being written back to the
- * store, so a temporarily narrow container never destroys the user's chosen
- * width. A player without a position sits in the top-right corner.
- */
 export function resolvePreviewMiniPlayerFrame(input: {
   readonly width: number | null;
   readonly position: PreviewMiniPlayerPosition | null;
@@ -256,13 +205,6 @@ export function resolvePreviewMiniPlayerFrame(input: {
   return { ...clampPreviewMiniPlayerPosition(anchored, container, size, obstacles), ...size };
 }
 
-/**
- * Resizes from any edge or corner while holding the aspect ratio. The edge
- * opposite the dragged one stays anchored, so growth stops at the container
- * on that axis and the pointer keeps tracking the grabbed edge. On a plain edge
- * drag the perpendicular axis may use the whole container, and the player
- * shifts as needed to stay inside.
- */
 export function resizePreviewMiniPlayer(input: {
   readonly start: PreviewMiniPlayerFrame;
   readonly direction: BrowserViewportResizeDirection;
@@ -285,9 +227,6 @@ export function resizePreviewMiniPlayer(input: {
   const south = direction.includes("south");
   const right = start.x + start.width;
   const bottom = start.y + start.height;
-  // Growth stops where the player's current columns meet the composer, and a
-  // plain edge drag lets the free axis use everything those columns have. A
-  // wider player may reach new columns; the clamp below slides it clear.
   const floor = floorFor(spanOf(start.x, start.width), container, obstacles);
   const max = {
     width: west

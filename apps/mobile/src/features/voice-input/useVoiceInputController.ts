@@ -37,8 +37,6 @@ async function releaseVoiceRecordingAudio(): Promise<void> {
   try {
     await setAudioModeAsync({ allowsRecording: false });
   } finally {
-    // Expo does not deactivate AVAudioSession when recording stops or its
-    // category changes. Explicit deactivation resumes interrupted app audio.
     await setIsAudioActiveAsync(false);
   }
 }
@@ -55,9 +53,7 @@ async function configureVoiceRecordingAudio(): Promise<void> {
   } catch (error) {
     try {
       await releaseVoiceRecordingAudio();
-    } catch {
-      // Keep the setup error. The controller has not started a recorder yet.
-    }
+    } catch {}
     throw error;
   }
 }
@@ -149,9 +145,6 @@ export function useVoiceInputController(input: {
 
   useEffect(() => {
     const subscription = AppState.addEventListener("change", (nextState) => {
-      // iOS reports `inactive` while its permission dialog is open. Only the
-      // real background state cancels preparation; recorder status handles
-      // calls and route interruptions during capture.
       if (nextState === "background") controller.appMovedToBackground();
     });
     return () => subscription.remove();
@@ -166,7 +159,6 @@ export function useVoiceInputController(input: {
     const activation = activateKeepAwakeAsync(tag);
     void activation.catch(() => {});
     return () => {
-      // Release after activation settles, even if the recording ends immediately.
       void activation.then(() => deactivateKeepAwake(tag)).catch(() => {});
     };
   }, [keepAwakeId, state.phase]);
@@ -219,8 +211,6 @@ export function useVoiceInputController(input: {
   const cancel = useCallback(() => controller.cancel(), [controller]);
 
   return {
-    // Store screenshots show the dictation button even on simulators, whose
-    // on-device transcription is unavailable.
     isAvailable: getLocalVoiceTranscriber() !== null || getNativeShowcaseScene() !== null,
     state,
     audioLevels,

@@ -10,8 +10,6 @@ import {
   type TranscriptParsePosition,
 } from "./usageTranscriptReader.ts";
 
-// Exercise the same transition with compact fixtures. UsageService tests and
-// external 65/517 MiB fixtures also exercise the production threshold.
 const readTranscriptRecords = (
   path: string,
   provider: "claude" | "codex" | "grok",

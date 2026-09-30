@@ -124,7 +124,6 @@ export function UsagePriceOverrides({
         .flatMap((environment) => environment.summary?.buckets.map((bucket) => bucket.model) ?? []),
     ]),
   ].sort();
-  // Keep new rows in place while successful environments publish their updated settings.
   const newModels = new Set(
     drafts.filter((draft) => draft.isNew).map((draft) => draft.model.trim()),
   );

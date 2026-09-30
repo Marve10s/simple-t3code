@@ -722,7 +722,6 @@ it.layer(NodeServices.layer)("SessionStore.layer", (it) => {
       });
       expect((yield* readRow)[0]).toEqual({ surface: "mobile", appVersion: "1.2.0" });
 
-      // A partial report (old or minimal client) must not null out stored data.
       yield* sessions.recordClientConnection(issued.sessionId, { appVersion: "1.3.0" });
       expect((yield* readRow)[0]).toEqual({ surface: "mobile", appVersion: "1.3.0" });
 

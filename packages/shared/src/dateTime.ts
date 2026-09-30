@@ -14,7 +14,6 @@ const isZonedIsoDateTime = Schema.is(
 function parseTimestamp(value: string): number {
   if (!isZonedIsoDateTime(value)) return Number.NaN;
 
-  // Engines can normalize invalid calendar dates instead of rejecting them.
   const datePart = value.slice(0, value.indexOf("T"));
   const date = DateTime.make(`${datePart}T00:00:00.000Z`);
   if (Option.isNone(date)) return Number.NaN;
@@ -25,7 +24,6 @@ function parseTimestamp(value: string): number {
   return Date.parse(value);
 }
 
-/** Compare date-time strings by absolute time, with stable handling for malformed stored values. */
 export function compareDateTimeStrings(left: string, right: string): number {
   const leftTimestamp = parseTimestamp(left);
   const rightTimestamp = parseTimestamp(right);

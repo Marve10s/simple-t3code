@@ -97,7 +97,6 @@ function hasImportBlockingActivity(
   );
 }
 
-/** Import recent transcript text and persist the cursor needed to resume its provider session. */
 export const importRecentAgentThreads = Effect.fn("importRecentAgentThreads")(function* (
   input: AgentSessionImportInput,
 ) {
@@ -220,9 +219,6 @@ export const importRecentAgentThreads = Effect.fn("importRecentAgentThreads")(fu
           return yield* new AgentSessionThreadModifiedError({ threadId });
         }
 
-        // Install the cursor before the thread becomes visible. A concurrent
-        // real session can replace it, while insert-ignore keeps this import
-        // from replacing that newer binding.
         if (Option.isNone(existingBinding)) {
           yield* directory.upsert(
             {

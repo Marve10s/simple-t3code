@@ -132,7 +132,6 @@ export function expectedMeasuredAssistantText(provider: ProviderDriverKind): str
   return expectedRecordedAssistantText(provider, TRANSFER_MEASURED_TURN_INDEX);
 }
 
-/** Takes from the queue until one value matches, and returns everything taken. */
 export const collectQueueUntil = Effect.fn("TransferBudget.collectQueueUntil")(function* <A>(
   queue: Queue.Queue<A>,
   predicate: (value: A) => boolean,
@@ -153,11 +152,6 @@ export const collectQueueUntil = Effect.fn("TransferBudget.collectQueueUntil")(f
   );
 });
 
-/**
- * Resumes the thread subscription from a cursor on a measured client. The
- * consumer runs in the client's scope, so closing the client stops it. Callers
- * read items from the returned queue.
- */
 export const subscribeThreadItems = Effect.fn("TransferBudget.subscribeThreadItems")(function* (
   measured: MeasuredWsClient,
   afterSequence: number,
@@ -175,7 +169,6 @@ export const subscribeThreadItems = Effect.fn("TransferBudget.subscribeThreadIte
   return items;
 });
 
-/** Shell counterpart of subscribeThreadItems. */
 export const subscribeShellItems = Effect.fn("TransferBudget.subscribeShellItems")(function* (
   measured: MeasuredWsClient,
   afterSequence: number,
@@ -192,7 +185,6 @@ export const subscribeShellItems = Effect.fn("TransferBudget.subscribeShellItems
   return items;
 });
 
-/** Waits for the initial catch-up and reports whether it was a replay or a snapshot reset. */
 export const awaitSubscriptionSynchronized = Effect.fn(
   "TransferBudget.awaitSubscriptionSynchronized",
 )(function* <Item extends OrchestrationThreadStreamItem | OrchestrationShellStreamItem>(

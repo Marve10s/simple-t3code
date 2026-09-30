@@ -200,13 +200,9 @@ import {
   ThreadMarkdownImageView,
 } from "./ThreadMarkdownImage";
 
-/** `ml-7` gutter plus the `px-3` padding of the expanded reasoning container. */
 const REASONING_CONTENT_INSET = 52;
 
 const WIDE_MARKDOWN_BLOCK_OPTIONS = {
-  // Native iOS blockquotes and adjacent selectable text are separate layout
-  // chunks. Giving their shrink-to-fit bubble a definite width keeps both
-  // chunks measured against the width at which UIKit draws them.
   includeBlockquotes: Platform.OS === "ios",
   includeOrderedLists: Platform.OS === "android",
 } as const;
@@ -223,21 +219,13 @@ function formatMessageTime(input: string): string {
   return MESSAGE_TIME_FORMATTER.format(timestamp);
 }
 
-// Fixed heights mirror renderFeedEntry's classNames and are only used while
-// text fits at the current font settings. Larger accessibility text is measured.
-const TURN_FOLD_HEIGHT = 42; // min-h-11 (38.5) + mb-1 (3.5), with the mobile 14px rem
-// Tailwind spacing on the mobile 14px rem: px-3.5 on the user bubble, px-1 on
-// assistant rows. Images size their frame from these before their own layout.
+const TURN_FOLD_HEIGHT = 42;
 const USER_BUBBLE_HORIZONTAL_PADDING = 3.5 * 3.5;
 const ASSISTANT_ROW_HORIZONTAL_PADDING = 3.5;
-// Let neighboring rows move out of the new rows' space before showing their text.
 const THREAD_FEED_DISCLOSURE_ENTER_TRANSITION = FadeIn.delay(
   THREAD_DISCLOSURE_TRANSITION_MS,
 ).duration(140);
 
-// Entering animations must only play for rows born just now — LegendList
-// remounts rows when they scroll back into view, and replaying an entrance for
-// old content would be its own kind of jank.
 const FRESH_ENTRY_WINDOW_MS = 3_000;
 function isFreshTimestamp(input: string): boolean {
   const timestamp = Date.parse(input);
@@ -272,7 +260,6 @@ export interface ThreadFeedProps {
   readonly onEndFollowEnabledChange?: (enabled: boolean) => void;
   readonly skills?: ReadonlyArray<SelectableMarkdownSkill>;
   readonly onUseArtifactTemplate?: (template: CodexArtifactTemplate) => void;
-  /** Non-null when older turns exist beyond the loaded window. */
   readonly loadEarlier?: {
     readonly loading: boolean;
     readonly onLoadEarlier: () => void;
@@ -315,7 +302,6 @@ function MessageAttachmentImage(props: {
         accessibilityRole="imagebutton"
         accessibilityLabel={`Open ${props.name}`}
         onPress={() =>
-          // The viewer mints its own URL from the resource so the image survives a refresh.
           props.onPressPreview({
             kind: "image",
             environmentId: props.environmentId,
@@ -349,12 +335,7 @@ function MessageAttachmentImage(props: {
   );
 }
 
-// The attachment union has an open member (`type: string` for attachment
-// types from newer servers), so literal comparisons do not narrow it. Split
-// with guards and render unknown types as inert rows, never crash.
 function isImageAttachment(attachment: ChatAttachment): attachment is ChatImageAttachment {
-  // Messages sent before pictures were typed by content carry `file`; they are still
-  // pictures, and reading them as such is what lets them keep their thumbnail.
   return attachment.type === "image" || imageMimeType(attachment) !== null;
 }
 
@@ -543,10 +524,6 @@ function MessageAttachmentFile(props: {
   );
 }
 
-/**
- * An attachment type this build does not know (newer server). Rendered as an
- * inert row: the name is still useful, but there is nothing to open.
- */
 function MessageAttachmentUnknown(props: { readonly name: string }) {
   return (
     <View className="flex-row items-center gap-2 py-1">
@@ -559,7 +536,6 @@ function MessageAttachmentUnknown(props: { readonly name: string }) {
 }
 
 const ThreadMediaVisibleContext = createContext(false);
-// LegendList only computes hook visibility when the list has a viewability config.
 const THREAD_MEDIA_VIEWABILITY_CONFIG = { itemVisiblePercentThreshold: 0 };
 
 function ThreadMediaVisibility(props: { readonly children: ReactNode }) {
@@ -772,7 +748,6 @@ function ArtifactTemplateCard(props: {
   );
 }
 
-/** Tap opens a link; long-press on a native file chip shows its menu. Built once per feed. */
 interface MarkdownLinkHandlers {
   readonly onLinkPress: (href: string) => void;
   readonly fileContextMenu: (href: string) => MarkdownFileContextMenu | undefined;
@@ -969,7 +944,6 @@ function useMarkdownStyles(
   const markdownCodeText = theme["--color-md-code-text"];
   const markdownInlineCodeText = theme["--color-foreground-secondary"];
   const markdownHrColor = theme["--color-md-hr"];
-  // Native chip drawing parses opaque hex only, and this role is translucent.
   const contextChipBorderColor = flattenThemeColor(
     theme["--color-border"],
     theme["--color-user-bubble"],
@@ -1386,7 +1360,6 @@ function renderFeedEntry(
     readonly reviewCommentBubbleWidth: number;
     readonly themeAppearance: "light" | "dark";
     readonly userBubbleMaxWidth: number;
-    /** Width assistant markdown lays out in, so images can size their frame before layout. */
     readonly markdownContentWidth: number;
   },
 ) {
@@ -1520,11 +1493,6 @@ function renderFeedEntry(
     const timestampLabel = formatMessageTime(isUser ? message.createdAt : message.updatedAt);
     const attachments = message.attachments ?? [];
     const hasReviewCommentContext = message.text.includes("<review_comment");
-    // A bubble that sizes itself from its content cannot lay out a block whose
-    // intrinsic width overflows `maxWidth`: Android positions the bubble's
-    // children during the unclamped pass and never moves them once the width
-    // is clamped, so the paragraphs around the block end up drawn on top of
-    // each other. Pinning the width removes that pass.
     const hasWideBlock = hasWideMarkdownBlock(renderedText, WIDE_MARKDOWN_BLOCK_OPTIONS);
     const assistantTurnStillInProgress =
       message.role === "assistant" &&
@@ -1586,7 +1554,6 @@ function renderFeedEntry(
                 <MessageAttachmentUnknown key={attachment.id} name={attachment.name} />
               ),
             )}
-            {/* An empty container still takes a gap, which pads every attachment-free bubble. */}
             {visibleAttachments.length > 0 ? (
               <View className={inlineAttachmentIds.size ? "flex-row flex-wrap gap-2" : "gap-2"}>
                 {visibleAttachments.map((attachment) => {
@@ -1679,16 +1646,10 @@ function renderFeedEntry(
       );
     }
 
-    // Skip empty assistant messages (no text, no attachments) — they would
-    // render as an orphaned timestamp and break adjacent activity-group merging.
     if (renderedText.trim().length === 0 && attachments.length === 0) {
       return null;
     }
 
-    // Assistant messages hit the same Android unclamped-pass bug as user
-    // bubbles: wide markdown blocks cause children to be positioned at
-    // intrinsic width before the container is clamped, overlapping the
-    // timestamp/copy button row. Pinning the width removes that pass.
     const enterAnimated = isFreshTimestamp(message.createdAt);
     return (
       <Animated.View
@@ -1750,8 +1711,6 @@ function renderFeedEntry(
 
   return (
     <ThreadWorkLog
-      // Fixed native rows need fresh measurement after a text-size change.
-      // Anchors/details live in ThreadFeed and survive this group-only remount.
       key={`${entry.id}:${props.workRowSizing.textSizeKey}`}
       activities={entry.activities}
       environmentId={props.environmentId}
@@ -1799,7 +1758,6 @@ function UserMessageContent(props: UserMessageContentProps) {
       props.linkHandlers.onLinkPress?.(record.path);
       return;
     }
-    // Documents open in the file screen; pictures, video and PDF keep their native viewers.
     const document = composerDocumentAttachmentRecord(record);
     if (document) {
       navigation.navigate("ThreadAttachment", {
@@ -1838,8 +1796,6 @@ function LegacyUserMessageContent(props: UserMessageContentProps) {
   const text = props.text;
   const segments = parseReviewCommentMessageSegments(text);
   const hasReviewComment = segments.some((segment) => segment.kind === "review-comment");
-  // A message can hold both a review comment and context chips. The fragment travels with every
-  // text run, so copying from the segmented branch carries the same context as the plain one.
   const contextClipboardFragment = props.context
     ? (encodeComposerContextFragment({
         version: 1,
@@ -1969,8 +1925,6 @@ export const ThreadFeed = memo(function ThreadFeed(props: ThreadFeedProps) {
       return;
     }
     previousTextSize.current = workRowSizing.textSizeKey;
-    // Text-size changes invalidate the outer list's fixed-height cache too.
-    // This never runs for scrolling, streamed output, or disclosure toggles.
     props.listRef.current?.clearCaches({ mode: "sizes" });
   }, [workRowSizing.textSizeKey, props.listRef]);
   const [viewportWidth, setViewportWidth] = useState(() =>
@@ -1978,16 +1932,8 @@ export const ThreadFeed = memo(function ThreadFeed(props: ThreadFeedProps) {
   );
   const [viewportHeight, setViewportHeight] = useState(0);
   const [disclosureToggleSettling, setDisclosureToggleSettling] = useState(false);
-  // Live-follow latch. LegendList's maintainScrollAtEnd alone re-pins the feed
-  // whenever the viewport drifts back inside its geometric threshold, which
-  // yanked users off history they were reading every time a stream chunk grew
-  // a row. Scrolling away or expanding a disclosure above the end breaks
-  // follow; reaching the end (or sending / switching threads) re-arms it.
   const [endFollowEnabled, setEndFollowEnabled] = useState(true);
   const endFollowEnabledRef = useRef(true);
-  // A "user scroll session" spans from drag start through the end of its
-  // momentum; scroll events only break follow inside that session, so MVCP
-  // compensations and programmatic scrolls never strand a follower.
   const userScrollSessionRef = useRef(false);
   const setEndFollow = useCallback(
     (enabled: boolean) => {
@@ -2058,13 +2004,6 @@ export const ThreadFeed = memo(function ThreadFeed(props: ThreadFeedProps) {
     usesNativeAutomaticInsets,
     bottomContentInset,
   });
-  // With automatic insets the header inset lives in UIKit's adjustedContentInset,
-  // which LegendList's JS anchoring math cannot see — it measures the anchored
-  // end space from the scroll view's frame top. Fold the header height back into
-  // the anchor offset or a just-sent message anchors underneath the header and
-  // the oversized end space keeps maintainScrollAtEnd snapping away from earlier
-  // messages. Read the context directly (useHeaderHeight throws outside a
-  // header-providing screen) and fall back to the standard iOS bar height.
   const navigationHeaderHeight = useContext(HeaderHeightContext);
   const anchorTopInset = usesNativeAutomaticInsets
     ? navigationHeaderHeight || insets.top + IOS_NAV_BAR_HEIGHT
@@ -2125,8 +2064,6 @@ export const ThreadFeed = memo(function ThreadFeed(props: ThreadFeedProps) {
         return;
       }
 
-      // A host file outside the workspace, such as a report an agent wrote to
-      // a temp directory, opens read-only in the file screen.
       if (presentation.kind === "file" && isAbsolutePath(presentation.path)) {
         void Haptics.selectionAsync();
         if (isPdfFile({ name: presentation.path })) {
@@ -2277,12 +2214,7 @@ export const ThreadFeed = memo(function ThreadFeed(props: ThreadFeedProps) {
   );
   const markdownStyles = useMarkdownStyles(onMarkdownLinkPress, renderMarkdownImage);
   const reviewCommentColors = useReviewCommentColors();
-  // One definition of "still live", shared with the fold derivation: two
-  // copies of this test are what let a row and the fold beside it disagree.
   const unsettledTurnId = deriveUnsettledTurnId(props.latestTurn ?? null);
-  // LegendList does not invalidate visible rows when only the renderItem closure changes.
-  // Include turn completion so unchanged message rows reveal their footer and spacing
-  // even when the final message update arrives before the turn settles.
   const listAppearanceData = useMemo(
     () => ({
       worktreeSetup: props.worktreeSetup,
@@ -2329,17 +2261,7 @@ export const ThreadFeed = memo(function ThreadFeed(props: ThreadFeedProps) {
   );
   const handleScroll = useCallback(
     (event: NativeSyntheticEvent<NativeScrollEvent>) => {
-      // anchorTopInset, not topContentInset: under automatic insets the list
-      // rests at contentOffset.y = -headerHeight (the inset lives only in
-      // UIKit's adjustedContentInset, so topContentInset is 0 here). Add the
-      // header height back or the material toggles a full header too late.
       reportHeaderMaterialVisibility(event.nativeEvent.contentOffset.y + anchorTopInset > 6);
-      // LegendList recomputes its inset-aware end distance before invoking
-      // this handler, so getState() is current. Only the actual end re-arms
-      // follow: its broader maintain-scroll threshold is large enough for a
-      // streaming chunk to pull a user back before their upward drag escapes.
-      // A live user-scroll session still wins even if the first scroll event
-      // remains inside LegendList's at-end tolerance.
       const listState = props.listRef.current?.getState();
       if (listState) {
         transitionEndFollow({
@@ -2360,8 +2282,6 @@ export const ThreadFeed = memo(function ThreadFeed(props: ThreadFeedProps) {
   const handleScrollBeginDrag = useCallback(() => {
     clearUserScrollSettle();
     userScrollSessionRef.current = true;
-    // Pause before the first scroll event. Otherwise a stream update can run
-    // maintainScrollAtEnd between touch-down and the drag leaving its threshold.
     transitionEndFollow({ type: "user-scroll-begin" });
   }, [clearUserScrollSettle, transitionEndFollow]);
   const finishUserScroll = useCallback(
@@ -2371,20 +2291,12 @@ export const ThreadFeed = memo(function ThreadFeed(props: ThreadFeedProps) {
       userScrollSessionRef.current = false;
       transitionEndFollow({
         type: "user-scroll-end",
-        // With no momentum, preserve the finger-release position. Streaming
-        // growth during the native momentum-detection window must not turn a
-        // release at the live edge into an opt-out from follow.
         isAtEnd: releaseIsAtEnd ?? props.listRef.current?.getState().isAtEnd ?? false,
         userScrollSessionActive,
       });
     },
     [clearUserScrollSettle, props.listRef, transitionEndFollow],
   );
-  // Finger-lift velocity is not a reliable momentum signal: a gentle fling
-  // can report zero and still decelerate. Give native momentum a short window
-  // to announce itself; if it does, onMomentumScrollBegin cancels this fallback
-  // and the session survives until the settled momentum-end position. This
-  // mirrors the native-event handoff used by the home thread list's scroll gate.
   const handleScrollEndDrag = useCallback(() => {
     clearUserScrollSettle();
     const releaseIsAtEnd = props.listRef.current?.getState().isAtEnd ?? false;
@@ -2408,12 +2320,7 @@ export const ThreadFeed = memo(function ThreadFeed(props: ThreadFeedProps) {
     setViewportHeight((current) => (Math.abs(current - nextHeight) > 1 ? nextHeight : current));
   }, []);
 
-  // Thread identity is env-scoped: two environments can hold the same
-  // ThreadId, and keying resets (or the list mount) on the bare id would
-  // carry stale scroll/follow state across an environment switch.
   const feedThreadKey = scopedThreadKey(props.environmentId, props.threadId);
-  // Virtualized groups can unmount without losing the reader's place. This cache
-  // belongs to this thread view only and never causes per-scroll React updates.
   const workGroupScrollPositions = useMemo(
     () => new Map<string, ThreadWorkGroupScrollPosition>(),
     [feedThreadKey],
@@ -2423,9 +2330,6 @@ export const ThreadFeed = memo(function ThreadFeed(props: ThreadFeedProps) {
     reportHeaderMaterialVisibility(false);
   }, [feedThreadKey, reportHeaderMaterialVisibility]);
 
-  // A thread switch opens pinned to the end; a send explicitly returns to the
-  // live edge (ThreadDetailScreen scrolls the new message into place). Both
-  // re-arm follow regardless of where the user had scrolled before.
   useEffect(() => {
     clearUserScrollSettle();
     userScrollSessionRef.current = false;
@@ -2473,13 +2377,6 @@ export const ThreadFeed = memo(function ThreadFeed(props: ThreadFeedProps) {
   const setupAnchorIndex = presentedFeed.findIndex(
     (entry) => entry.type === "message" && entry.message.role === "user",
   );
-  // The empty↔filled key below remounts the list and resets its imperative
-  // content-inset override. Seed the fresh instance synchronously with the
-  // current overlay height before the scroll integration's next reaction;
-  // on Android the declarative contentInset floor covers this same window.
-  // The thinking row a running thread shows while its messages load is not
-  // content: the list must still remount, and so open at the end, when they
-  // arrive.
   const listMountKey = `${feedThreadKey}:${presentedFeed.some((entry) => entry.type !== "thinking") ? "filled" : "empty"}`;
   useLayoutEffect(() => {
     const bottom = props.contentInsetEndAdjustment.value;
@@ -2556,8 +2453,6 @@ export const ThreadFeed = memo(function ThreadFeed(props: ThreadFeedProps) {
     }
     disclosureSettleFrameRef.current = requestAnimationFrame(() => {
       disclosureSettleSecondFrameRef.current = requestAnimationFrame(() => {
-        // A disclosure can leave the reader above the end without a drag.
-        // Reconcile follow before a later layout or resume can re-pin it.
         const listState = props.listRef.current?.getState();
         if (listState) {
           transitionEndFollow({
@@ -2579,9 +2474,6 @@ export const ThreadFeed = memo(function ThreadFeed(props: ThreadFeedProps) {
     setDisclosureToggleSettling(true);
   }, []);
 
-  // Start the quiet-frame countdown after React has committed the disclosure.
-  // Every measured item-size change restarts it, so end maintenance cannot
-  // wake between the data mutation and LegendList's final layout correction.
   useLayoutEffect(() => {
     if (disclosureAnchorKeyRef.current !== null) {
       settleDisclosureAfterLayout();
@@ -2677,7 +2569,6 @@ export const ThreadFeed = memo(function ThreadFeed(props: ThreadFeedProps) {
 
   const onToggleReasoning = useCallback(
     (messageId: string) => {
-      // Reasoning details use their own row within the expanded activity history.
       suspendEndScrollMaintenanceForDisclosure(messageId);
       setInteractionState((current) => {
         const next = new Set(current.expandedReasoningMessageIds);
@@ -2706,12 +2597,6 @@ export const ThreadFeed = memo(function ThreadFeed(props: ThreadFeedProps) {
     [props.environmentId],
   );
 
-  // Rows whose height is known before they ever render. Without this, every
-  // row above the viewport is assumed to be estimatedItemSize tall, and
-  // scrolling up through unmeasured content corrects each row's height as it
-  // mounts — the feed visibly jumps. Fixed sizes make the small chrome rows
-  // exact; message rows stay undefined and use LegendList's per-type running
-  // average once one of their type has been measured.
   const getFixedItemSize = useCallback(
     (entry: ThreadFeedEntry) => {
       if (workRowSizing.fixedRowHeight === undefined) {
@@ -2719,7 +2604,6 @@ export const ThreadFeed = memo(function ThreadFeed(props: ThreadFeedProps) {
       }
       switch (entry.type) {
         case "message":
-          // A collapsed reasoning row is the same chrome as a work toggle.
           return entry.message.role === "reasoning" && !expandedReasoningMessageIds.has(entry.id)
             ? WORK_GROUP_TOGGLE_HEIGHT
             : undefined;
@@ -2732,8 +2616,6 @@ export const ThreadFeed = memo(function ThreadFeed(props: ThreadFeedProps) {
           if (isContextCompactionActivityGroup(entry)) {
             return undefined;
           }
-          // Expanded rows append a variable detail block — fall back to
-          // measurement for those groups.
           return entry.activities.some((activity) => expandedWorkRows[activity.id])
             ? undefined
             : collapsedWorkLogHeight(entry.activities);
@@ -2744,8 +2626,6 @@ export const ThreadFeed = memo(function ThreadFeed(props: ThreadFeedProps) {
     [expandedReasoningMessageIds, expandedWorkRows, workRowSizing.fixedRowHeight],
   );
 
-  // Disclosures can mount existing offscreen rows as well as new work rows.
-  // Fade those in after movement; never retain removed rows over replacements.
   const renderItem = useCallback(
     (info: { item: PendingThreadFeedEntry; index: number }) => (
       <Animated.View
@@ -2854,63 +2734,23 @@ export const ThreadFeed = memo(function ThreadFeed(props: ThreadFeedProps) {
         <View className="flex-1">
           <KeyboardAwareLegendList
             ref={props.listRef}
-            // The empty↔filled key remounts the list when messages first
-            // arrive. LegendList's maintainScrollAtEnd calls scrollToEnd(),
-            // which is blind to UIKit's adjustedContentInset — inserting into
-            // an already-attached list under a transparent header can pin
-            // short content at offset 0 (one header-height too high). A fresh
-            // mount positions during attach, where UIKit applies the inset.
             key={listMountKey}
             style={{ flex: 1 }}
-            // RN 0.81+ drops touches inside the contentInset area
-            // (facebook/react-native#54123); the anchored end space after a send
-            // is pure inset, so without this the blank region can't be scrolled.
             applyWorkaroundForContentInsetHitTestBug
             contentInsetAdjustmentBehavior={usesNativeAutomaticInsets ? "automatic" : "never"}
             automaticallyAdjustsScrollIndicatorInsets={usesNativeAutomaticInsets}
             {...(usesNativeAutomaticInsets
               ? {
-                  // Do NOT pass a manual `contentInset` here. Like the Home
-                  // ScrollView, we rely purely on `contentInsetAdjustmentBehavior:
-                  // "automatic"` so UIKit derives the top inset from the transparent
-                  // header. A manual contentInset (which LegendList consumes into its
-                  // own layout math) collapses the scroll view's adjustedContentInset
-                  // top to 0, leaving the iOS 26/27 scroll-edge effect no region to
-                  // render into — which is why the header blur was missing on threads.
                   scrollIndicatorInsets: { top: 0, left: 0, right: 0, bottom: 0 },
                 }
               : { scrollIndicatorInsets: { top: topContentInset, bottom: 0 } })}
             {...(anchoredEndSpace ? { anchoredEndSpace } : {})}
-            // Patched LegendList prop (patches/@legendapp__list@3.3.5.patch):
-            // lets its scroll math clamp programmatic scrolls to -headerInset
-            // instead of 0, so initialScrollAtEnd/maintainScrollAtEnd on short
-            // content rest below the transparent header rather than at frame top.
             contentInsetStartAdjustment={usesNativeAutomaticInsets ? anchorTopInset : 0}
             contentInsetEndAdjustment={props.contentInsetEndAdjustment}
-            // UIKit's automatic behavior adds the safe-area bottom on top of the
-            // raw contentInset the keyboard integration writes. The detail screen
-            // under-reports the composer inset by this amount (see
-            // ThreadDetailScreen); this tells LegendList's scroll math about the
-            // extra so programmatic end scrolls land at the true resting offset.
             contentInsetEndStaticAdjustment={usesNativeAutomaticInsets ? insets.bottom : 0}
-            // Android: the composer overlay only exists as the keyboard
-            // integration's animated bottom padding, which the list's scroll
-            // math cannot see until the inset reports above land — and those
-            // arrive via runOnJS, racing the remounted list's one-shot initial
-            // scroll-at-end. Seed the estimated overlay height as a declarative
-            // contentInset floor: LegendList consumes it in JS math only
-            // (Android's ScrollView has no native contentInset prop) and the
-            // first reported override REPLACES it instead of adding to it.
-            // Not on iOS: there the prop would reach UIKit and inset natively
-            // on top of the animated padding.
             {...(initialContentInset ? { contentInset: initialContentInset } : {})}
-            // The keyboard integration's offset math (end pinning, max scroll)
-            // must add the same UIKit-added extra, or its keyboard-open end
-            // targets land one safe-area short of the true resting offset.
             adjustedInsetCompensation={usesNativeAutomaticInsets ? insets.bottom : 0}
             freeze={props.freeze}
-            // Follow the measured end immediately. Animating toward an estimated
-            // end races row measurement when a pending message is acknowledged.
             maintainScrollAtEnd={
               disclosureToggleSettling || !endFollowEnabled
                 ? false
@@ -2935,35 +2775,16 @@ export const ThreadFeed = memo(function ThreadFeed(props: ThreadFeedProps) {
               entry.type === "message" ? `message:${entry.message.role}` : entry.type
             }
             getFixedItemSize={getFixedItemSize}
-            // Virtualized rows must move with their measurements. Native layout
-            // transitions can retain stale positions during sync, even at duration 0.
             onItemSizeChanged={handleItemSizeChanged}
-            // Measure rows well before they scroll into view so estimate→actual
-            // corrections land offscreen instead of under the user's finger.
             drawDistance={500}
             keyboardShouldPersistTaps="always"
             keyboardDismissMode="none"
             keyboardLiftBehavior="whenAtEnd"
-            // Seed the list's scroll math with the real viewport before its own
-            // onLayout: the empty→filled remount can then tell at mount that
-            // short content underflows the viewport and skip programmatic
-            // positioning entirely (any offset write during screen attach races
-            // UIKit's adjustedContentInset application and lands high or low).
             {...(viewportHeight > 0 && viewportWidth > 0
               ? { estimatedListSize: { height: viewportHeight, width: viewportWidth } }
               : {})}
-            // RN's native scrollTo command clamps targets to a floor of
-            // -contentInset.top using the RAW inset — under automatic insets the
-            // header inset only exists in adjustedContentInset, so scrolls to
-            // negative offsets (content top below the transparent header) get
-            // clamped to 0. This prop disables that clamp; UIKit still bounces
-            // user overscroll back to the adjusted rest position.
             scrollToOverflowEnabled
             estimatedItemSize={180}
-            // Chat-style bottom alignment: when a thread is shorter than the
-            // viewport, pad above the content so messages rest just above the
-            // composer instead of under the header. No effect on threads that
-            // overflow the viewport (the padding clamps to zero).
             alignItemsAtEnd
             initialScrollAtEnd
             onScroll={handleScroll}

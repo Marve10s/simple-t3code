@@ -35,8 +35,6 @@ const makeProviderSessionReaper = (options?: ProviderSessionReaperLiveOptions) =
     const sweepIntervalMs = Math.max(1, options?.sweepIntervalMs ?? DEFAULT_SWEEP_INTERVAL_MS);
 
     const sweep = Effect.gen(function* () {
-      // Stopped rows stay for their resume cursors and far outnumber live
-      // ones, so the query skips them.
       const bindings = yield* directory.listBindings({ excludeStopped: true });
       const now = yield* Clock.currentTimeMillis;
       let reapedCount = 0;
@@ -59,9 +57,6 @@ const makeProviderSessionReaper = (options?: ProviderSessionReaperLiveOptions) =
         const thread = yield* projectionSnapshotQuery
           .getThreadShellById(binding.threadId)
           .pipe(Effect.map(Option.getOrUndefined));
-        // Ingestion updates this timestamp alongside activeTurnId when a turn
-        // settles. Long turns must get a full idle window after that transition,
-        // even though the binding was last touched when the turn was sent.
         const lastActivityMs = Math.max(
           lastSeenMs,
           Date.parse(thread?.session?.updatedAt ?? binding.lastSeenAt),
@@ -79,10 +74,6 @@ const makeProviderSessionReaper = (options?: ProviderSessionReaperLiveOptions) =
           continue;
         }
 
-        // The turn can settle while background work runs on (subagent
-        // fleets, workflow runs, Monitor watch loops). Those live inside the
-        // provider process, so stopping the session would kill them silently,
-        // and nothing bumps lastSeenAt between turns.
         if (thread?.backgroundLiveness != null) {
           yield* Effect.logDebug("provider.session.reaper.skipped-background-work", {
             threadId: binding.threadId,

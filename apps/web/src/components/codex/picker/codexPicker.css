@@ -1,6 +1,3 @@
-/* SimpleT3Code model picker (CodexModelPicker.tsx). Plain, unlayered CSS keyed
-   on data-codex-part so upstream Tailwind classes never collide with it. */
-
 [data-codex-model-picker] {
   gap: 6px;
 }
@@ -25,15 +22,12 @@
   color: #f59e0b;
 }
 
-/* The picker takes over effort, so the separate effort pill stays hidden. */
 [data-chat-composer-controls]:has([data-codex-model-picker]) [data-resting-block="traits"],
 [data-chat-resting-composer-controls-host]:has([data-codex-model-picker])
   [data-resting-block="traits"] {
   display: none !important;
 }
 
-/* The popover's own chrome is replaced by the picker's cards, so the flyout
-   can sit beside the main panel instead of being clipped by it. */
 [data-slot="popover-popup"]:has([data-codex-part="picker"]) {
   border: 0 !important;
   background: transparent !important;
@@ -63,7 +57,6 @@
   font-size: 13px;
 }
 
-/* Rows shared by every design. */
 [data-codex-part="picker-row"] {
   position: relative;
   display: flex;
@@ -310,7 +303,6 @@
   padding: 4px;
 }
 
-/* The trigger sits at the composer's right edge, so the flyout opens to the left. */
 [data-codex-part="picker-flyout"] {
   position: absolute;
   right: calc(100% + 6px);
@@ -324,7 +316,6 @@
     0 2px 6px rgb(0 0 0 / 6%);
 }
 
-/* Popups enter with a short rise when Motion animations are on. */
 html[data-codex-animations="motion"] [data-codex-part="picker-flyout"] {
   animation: codex-picker-pop 0.16s cubic-bezier(0.19, 1, 0.22, 1);
 }

@@ -1,20 +1,3 @@
-/**
- * ProviderAdapterRegistryLive — facade over `ProviderInstanceRegistry`.
- *
- * `ProviderAdapterRegistry` historically mapped one `ProviderDriverKind` to one
- * adapter via the four `<X>AdapterLive` singleton Layers. The per-instance
- * refactor moved adapter construction inside each `ProviderDriver.create()`:
- * adapters are now bundled on the `ProviderInstance` that the
- * `ProviderInstanceRegistry` owns.
- *
- * This facade fulfills the `ProviderAdapterRegistryShape` contract by doing
- * dynamic look-ups against `ProviderInstanceRegistry` on every call. That
- * means settings-driven hot-reload shows up here automatically — adding a
- * new instance via settings makes `getByInstance` resolve immediately
- * without rebuilding the facade.
- *
- * @module ProviderAdapterRegistryLive
- */
 import { ProviderInstanceId, ProviderSetupError, type ProviderSession } from "@t3tools/contracts";
 import * as Effect from "effect/Effect";
 import * as Schema from "effect/Schema";
@@ -39,7 +22,6 @@ const isSetupError = Schema.is(ProviderSetupError);
 
 const makeProviderAdapterRegistry = Effect.fn("makeProviderAdapterRegistry")(function* () {
   const registry = yield* ProviderInstanceRegistry;
-  // Stable identity keeps ProviderService's event subscriptions attached once.
   const guarded = new WeakMap<ProviderInstance, ProviderAdapterShape<ProviderAdapterError>>();
   const guard = (instance: ProviderInstance) => {
     const auth = instance.auth;
@@ -73,15 +55,11 @@ const makeProviderAdapterRegistry = Effect.fn("makeProviderAdapterRegistry")(fun
             ProviderAdapterError | ProviderSetupError,
             Scope.Scope
           > = instance.adapter.startSession(input);
-          // Every shared owner holds the startup scope. A credential change
-          // interrupts admitted startup before it can escape the session drain.
           for (const peer of related) {
             if (peer.auth?.withAccess) admitted = peer.auth.withAccess(admitted);
           }
           return yield* Effect.scoped(admitted);
         });
-        // Adapters own established session lifetimes. This scope guards startup;
-        // ProviderAuthService drains routed sessions before changing credentials.
         return start.pipe(
           Effect.mapError((cause) =>
             isSetupError(cause)
@@ -150,6 +128,4 @@ export const ProviderAdapterRegistryLive = Layer.effect(
   makeProviderAdapterRegistry(),
 );
 
-// Re-export for consumers (including tests) that construct a
-// `ProviderInstanceId` before calling `getByInstance`.
 export { ProviderInstanceId };

@@ -11,11 +11,6 @@ import { resolveMediaSource } from "@t3tools/client-runtime/media-source";
 import { parseChangeRequestUrl } from "@t3tools/shared/changeRequestUrl";
 import { isWorkspaceImagePreviewPath } from "@t3tools/shared/filePreview";
 
-/**
- * Activities the worktree setup card already represents. The settled record
- * is rendered by the card on web and mobile, never as a
- * worklog entry, so it is hidden from the activity feed even when it failed.
- */
 export function isWorktreeSetupActivity(kind: string): boolean {
   return (
     kind === "setup-script.requested" ||
@@ -185,14 +180,12 @@ function resolveT3McpToolPresentation(
   };
 }
 
-/** Latest live activity stays present-tense unless the call itself failed, declined, or stopped. */
 export function liveActivityToolStatus(status: string | undefined, presentTense: boolean) {
   if (status === "failed" || status === "declined" || status === "stopped") return status;
   if (presentTense || status === "inProgress") return "inProgress";
   return "completed";
 }
 
-/** Resolves tool identity before choosing labels or icons in either client. */
 export function resolveWorkEntryToolPresentation(
   entry: Pick<WorkLogPresentationEntry, "label" | "toolTitle" | "toolData" | "toolLifecycleStatus">,
   fallbackStatus?: "inProgress" | "completed",
@@ -248,7 +241,6 @@ function commandResultContent(value: unknown): string | null {
   return chunks.length > 0 ? chunks.join("\n") : null;
 }
 
-/** Returns provider command output before it is formatted for a work-log row. */
 export function extractCommandOutputText(dataValue: unknown): string | null {
   const data = asRecord(dataValue);
   const item = asRecord(data?.item);
@@ -286,11 +278,6 @@ export function extractCommandOutputText(dataValue: unknown): string | null {
   return null;
 }
 
-/**
- * Ingestion caps tool details at 180 chars and appends "...", so a long command
- * echo no longer equals the command it repeats. Treat a truncated prefix of the
- * command as the same echo.
- */
 function textRepeatsCommand(text: string, commands: ReadonlyArray<string | null>): boolean {
   const truncated = text.endsWith("...")
     ? text.slice(0, -3)
@@ -310,14 +297,6 @@ function textRepeatsCommand(text: string, commands: ReadonlyArray<string | null>
   });
 }
 
-/**
- * Decides whether a command row's `detail` is a synthetic echo of the command
- * rather than real output. OpenCode stores completed output in `detail` with no
- * other output channel, so plain equality is only treated as synthetic when the
- * payload shape shows the detail came from the command: Codex item metadata,
- * an ACP tool call (`data.toolCallId`, `kind: "execute"`), a Claude tool-name
- * prefix, or no structured command at all.
- */
 export function commandDetailRepeatsCommand(input: {
   readonly detail: string;
   readonly command: string | null;
@@ -367,7 +346,6 @@ export function workLogEntryIsToolLike(entry: WorkLogPresentationEntry): boolean
   return entry.itemType !== undefined && isToolLifecycleItemType(entry.itemType);
 }
 
-/** Maps item and task status to the status shown on a work-log row. */
 export function extractWorkLogToolLifecycleStatus(
   payloadValue: unknown,
 ): WorkLogToolLifecycleStatus | undefined {
@@ -381,7 +359,6 @@ export function extractWorkLogToolLifecycleStatus(
     case "interrupted":
       return "stopped";
     case "idle":
-      // A batch becomes idle when its parent turn ends. Other idle tasks can resume.
       return payload.taskType === "subagent_batch" ? "stopped" : undefined;
     case "inProgress":
     case "completed":
@@ -394,7 +371,6 @@ export function extractWorkLogToolLifecycleStatus(
   }
 }
 
-// Some providers report completion even when the output describes a failure.
 function toolDetailTextLooksLikeFailure(text: string): boolean {
   const normalized = text.toLowerCase();
   return (
@@ -433,17 +409,14 @@ function workEntryIndicatesToolFailureFromOutput(
   return output.length > 0 && toolDetailTextLooksLikeFailure(output);
 }
 
-/** Includes legacy activities that stored error output in the command field. */
 export function workEntryIndicatesToolFailure(entry: WorkLogPresentationEntry): boolean {
   return workEntryIndicatesToolFailureFromOutput(entry, true);
 }
 
-/** Checks rendered output without treating the user's command as an error. */
 export function workEntryDisplayIndicatesToolFailure(entry: WorkLogPresentationEntry): boolean {
   return workEntryIndicatesToolFailureFromOutput(entry, false);
 }
 
-/** Decides whether the row can show a success marker. */
 export function workEntryIndicatesToolSuccess(entry: WorkLogPresentationEntry): boolean {
   return (
     workLogEntryIsToolLike(entry) &&
@@ -528,8 +501,6 @@ export function resolveViewedImageAsset(
     readonly workspaceRoot?: string | null | undefined;
   },
 ): ViewedImageAsset | null {
-  // A relative path with no known workspace still names a media-file relative
-  // to the thread's workspace, so classify against "." and drop the prefix.
   const imageSource = classifyMarkdownImageSource(source, input.workspaceRoot ?? ".");
   if (imageSource._tag !== "WorkspaceFile") return null;
   const resolvedFilePath =
@@ -667,7 +638,6 @@ export function omitSupersededLifecycleMarkers<T>(
     }
   }
 
-  // Hermes lacks toReversed; this array is local, so reversing it cannot mutate the input.
   // oxlint-disable-next-line unicorn/no-array-reverse
   return reversedEntries.reverse();
 }

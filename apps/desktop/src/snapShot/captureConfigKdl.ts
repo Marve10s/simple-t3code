@@ -2,7 +2,6 @@ import * as Schema from "effect/Schema";
 
 const decodeString = Schema.decodeUnknownSync(Schema.fromJsonString(Schema.String));
 
-/** A lossless structural reader: edits only binding nodes, never reformats a user's KDL. */
 type Token = { value: string; start: number; end: number; quoted: boolean };
 export type KdlNode = {
   name: string;
@@ -72,7 +71,6 @@ export function readKdlNodes(source: string): KdlNode[] {
       }
       if (offset === source.length) throw invalid();
       offset++;
-      // KDL's unicode escapes differ from JSON; names needing those stay on the manual path.
       let value: string;
       try {
         value = decodeString(source.slice(start, offset));

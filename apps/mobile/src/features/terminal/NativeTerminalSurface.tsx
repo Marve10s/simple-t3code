@@ -148,7 +148,6 @@ const FallbackTerminalSurface = memo(function FallbackTerminalSurface(props: Ter
           onSubmitEditing={(event) => {
             const text = event.nativeEvent.text;
             if (text.length > 0) {
-              // Terminal Enter is CR. LF is Ctrl+J and raw-mode TUIs can treat it as J.
               props.onInput(`${text}\r`);
             }
           }}
@@ -185,7 +184,6 @@ export const TerminalSurface = memo(function TerminalSurface(props: TerminalSurf
     terminalDebugLog("native:surface", {
       terminalKey: props.terminalKey,
       native: hasNativeSurface,
-      // null = installed binary predates native hardware-key handling (rebuild needed).
       hardwareKeyRevision: getNativeTerminalHardwareKeyRevision(),
       bufferLen: props.buffer.length,
       isRunning: props.isRunning,

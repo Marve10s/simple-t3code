@@ -94,8 +94,6 @@ export function appendReviewCommentToDraft(input: {
     return;
   }
   if (input.attachments && input.attachments.length > 0) {
-    // Capped: a review comment is new content, not a send-failure restore, so
-    // it must not push the draft over the send limit. Overflow is released.
     const rejectedCount = appendComposerDraftAttachments(threadKey, input.attachments, {
       appendReference: true,
     });
@@ -165,8 +163,6 @@ export function useThreadComposerState() {
   const selectedThreadKey = selectedThreadShell
     ? scopedThreadKey(selectedThreadShell.environmentId, selectedThreadShell.id)
     : null;
-  // The creation entry is the thread itself (rendered as the first message),
-  // not a follow-up waiting behind it.
   const selectedThreadQueuedMessages = useMemo(
     () =>
       selectedThreadKey
@@ -192,10 +188,6 @@ export function useThreadComposerState() {
   );
   const selectedThreadMessages = selectedThreadDetail?.messages;
   const selectedThreadActivities = selectedThreadDetail?.activities;
-  // A thread whose creation has not delivered its turn yet: the prompt only
-  // exists in the outbox, so it is appended to whatever the server has. The
-  // detail is usually present but empty during a worktree checkout, so this
-  // cannot be an either/or with the loaded messages.
   const pendingCreationMessage = selectedThreadCreation?.message ?? null;
   const selectedThreadFeed = useMemo(() => {
     const loadedMessages = selectedThreadMessages ?? [];
@@ -327,10 +319,6 @@ export function useThreadComposerState() {
     if (!selectedThreadShell) {
       return null;
     }
-    // The server has not created this thread yet. Queuing a follow-up against
-    // its id would strand the message: if the creation is rejected the thread
-    // never appears and the drain drops the orphan. The composer disables its
-    // send button too; this guard also covers the editor's submit key.
     if (selectedThreadCreation !== null) {
       return null;
     }
@@ -354,10 +342,6 @@ export function useThreadComposerState() {
     if (text.length === 0 && attachments.length === 0) {
       return null;
     }
-    // A send-failure restore appends with allowOverflow so it never drops the
-    // user's files, which can leave the draft over the cap. Sending it anyway
-    // would enqueue a message that outbox recovery rejects forever, so block
-    // here until the user removes attachments.
     if (attachments.length > PROVIDER_SEND_TURN_MAX_ATTACHMENTS) {
       Alert.alert(
         "Too many attachments",
@@ -431,11 +415,6 @@ export function useThreadComposerState() {
 
     const metadata = makeQueuedMessageMetadata();
     const messageId = MessageId.make(metadata.messageId);
-    // Enqueue publishes the queued atom synchronously (the durable write
-    // happens behind it), so clearing the draft here gives send feedback on
-    // the tap frame instead of after file I/O. If the write fails the message
-    // is rolled out of the queue and the content is merged back into the
-    // draft, preserving anything typed since.
     const enqueuePromise = enqueueThreadOutboxMessage({
       environmentId: selectedThreadShell.environmentId,
       threadId: selectedThreadShell.id,
@@ -455,16 +434,9 @@ export function useThreadComposerState() {
     clearComposerDraftContent(threadKey, { deferAttachmentCleanup: true });
     enqueuePromise.then(
       () => {
-        // The queued message owns the files now; the sweep sees that and
-        // spares them. Deferred to here so a failed write cannot roll the
-        // message out of the queue mid-sweep and lose the bytes.
         scheduleUnusedComposerAttachmentCleanup(attachments);
       },
       (error: unknown) => {
-        // Restore text via merge (idempotent) but attachments via the uncapped
-        // append: the merge path slots existing attachments first and truncates
-        // at the send limit, which would silently drop this message's images if
-        // the user attached new ones while the write was in flight.
         void mergeComposerDraftContent(threadKey, {
           text,
           context: draft.context,
@@ -542,7 +514,6 @@ export function useThreadComposerState() {
 
     const threadKey = scopedThreadKey(selectedThreadShell.environmentId, selectedThreadShell.id);
     const insertion = captureComposerDraftInsertion(threadKey);
-    // pickComposerFiles clamps the advertised limit to the contract maximum.
     const result = await pickComposerFiles({
       existingCount: countComposerDraftAttachmentsAfterSelection(threadKey, insertion),
       maxBytes,
@@ -551,8 +522,6 @@ export function useThreadComposerState() {
       appendReference: true,
       insertion,
     });
-    // The picker error and the live-cap rejection can both happen in one
-    // pick; report both in a single alert.
     const problems = [
       ...(result.error ? [result.error] : []),
       ...(rejectedCount > 0
@@ -616,8 +585,6 @@ export function useThreadComposerState() {
             ),
             maxBytes,
           });
-          // Same reference the pasted images above get: a folded paste is only visible
-          // as its chip until the message is sent.
           if (
             appendComposerDraftAttachments(threadKey, [attachment], {
               appendReference: true,
@@ -710,9 +677,6 @@ export function useThreadComposerState() {
           ),
           maxBytes: clampFileAttachmentUploadBytes(advertisedMax),
         });
-        // The chip is how a folded paste stays visible: without it the attachment is in the
-        // draft but nothing in the composer says so until the message is sent. Web folds
-        // through its ordinary attach path, which always writes a reference; match that.
         const rejectedCount = appendComposerDraftAttachments(threadKey, [attachment], {
           appendReference: true,
           insertion,

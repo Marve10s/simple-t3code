@@ -372,7 +372,6 @@ describe("thread outbox drain delivery cleanup", () => {
         cleared ? "edited" : "removed",
       );
 
-      // Restart before signing back in: the archived copy must be removed on disk too.
       appAtomRegistry.set(composerDrafts.composerCloudDraftsAtom, {
         accountId: null,
         signedOut: {},
@@ -683,8 +682,6 @@ describe("thread outbox recovery rollback", () => {
       "restored",
     );
 
-    // The draft is keyed by the message so a retry lands on the same one, and
-    // stamped with the project so it shows up as a Draft row for that project.
     expect(
       composerDrafts.getComposerDraftSnapshot(`new-task:restored-${message.messageId}`),
     ).toMatchObject({
@@ -699,7 +696,6 @@ describe("thread outbox recovery rollback", () => {
     });
     expect(remainingMessages()).toEqual([]);
     expect(harness.setPendingConnectionError).toHaveBeenCalledWith("rejected by server");
-    // The thread screen opened for this creation reads the failure from here.
     expect(
       appAtomRegistry.get(pendingThreadCreationOutcomesAtom)[
         `${message.environmentId}:${message.threadId}`
@@ -748,14 +744,12 @@ describe("thread outbox recovery rollback", () => {
     harness.draftFile.setWriteError(new Error("disk full"));
     await expect(restoreRejectedQueuedMessage(message, "too large")).resolves.toBe("retry");
 
-    // The merge was rolled back and the message stayed queued for the retry.
     expect(composerDrafts.getComposerDraftSnapshot(draftKey).text).toBe("typed offline");
     expect(remainingMessages()).toEqual([message]);
 
     harness.draftFile.setWriteError(null);
     await expect(restoreRejectedQueuedMessage(message, "too large")).resolves.toBe("restored");
 
-    // The recovered text landed exactly once and the message left the queue.
     expect(composerDrafts.getComposerDraftSnapshot(draftKey).text).toBe(
       "typed offline\n\nqueued text",
     );

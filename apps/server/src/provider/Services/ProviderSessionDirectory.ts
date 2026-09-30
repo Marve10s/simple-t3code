@@ -18,11 +18,6 @@ import type {
 export interface ProviderRuntimeBinding {
   readonly threadId: ThreadId;
   readonly provider: ProviderDriverKind;
-  /**
-   * Routing key for the configured provider instance that owns this
-   * session. The persistence layer promotes legacy null rows before
-   * exposing bindings; runtime callers must not infer this from `provider`.
-   */
   readonly providerInstanceId?: ProviderInstanceId;
   readonly adapterKey?: string;
   readonly status?: ProviderSessionRuntimeStatus;
@@ -51,7 +46,6 @@ export interface ProviderSessionDirectoryShape {
     options?: ProviderSessionDirectoryUpsertOptions,
   ) => Effect.Effect<void, ProviderSessionDirectoryWriteError>;
 
-  /** Record an imported file without changing the current provider session. */
   readonly recordImportedTranscript: (input: {
     readonly threadId: ThreadId;
     readonly source: AgentSessionImportSource;
@@ -70,7 +64,6 @@ export interface ProviderSessionDirectoryShape {
     ProviderSessionDirectoryPersistenceError
   >;
 
-  /** `excludeStopped` skips stopped rows in the query, not after decoding. */
   readonly listBindings: (options?: {
     readonly excludeStopped?: boolean;
   }) => Effect.Effect<

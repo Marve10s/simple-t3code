@@ -31,13 +31,6 @@ import { useProjectScriptSettings } from "./useProjectScriptSettings";
 import { SettingsRow, SettingsSection } from "./settingsLayout";
 import { useSettingsScope } from "./SettingsScopeContext";
 
-/**
- * A project's actions on each selected environment. Actions belong to a
- * project, so this only renders at a project scope; the environment's
- * `defaultProjectScripts` is the layer a project without its own list
- * inherits. Shortcuts are environment-wide, so the same action id shares its
- * binding on an environment.
- */
 export function ProjectActionsSettings() {
   const { scope, targets, target } = useSettingsScope();
   const { environments } = useEnvironments();
@@ -63,9 +56,6 @@ export function ProjectActionsSettings() {
       );
       if (!environment?.serverConfig) return [];
       const member = candidate.projectId ? memberById.get(candidate.projectId) : undefined;
-      // An older server ignores the override record, so a project edit there
-      // would report success and vanish; such environments are left out and
-      // the legacy per-project map keeps serving them.
       if (
         member &&
         environment.serverConfig.environment?.capabilities.projectSettingsOverrides !== true
@@ -75,8 +65,6 @@ export function ProjectActionsSettings() {
       return [
         {
           environmentId: candidate.environmentId,
-          // Writes read the raw environment settings so an override entry is
-          // extended, not derived from already-resolved values.
           settings: environment.serverConfig.settings,
           keybindings: environment.serverConfig.keybindings,
           ...(member ? { project: member } : {}),
@@ -85,8 +73,6 @@ export function ProjectActionsSettings() {
     }),
   );
 
-  // A project's t3.json can declare actions to import. Read it from the
-  // representative checkout; the imported action still fans out.
   const representativeMember = target?.projectId ? memberById.get(target.projectId) : undefined;
   const t3File = useT3ProjectFileState(
     representativeMember?.environmentId ?? EnvironmentId.make("none"),

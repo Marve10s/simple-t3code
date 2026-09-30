@@ -1,24 +1,6 @@
 // @effect-diagnostics globalFetch:off globalTimers:off - This browser and WebView transport runs without an Effect runtime.
 /* oxlint-disable unicorn/prefer-add-event-listener -- Each client owns its sockets and their handlers. */
 
-/**
- * Framework-free client for expo-device-hub's per-device streams, reached
- * through the T3 proxy. One class handles both platforms because the hub
- * vendors two servers with different wire formats:
- *
- * - iOS (serve-sim): video is an HTTP `stream.avcc` body of length-prefixed
- *   envelopes (`u32be length, u8 tag, payload`; tag 1 avcC description,
- *   2 keyframe, 3 delta, 4 JPEG seed) decoded with WebCodecs; input goes over
- *   `helper/ws?device=<udid>` as `[tag][json]` packets. When WebCodecs is
- *   unavailable (plain-http remote origins) the MJPEG endpoint is used as an
- *   `<img>` source instead.
- * - Android (serve-emu): one WebSocket at `ws?device=<serial>&frame-meta=1`
- *   carries H.264 access units prefixed with a 16-byte "SEMU" header
- *   (magic, version, key flag, pts) and accepts JSON gestures upstream.
- *
- * The decoder only runs while frames arrive and the viewer is attached; a
- * hidden panel calls `stop()` so an idle device costs nothing on the GPU.
- */
 import {
   createDuoControl,
   type DuoCommand,
@@ -78,25 +60,16 @@ const decodeControlReply = Schema.decodeUnknownOption(controlReplySchema);
 export interface DuoPanelSinks {
   readonly cover: DeviceFrameSink;
   readonly inner: DeviceFrameSink;
-  /** Invalidate captured input synchronously, before React can commit the new layout. */
   readonly onScreen?: (screen: DeviceScreenSize) => void;
 }
 
 export interface DeviceStreamEvents {
   readonly onDuoControl?: (state: DuoControlState) => void;
-  /** A fixed panel cannot be decoded; the owner should return to the active flat feed. */
   readonly onDuoUnavailable?: (detail?: string) => void;
   readonly onStatus: (status: DeviceStreamStatus, detail?: string) => void;
   readonly onScreen: (screen: DeviceScreenSize) => void;
-  /** The proxy rejected the credential; the owner should refresh access and reconnect. */
   readonly onUnauthorized: () => void;
-  /**
-   * H.264 cannot be decoded here (no WebCodecs, or the simulator's profile is
-   * unsupported); the owner should show an `<img>` instead of the canvas
-   * and attach it with `setMjpegImage` so the client can observe real frames.
-   */
   readonly onMjpegFallback: (url: string) => void;
-  /** Whether touches and keys can currently reach the device. */
   readonly onInputConnected: (connected: boolean, detail?: string) => void;
 }
 
@@ -104,9 +77,7 @@ export interface DeviceStreamTarget {
   readonly platform: DevicePlatform;
   readonly deviceId: string;
   readonly access: DeviceHubAccess;
-  /** Native iOS WebViews can use MJPEG without cross-origin fetch or secure-context support. */
   readonly preferMjpeg?: boolean;
-  /** Internal fixed-panel feeds share their parent's input session. */
   readonly panelId?: 1 | 3;
   readonly videoOnly?: boolean;
 }
@@ -122,13 +93,11 @@ const SEMU_HEADER_BYTES = 16;
 const SEMU_FLAG_KEY = 1;
 const SOFT_DECODE_QUEUE = 8;
 
-// serve-sim binary WS message tags (browser -> helper).
 const IOS_MSG_TOUCH = 0x03;
 const IOS_MSG_BUTTON = 0x04;
 const IOS_MSG_KEY = 0x06;
 const IOS_MSG_ORIENTATION = 0x07;
 const IOS_MSG_HARDWARE_KEYBOARD = 0x0d;
-// helper -> browser.
 const IOS_TAG_SCREEN_CONFIG = 0x82;
 
 const encoder = new TextEncoder();
@@ -147,14 +116,12 @@ function taggedJson(tag: number, payload: unknown): Uint8Array<ArrayBuffer> {
   return out;
 }
 
-/** Build the WebCodecs `avc1.PPCCLL` string from an avcC record or an SPS NAL. */
 export function avcCodecString(bytes: Uint8Array): string {
   if (bytes.length < 4) return "avc1.42E01E";
   const hex = (byte: number) => byte.toString(16).padStart(2, "0");
   return `avc1.${hex(bytes[1]!)}${hex(bytes[2]!)}${hex(bytes[3]!)}`;
 }
 
-/** Split serve-emu's SEMU-framed message into metadata and the Annex-B payload. */
 export function parseSemuPacket(raw: ArrayBuffer): {
   readonly data: Uint8Array;
   readonly isKey: boolean | null;
@@ -184,7 +151,6 @@ const isVideoSessionMessage = (text: string) => {
   }
 };
 
-/** Walk an Annex-B access unit for its keyframe flag and SPS bytes. */
 export function scanAccessUnit(buf: Uint8Array): { isKey: boolean; sps: Uint8Array | null } {
   let isKey = false;
   let sps: Uint8Array | null = null;
@@ -220,7 +186,6 @@ const AVCC_TAGS: Record<number, AvccChunk["type"] | undefined> = {
   4: "seed",
 };
 
-/** Turns a fragmented AVCC byte stream into complete envelopes. */
 export class AvccDemuxer {
   private buffer = new Uint8Array(64 * 1024);
   private length = 0;
@@ -265,21 +230,14 @@ export class AvccDemuxer {
 export interface DeviceStreamClient {
   readonly start: () => void;
   readonly stop: () => void;
-  /**
-   * Own the displayed MJPEG image's source and frame/error observation.
-   * `stop()` detaches it; attach a fresh image for each restart.
-   */
   readonly setMjpegImage: (image: HTMLImageElement | null) => void;
-  /** Normalized 0..1 coordinates in the displayed frame. */
   readonly sendTouch: (phase: "begin" | "move" | "end", x: number, y: number) => void;
   readonly sendKey: (event: KeyboardEvent, phase: "down" | "up") => void;
   readonly pressButton: (button: DeviceHardwareButton) => void;
   readonly rotate: () => void;
   readonly setOrientation: (orientation: DeviceScreenSize["orientation"]) => void;
   readonly controlDuo: (command: DuoCommand) => void;
-  /** Switch between one active feed and two fixed-panel feeds without replacing HID. */
   readonly setDuoPanels: (panels: DuoPanelSinks | null) => void;
-  /** Model UVs already map to the hardware framebuffer. */
   readonly sendRawTouch: (phase: "begin" | "move" | "end", x: number, y: number) => void;
 }
 
@@ -392,8 +350,6 @@ export function createDeviceStreamClient(
           const value = request.command.value;
           pendingOrientation = { requestId: request.requestId };
           rotationCursor = value;
-          // Upstream serializes orientation with hinge commands, then broadcasts config.
-          // An orientation-locked app can keep its framebuffer orientation after the sensor rotates.
           socket.send(taggedJson(IOS_MSG_ORIENTATION, { orientation: value }));
         } else socket.send(taggedJson(0x10, request));
         return true;
@@ -457,7 +413,6 @@ export function createDeviceStreamClient(
       timer = null;
       if (image.naturalWidth > 0 && image.naturalHeight > 0) frameReceived();
       else {
-        // Multipart images may not emit load until the response ends. Stop checking after the first frame.
         timer = setTimeout(check, MJPEG_FRAME_CHECK_MS);
       }
     };
@@ -513,9 +468,7 @@ export function createDeviceStreamClient(
     decoderEpoch++;
     try {
       videoDecoder?.close();
-    } catch {
-      // Already closed.
-    }
+    } catch {}
     videoDecoder = null;
     awaitingKeyframe = true;
   };
@@ -556,7 +509,6 @@ export function createDeviceStreamClient(
     return decoder;
   };
 
-  /** iOS can fall back to MJPEG when the stream's H.264 profile is unsupported. */
   const configureDecoder = async (
     config: VideoDecoderConfig,
     isCurrent = () => !stopped,
@@ -626,7 +578,6 @@ export function createDeviceStreamClient(
     events.onUnauthorized();
   };
 
-  // iOS video: fetch the AVCC body and demux into the decoder.
   const readIosVideo = async () => {
     const lifecycle = generation;
     const feedGeneration = ++videoGeneration;
@@ -657,7 +608,6 @@ export function createDeviceStreamClient(
       if (!response.ok || !response.body) throw new Error(`stream ${response.status}`);
       const reader = response.body.getReader();
       for (;;) {
-        // An AVCC body can stay open after its helper stops producing frames.
         const timer = setTimeout(() => {
           if (isCurrent()) fail("Device stream stopped receiving video. Reconnect to try again.");
         }, FIRST_FRAME_TIMEOUT_MS);
@@ -725,11 +675,6 @@ export function createDeviceStreamClient(
     }
   };
 
-  /**
-   * serve-sim's helper only accepts HID and pushes its screen config once
-   * screen capture is running, and the AVCC stream does not reliably start
-   * it. Touching the MJPEG endpoint does; one aborted request is enough.
-   */
   const primeIosHelper = async (session: number) => {
     const controller = new AbortController();
     primeController = controller;
@@ -743,7 +688,6 @@ export function createDeviceStreamClient(
       if (response.status === 401 || response.status === 403) return handleUnauthorized();
       await response.body?.getReader().read();
     } catch {
-      // A failed prime just means the socket may take a retry to come up.
     } finally {
       clearTimeout(timeout);
       controller.abort();
@@ -753,9 +697,6 @@ export function createDeviceStreamClient(
 
   const startDuoVideo = (panels: DuoPanelSinks) => {
     for (const panel of panelClients) panel.stop();
-    // Physical handoff elects a native surface. Fixed-panel encoders can keep
-    // an inactive shutdown frame after election, so this build uses one active
-    // feed instead of decoding a third stream alongside the two fixed feeds.
     const ids = screen?.supportsPhysicalOrientation ? ([null] as const) : ([1, 3] as const);
     panelClients = ids.map((id) => {
       const output = id === 1 ? panels.cover : panels.inner;
@@ -766,7 +707,6 @@ export function createDeviceStreamClient(
             if (id === null) {
               return sink.present(source, width, height);
             }
-            // An inactive native LCD can emit its shutdown black frame. Retain its last useful image.
             if (screen?.screenId !== id) return true;
             const retained = output.present(source, width, height);
             const primary = sink.present(source, width, height);
@@ -787,7 +727,6 @@ export function createDeviceStreamClient(
     for (const panel of panelClients) panel.start();
   };
 
-  // iOS input socket; also carries the screen config the helper pushes.
   const connectIosInput = async () => {
     if (stopped) return;
     const session = generation;
@@ -822,9 +761,6 @@ export function createDeviceStreamClient(
               rotationCursor = screen.orientation;
             panelSinks?.onScreen?.(screen);
             events.onScreen(screen);
-            // A surface election can leave an existing decoder on the former
-            // encoder description. Reopen only video to acquire the elected
-            // surface's seed and codec configuration; HID and the viewer stay.
             if (
               panelSinks &&
               screen.supportsPhysicalOrientation &&
@@ -842,9 +778,7 @@ export function createDeviceStreamClient(
             }
           }
         }
-      } catch {
-        // Ignore malformed config frames.
-      }
+      } catch {}
     };
     ws.onclose = (event) => {
       if (socket !== ws) return;
@@ -856,7 +790,6 @@ export function createDeviceStreamClient(
         false,
         event.reason || (event.code === 1006 ? "input socket refused" : `closed ${event.code}`),
       );
-      // A rejected HTTP upgrade surfaces as 1006, including an expired stream ticket.
       if (
         event.code === 1008 ||
         event.code === 4401 ||
@@ -868,7 +801,6 @@ export function createDeviceStreamClient(
     ws.onerror = () => ws.close();
   };
 
-  // Android: one socket for video and input.
   const connectAndroid = () => {
     if (stopped) return;
     const ws = new WebSocket(wsUrl(`/ws?device=${device}&frame-meta=1`));
@@ -882,8 +814,6 @@ export function createDeviceStreamClient(
     ws.onmessage = (event) => {
       if (stopped || socket !== ws) return;
       if (typeof event.data === "string") {
-        // The encoder restarts at a new size when the device rotates; the
-        // next keyframe carries a fresh SPS, so the decoder is rebuilt from it.
         if (isVideoSessionMessage(event.data)) {
           closeDecoder();
           configuring = false;
@@ -990,8 +920,6 @@ export function createDeviceStreamClient(
   };
 
   const rawPoint = (x: number, y: number) => {
-    // serve-sim streams the raw framebuffer; rotated devices need input
-    // remapped into that raw space.
     if (platform !== "ios" || !screen || screen.width > screen.height) return { x, y };
     switch (screen.orientation) {
       case "landscape_left":

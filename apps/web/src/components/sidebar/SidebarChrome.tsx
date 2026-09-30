@@ -47,7 +47,6 @@ export const SidebarChromeHeader = memo(function SidebarChromeHeader({
       : null;
 
   return (
-    // The titlebar row, not a padded SidebarHeader: it aligns to the window controls.
     <div
       className={cn(
         "@container/sidebar-header relative flex h-[var(--workspace-topbar-height)] shrink-0 flex-row items-center gap-2 px-3 md:px-0",
@@ -56,7 +55,6 @@ export const SidebarChromeHeader = memo(function SidebarChromeHeader({
     >
       {backdropVariant ? <SidebarStageBackdrop variant={backdropVariant} /> : null}
       <SidebarTrigger
-        // Over the stage artwork: the media viewer's control-on-imagery treatment.
         variant={backdropVariant ? "media-navigation" : "ghost"}
         className="relative top-auto z-10 translate-y-0 md:hidden"
       />
@@ -85,7 +83,6 @@ function SidebarBrand({ onBackdrop }: { onBackdrop: boolean }) {
       )}
       to="/"
     >
-      {/* Center the visible capitals, without the font's ascender/descender space. */}
       <span className="inline-flex min-w-0 items-baseline gap-1 text-sm font-medium tracking-tight">
         <T3Wordmark aria-label="T3" className="h-[1cap] w-auto shrink-0" />
         <span
@@ -134,8 +131,6 @@ export const SidebarUtilityMenu = memo(function SidebarUtilityMenu() {
     select: (location) => isSidebarUtilityPage(location.pathname),
   });
   const { environments } = useEnvironments();
-  // The page reads every connected server, so one of them offering pull requests is enough for
-  // the link to lead somewhere.
   const pullRequestsSupported = environments.some(
     (environment) => environment.serverConfig?.environment.capabilities.pullRequests === true,
   );

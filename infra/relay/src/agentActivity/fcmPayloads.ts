@@ -11,7 +11,6 @@ export function androidActivityHero(aggregate: RelayAgentActivityAggregateState)
   )[0];
 }
 
-/** Android focuses the priority thread while retaining rows for older clients. */
 export function androidActivityData(aggregate: RelayAgentActivityAggregateState | null) {
   const rows = [...(aggregate?.activities ?? [])].sort(
     (a, b) => activityPhasePriority(a.phase) - activityPhasePriority(b.phase),
@@ -40,7 +39,6 @@ export function androidActivityData(aggregate: RelayAgentActivityAggregateState 
   );
   return {
     active: String(activeCount > 0),
-    // Keep the status bar chip short enough to display alongside the app icon.
     activity_chip: activeCount > 0 ? (attentionCount > 0 ? "Review" : "Active") : "",
     activity_title: title,
     activity_phase: hero?.phase ?? "",
@@ -49,14 +47,12 @@ export function androidActivityData(aggregate: RelayAgentActivityAggregateState 
     activity_body: hero
       ? `${hero.status}: ${clean(hero.threadTitle)} · ${clean(hero.projectTitle)}`
       : "",
-    // Separate keys avoid double JSON encoding and preserve each expanded row when bounding the payload.
     ...Object.fromEntries(lines.map((line, index) => [`activity_line_${index}`, line])),
     activity_path: rows[0]?.deepLink ?? "/",
     activity_expires_at: String(expiresAt),
   };
 }
 
-/** Keep Unicode, escaping and grouped alerts within FCM's 4 KB data budget. */
 export function fitFcmData(input: Readonly<Record<string, string>>): Record<string, string> {
   const data = { ...input };
   const encoder = new TextEncoder();
@@ -75,7 +71,6 @@ export function fitFcmData(input: Readonly<Record<string, string>>): Record<stri
     const parts = key.startsWith("activity_line_") ? data[key]!.split("\t") : [data[key]!];
     const part = parts.length === 3 ? (parts[1]!.length > parts[2]!.length ? 1 : 2) : 0;
     const characters = Array.from(parts[part]!);
-    // Five characters would become four plus the ellipsis and never shrink.
     if (characters.length <= 5) {
       textKeys.splice(textKeys.indexOf(key), 1);
       continue;

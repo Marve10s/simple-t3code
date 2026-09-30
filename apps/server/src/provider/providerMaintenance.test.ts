@@ -33,8 +33,6 @@ import {
 import { symlinksSupported } from "@t3tools/shared/testing/symlinks";
 
 const driver = (value: string) => ProviderDriverKind.make(value);
-// These write `#!/bin/sh` stubs and evaluate them with darwin/linux path
-// semantics; a Windows temp path cannot be split on `:`.
 const windowsHost = HostProcessPlatform.defaultValue() === "win32";
 const makeTempDir = (name: string) =>
   Crypto.Crypto.pipe(
@@ -83,7 +81,6 @@ function writeExecutable(path: string) {
   NodeFS.chmodSync(path, 0o755);
 }
 
-/** Symlink `<tempDir>/bin/<name>` into a package entry point, like npm/pnpm do. */
 function linkIntoPackage(tempDir: string, name: string, packageSegments: ReadonlyArray<string>) {
   const target = NodePath.join(tempDir, ...packageSegments, "bin", `${name}.js`);
   writeExecutable(target);
@@ -290,7 +287,6 @@ it.layer(NodeServices.layer)("providerMaintenance", (it) => {
         "@openai/codex",
       ),
     ).toBe("/usr/local");
-    // A copy nested inside another package is not a global install.
     expect(
       npmGlobalPrefixFromCommandPath(
         "/usr/local/lib/node_modules/other/node_modules/@openai/codex/bin/codex.js",
@@ -303,7 +299,6 @@ it.layer(NodeServices.layer)("providerMaintenance", (it) => {
         "@openai/codex",
       ),
     ).toBe("/");
-    // Neither is a project-local dependency.
     expect(
       npmGlobalPrefixFromCommandPath(
         "/work/app/node_modules/@openai/codex/bin/codex.js",
@@ -312,10 +307,6 @@ it.layer(NodeServices.layer)("providerMaintenance", (it) => {
     ).toBeNull();
   });
 
-  // The Codex Windows installer exposes `%LOCALAPPDATA%\\Programs\\OpenAI\\Codex\\bin`
-  // as a junction into `%CODEX_HOME%\\packages\\standalone\\current\\bin`. Node's
-  // realpath follows junctions, so the real path carries the standalone marker
-  // even though the visible path does not.
   it.effect("recognizes a Windows standalone install through its junctioned bin dir", () =>
     Effect.gen(function* () {
       const visiblePath =
@@ -375,7 +366,6 @@ it.layer(NodeServices.layer)("providerMaintenance", (it) => {
         args: ["install", "-g", "--prefix", tempDir, expect.any(String), expect.any(String)],
       });
 
-      // The same layout on POSIX is a project checkout, not a global install.
       const script = NodePath.join(tempDir, "package-tool");
       writeExecutable(script);
       const posix = yield* resolveProviderMaintenanceCapabilitiesEffect(packageToolUpdate, {
@@ -477,8 +467,6 @@ it.layer(NodeServices.layer)("providerMaintenance", (it) => {
     }),
   );
 
-  // Regression for #9850: an explicit native path outside PATH, with spaces,
-  // must be what actually gets spawned.
   it.effect.skipIf(windowsHost)("runs an explicit native updater outside PATH", () =>
     Effect.gen(function* () {
       const tempDir = yield* makeTempDir("t3-native-update");
@@ -513,7 +501,6 @@ it.layer(NodeServices.layer)("providerMaintenance", (it) => {
     "prefers npm ownership over the Node keg the package lives under",
     () =>
       Effect.gen(function* () {
-        // `brew install node` keeps npm globals inside the node keg.
         const tempDir = yield* makeTempDir("t3-homebrew-node-capabilities");
         const keg = NodePath.join(tempDir, "Cellar", "node", "22.1.0");
         const target = NodePath.join(
@@ -608,10 +595,7 @@ it.layer(NodeServices.layer)("providerMaintenance", (it) => {
       name: "codex",
       prefix: "/usr/local",
     });
-    // A plain /usr/local/bin binary is not evidence of Homebrew (#8832).
     expect(homebrewOwnershipFromCommandPath("/usr/local/bin/codex")).toBeNull();
-    // A keg elsewhere reports its prefix so the resolver can reject it against
-    // `brew --prefix`.
     expect(homebrewOwnershipFromCommandPath("/srv/Cellar/claude/1.0.0/bin/claude")).toMatchObject({
       prefix: "/srv",
     });

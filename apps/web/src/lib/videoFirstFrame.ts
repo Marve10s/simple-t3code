@@ -1,4 +1,3 @@
-/** Requests an initial frame without playing or replacing the video's streaming source. */
 export function prepareVideoFirstFrame(
   video: Pick<
     HTMLVideoElement,
@@ -22,7 +21,5 @@ export function prepareVideoFirstFrame(
 
   try {
     video.currentTime = Math.min(0.1, video.duration / 2);
-  } catch {
-    // A rejected preview seek must leave the native Play control usable.
-  }
+  } catch {}
 }

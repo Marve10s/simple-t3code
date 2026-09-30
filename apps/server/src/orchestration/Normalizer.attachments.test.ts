@@ -227,8 +227,6 @@ describe("normalizeDispatchCommand attachments", () => {
       expect(NodeFS.existsSync(pendingPath)).toBe(true);
       const claimedPngPath = NodePath.join(config.attachmentsDir, `${attachmentId}.png`);
       expect(NodeFS.existsSync(claimedPngPath)).toBe(true);
-      // A copy, not a hard link: editing the delivered file must not mutate
-      // the retryable pending upload.
       expect(NodeFS.statSync(claimedPngPath).ino).not.toBe(NodeFS.statSync(pendingPath).ino);
       expect(NodeFS.readFileSync(claimedPngPath)).toEqual(bytes);
     }).pipe(Effect.provide(testLayer)),

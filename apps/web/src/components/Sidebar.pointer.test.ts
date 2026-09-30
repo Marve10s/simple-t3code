@@ -33,7 +33,6 @@ function gesture() {
     onPending: vi.fn(),
   };
   const onFinish = vi.fn();
-  // The sensor never reads dnd-kit's layout context or active node.
   const props = {
     active: "thread",
     event: pointer("pointerdown"),

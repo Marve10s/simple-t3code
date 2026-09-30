@@ -51,7 +51,6 @@ function resolveThreadMarkTone(input: {
     : null;
 }
 
-/** Status tone per thread key, from the same signals as upstream's sidebar pills. */
 export function useThreadMarkTones(): ReadonlyMap<string, ThreadMarkTone | null> {
   const threads = useThreadShells();
   const lastVisitedAtByThreadKey = useUiStateStore((store) => store.threadLastVisitedAtById);
@@ -75,9 +74,6 @@ export function useThreadMarkTones(): ReadonlyMap<string, ThreadMarkTone | null>
   }, [lastVisitedAtByThreadKey, nowMinute, threads]);
 }
 
-// Status is a dot, not a label. Only "working" moves: a stepped opacity pulse
-// (see --animate-status-pulse) that the compositor redraws a few times per
-// cycle instead of every frame.
 export function ThreadMark({ tone }: { tone: ThreadMarkTone | null }) {
   if (tone === null) return null;
   return (
@@ -104,7 +100,6 @@ const ATTENTION_TONES: ReadonlySet<ThreadMarkTone | null> = new Set([
   "woke",
 ]);
 
-/** Bell menu listing threads that are waiting on the user. */
 export function CodexNotificationsMenu() {
   const navigate = useNavigate();
   const threads = useThreadShells();

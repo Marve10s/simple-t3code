@@ -52,8 +52,6 @@ const formatPendingPrimaryActionLabel = (input: {
   return input.questionIndex > 0 ? "Submit answers" : "Submit answer";
 };
 
-// The composer's labeled primary actions (Submit, Refine, Implement) share the send button's
-// message-action pill, so they are composer-owned buttons rather than restyled Buttons.
 const messageActionPillClassName =
   "inline-flex shrink-0 cursor-pointer items-center justify-center gap-1.5 whitespace-nowrap rounded-full bg-message-action font-medium text-base text-message-action-foreground shadow-xs shadow-message-action/24 outline-none hover:bg-message-action-hover focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 focus-visible:ring-offset-background disabled:pointer-events-none disabled:opacity-64 disabled:shadow-none sm:text-sm";
 
@@ -269,8 +267,6 @@ export const ComposerPrimaryActions = memo(function ComposerPrimaryActions({
     return sendButton;
   }
 
-  // While a turn runs, a sendable draft queues for the next tool boundary, so
-  // the send button stays next to Stop on every viewport.
   return (
     <>
       {renderStopGenerationButton(false)}

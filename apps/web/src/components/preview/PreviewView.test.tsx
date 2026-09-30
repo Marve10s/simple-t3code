@@ -63,9 +63,6 @@ vi.mock("~/state/session", async (importOriginal) => ({
   readPreparedConnection: mocks.readPreparedConnection,
 }));
 
-// Stubbed at the direct dependency rather than letting the real module pull in
-// `useSettings` -> `state/server`, which would drag the whole settings and
-// connection graph into a test that only cares about the browser chrome.
 vi.mock("~/browser/browserDefaults", () => ({
   useBrowserDefaults: () => STUB_BROWSER_DEFAULTS,
   getBrowserDefaults: () => STUB_BROWSER_DEFAULTS,
@@ -264,7 +261,6 @@ const TEST_THREAD_REF = {
 } as const;
 const TEST_RUNTIME_TAB_ID = previewRuntimeTabId(TEST_THREAD_REF, null, "tab-1");
 
-// ReactDOM needs a host, but this unit suite intentionally has no DOM dependency.
 class TestNode {
   parentNode: TestNode | null = null;
   childNodes: TestNode[] = [];
@@ -608,8 +604,6 @@ describe("PreviewView navigation", () => {
     mocks.toggleAnnotation?.();
 
     await vi.waitFor(() => expect(onSendAnnotation).toHaveBeenCalledWith(annotation, null));
-    // A null screenshot alone looks like a comment-only pick; the flag is what
-    // separates "no crop requested" from "crop lost to a timeout".
     expect(toastManager.add).toHaveBeenCalledTimes(1);
   });
 
@@ -644,8 +638,6 @@ describe("PreviewView navigation", () => {
     );
     mocks.toggleAnnotation?.();
 
-    // The forwarded and stored annotation both drop the screenshot, so the
-    // prompt does not claim a crop that was never attached.
     const sent = { ...annotation, screenshot: null };
     await vi.waitFor(() => expect(onSendAnnotation).toHaveBeenCalledWith(sent, null));
     expect(mocks.addPreviewAnnotation).toHaveBeenCalledWith(TEST_THREAD_REF, sent);

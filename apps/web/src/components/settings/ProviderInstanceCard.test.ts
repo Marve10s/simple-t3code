@@ -67,7 +67,6 @@ describe("deriveProviderModelsForDisplay", () => {
       ],
     });
 
-    // A bare entry keeps the driver default the server filled in.
     expect(display[0]).toEqual({
       slug: "bare",
       name: "bare",

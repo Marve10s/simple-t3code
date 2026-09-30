@@ -197,9 +197,7 @@ const resolveDesktopCoreAdvertisedEndpoints = (
             : "User-configured endpoint for this desktop backend.",
         }),
       );
-    } catch {
-      // Ignore malformed user-configured endpoints without dropping valid endpoints.
-    }
+    } catch {}
   }
 
   return endpoints;
@@ -411,7 +409,7 @@ const requiresBackendRelaunch = (previous: RuntimeState, next: RuntimeState): bo
   previous.bindHost !== next.bindHost ||
   previous.localHttpUrl !== next.localHttpUrl;
 
-/** @public Service construction is part of the canonical Effect module API. */
+/** @public */
 export const make = Effect.gen(function* () {
   const config = yield* DesktopConfig.DesktopConfig;
   const networkInterfaces = yield* DesktopNetworkInterfaces.DesktopNetworkInterfaces;
@@ -420,9 +418,6 @@ export const make = Effect.gen(function* () {
   const desktopSettings = yield* DesktopAppSettings.DesktopAppSettings;
   const stateRef = yield* Ref.make(initialRuntimeState());
 
-  // Cache the `tailscale status` spawn for the TTL. On macOS, the Mac App
-  // Store Tailscale CLI lives inside Tailscale's sandbox container, so each
-  // spawn re-triggers the "Other apps" TCC prompt.
   const cachedReadMagicDnsName = yield* Effect.cachedWithTTL(
     readTailscaleStatus.pipe(
       Effect.map((status) => status.magicDnsName),
@@ -538,9 +533,6 @@ export const make = Effect.gen(function* () {
       customHttpsEndpointUrls: config.desktopHttpsEndpointUrls,
     });
 
-    // Don't spawn the Tailscale CLI when the user hasn't opted into any
-    // network exposure. The spawn itself triggers a macOS "Other apps"
-    // TCC prompt on Mac App Store Tailscale builds.
     if (state.mode !== "network-accessible" && !state.tailscaleServeEnabled) {
       return coreEndpoints;
     }

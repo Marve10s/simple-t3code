@@ -49,8 +49,6 @@ export function useFileSaveCoordinator({
     };
   }, [cwd, environmentId, onPendingChange, relativePath, writeFile]);
 
-  // StrictMode replays effect setup. Retired file sessions stay inert, while the
-  // replay gets a fresh coordinator instead of reusing a disposed one.
   useEffect(session.setup, [session]);
   return session;
 }

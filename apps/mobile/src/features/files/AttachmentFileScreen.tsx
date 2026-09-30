@@ -25,10 +25,6 @@ import { useAppearancePreferences } from "../settings/appearance/AppearancePrefe
 import { SourceFileSurface } from "./SourceFileSurface";
 import { WorkspaceFileWebPreview } from "./WorkspaceFileWebPreview";
 
-/**
- * Both the thread stack and the new-task sheet stack register this screen, so a chip in a
- * sent message and a chip in a draft open the same view a workspace file does.
- */
 export type AttachmentFileRouteParams = {
   readonly environmentId?: string;
   readonly threadId?: string;
@@ -36,13 +32,11 @@ export type AttachmentFileRouteParams = {
   readonly name: string;
   readonly mimeType: string;
   readonly sizeBytes: string;
-  /** Present for a draft attachment, which may still live only on this device. */
   readonly draftKey?: string;
 };
 
 type AttachmentFileScreenProps = StaticScreenProps<AttachmentFileRouteParams>;
 
-/** Kinds this screen cannot render itself; the platform viewer is the primary presentation. */
 function nativeViewerKind(kind: ReturnType<typeof useAttachmentDocument>["kind"]) {
   if (kind === "image") return "image" as const;
   if (kind === "pdf") return "pdf" as const;
@@ -182,8 +176,6 @@ export function AttachmentFileScreen(props: AttachmentFileScreenProps) {
     attachment: localAttachment,
   });
   const [nativeOpen, setNativeOpen] = useState(false);
-  // A format we cannot render goes straight to the system viewer; this screen is only the
-  // launch pad and, when no viewer can show it, the honest fallback.
   const nativeKind = nativeViewerKind(document.kind);
   const [nativeViewer, setNativeViewer] = useState<"pending" | "open" | "unavailable" | null>(
     nativeKind ? "pending" : null,
@@ -200,8 +192,6 @@ export function AttachmentFileScreen(props: AttachmentFileScreenProps) {
     setNativeViewer("open");
     setNativeOpen(true);
   }, [nativeViewer, uri]);
-  // The viewer mints its own fresh URL from the resource, so a link that expired while this
-  // screen sat in the background is never handed to Quick Look or ACTION_VIEW.
   const nativeSource = useMemo<FilePreviewSource | null>(() => {
     const kind = nativeKind ?? "document";
     const base = { kind, name: params.name, mimeType: params.mimeType };
@@ -217,7 +207,6 @@ export function AttachmentFileScreen(props: AttachmentFileScreenProps) {
     const message = pendingNativeError.current;
     pendingNativeError.current = null;
     if (nativeViewer === null) {
-      // A file this screen renders itself: an explicit viewer failure is worth a word.
       if (message) Alert.alert("Could not open document", message);
       return;
     }
@@ -226,7 +215,6 @@ export function AttachmentFileScreen(props: AttachmentFileScreenProps) {
       setNativeViewer("unavailable");
       return;
     }
-    // The viewer was the whole visit: return to the conversation rather than a blank screen.
     handleBack();
   }, [handleBack, nativeViewer]);
   const removeFromDraft = useCallback(() => {

@@ -173,8 +173,6 @@ function summarizeToolTextOutput(value: string): string | null {
       meaningfulLineCount += 1;
       if (line !== "```") {
         const summary = line.length <= 84 ? line : `${line.slice(0, 83).trimEnd()}…`;
-        // V8 can retain the full tool output behind a short sliced string.
-        // Join a tiny character array so the returned preview owns its bytes.
         return Array.from(summary).join("");
       }
     }
@@ -187,12 +185,6 @@ function summarizeToolTextOutput(value: string): string | null {
   return meaningfulLineCount > 1 ? `${meaningfulLineCount.toLocaleString()} lines` : null;
 }
 
-/**
- * Fields of an MCP tool-call item both clients render in the expanded
- * work-log row. Everything else — notably `result`, which carries the full
- * tool output and dominates wire size on MCP-heavy threads — is summarized
- * or dropped. Full payloads remain in persistence.
- */
 const MCP_ITEM_KEPT_FIELDS = [
   "type",
   "id",
@@ -205,11 +197,6 @@ const MCP_ITEM_KEPT_FIELDS = [
   "durationMs",
 ] as const;
 
-/**
- * Pulls renderable text out of an MCP tool result: either a Codex-style
- * `{content: [{type: "text", text}, ...]}` record or a raw Claude
- * `tool_result` block whose `content` is a string or block array.
- */
 function extractMcpResultText(result: unknown): string | null {
   const record = asRecord(result);
   if (!record) {
@@ -242,7 +229,6 @@ function summarizeMcpResult(result: unknown): Record<string, unknown> | undefine
   return summary ? { content: summary } : undefined;
 }
 
-/** Reuse the page URL already returned by preview tools before slimming their output. */
 function projectPreviewToolMetadata(data: Record<string, unknown>, status: unknown) {
   const item = asRecord(data.item);
   const name = item ? `mcp__${item.server}__${item.tool}` : (data.toolName ?? data.tool);
@@ -280,7 +266,6 @@ function projectPreviewToolMetadata(data: Record<string, unknown>, status: unkno
     try {
       page = asRecord(JSON.parse(extractJsonObject(text)));
     } catch {
-      // A truncated MCP envelope can still contain a complete first text block.
       const firstBlock = /^\s*\{\s*"content"\s*:\s*\[\s*/.exec(text);
       if (!firstBlock) return {};
       try {
@@ -306,12 +291,6 @@ function projectPreviewToolMetadata(data: Record<string, unknown>, status: unkno
   }
 }
 
-/**
- * MCP tool calls carry full tool results (`data.item.result` on Codex,
- * `data.result` on Claude/OpenCode) that used to bypass slimming entirely to
- * keep the expanded-row UI working. Keep the fields the UI actually renders
- * and summarize the result like regular tool output.
- */
 function projectMcpToolCallData(data: Record<string, unknown>): Record<string, unknown> {
   const projectedData: Record<string, unknown> = {};
 
@@ -418,10 +397,6 @@ function projectAcpContent(value: unknown): Record<string, unknown> | undefined 
   return summary ? { content: summary } : undefined;
 }
 
-/**
- * Removes activity payload fields that no current client reads while retaining
- * the full payload in persistence and the event store.
- */
 export function projectActivityPayload(
   activity: OrchestrationThreadActivity,
 ): OrchestrationThreadActivity {
@@ -469,7 +444,6 @@ export function projectActivityPayload(
   const changedFiles: string[] = [];
   collectChangedFiles(data, changedFiles, new Set<string>(), 0);
   if (changedFiles.length > 0) {
-    // Both clients discover file names by walking objects with path-like keys.
     projectedData.files = changedFiles.map((path) => ({ path }));
   }
 
@@ -500,12 +474,6 @@ export function projectActivityPayload(
   };
 }
 
-/**
- * Matches the validity rule in the web client's
- * `deriveLatestContextWindowSnapshot`: rows without a finite, non-negative
- * `usedTokens` are skipped during its backward walk, so they must not shadow
- * an earlier resolvable row here.
- */
 function isResolvableContextWindowActivity(activity: OrchestrationThreadActivity): boolean {
   if (activity.kind !== "context-window.updated") {
     return false;
@@ -515,18 +483,6 @@ function isResolvableContextWindowActivity(activity: OrchestrationThreadActivity
   return typeof usedTokens === "number" && Number.isFinite(usedTokens) && usedTokens >= 0;
 }
 
-/**
- * Drops all but the last resolvable context-window activity per turn from a
- * snapshot. Clients only ever read the latest usage value (walking the array
- * backwards), so shipping the full history — often thousands of rows on long
- * threads — buys nothing. Retention is per turn rather than per thread because
- * a live `thread.reverted` makes the client discard whole turns; keeping each
- * turn's latest row means the meter can still resolve a value from the turns
- * that survive. Malformed rows pass through untouched rather than shadowing a
- * valid earlier row. Live `thread.activity-appended` events are untouched:
- * newer updates still stream through and supersede the retained rows on the
- * client.
- */
 function dropStaleContextWindowActivities(
   activities: ReadonlyArray<OrchestrationThreadActivity>,
 ): ReadonlyArray<OrchestrationThreadActivity> {
@@ -546,12 +502,6 @@ function dropStaleContextWindowActivities(
   );
 }
 
-/**
- * Identity used to retain only the newest lifecycle row for each call in a
- * thread snapshot. Prefer the runtime item id, then the legacy nested id, and
- * finally the itemType/title/detail triple. Rows without any identity remain
- * untouched.
- */
 function toolLifecycleIdentity(activity: OrchestrationThreadActivity): string | null {
   const payload = asRecord(activity.payload);
   if (!payload) {
@@ -565,8 +515,6 @@ function toolLifecycleIdentity(activity: OrchestrationThreadActivity): string | 
   }
 
   const itemType = asTrimmedString(payload.itemType) ?? "";
-  // Mirrors the clients' `normalizeCompactToolLabel`: a completion's title may
-  // gain a trailing "complete"/"completed" the in-flight updates lack.
   const label = (asTrimmedString(payload.title) ?? activity.summary)
     .replace(/\s+(?:complete|completed)\s*$/iu, "")
     .trim();
@@ -577,34 +525,6 @@ function toolLifecycleIdentity(activity: OrchestrationThreadActivity): string | 
   return [itemType, label, detail].join("");
 }
 
-/**
- * Drops `tool.updated` rows a `tool.completed` row already supersedes. An
- * update is the in-flight snapshot of a call; once the call completes, the
- * completion carries the final state and the clients fold every matching
- * update into it, so shipping the updates buys nothing — 47k such rows exist
- * in one real database, and a single thread carries 2,291 of them totalling
- * ~1MB post-slimming.
- *
- * Matching is per turn for the same reason `dropStaleContextWindowActivities`
- * retains per turn: a live `thread.reverted` makes the client discard whole
- * turns, so a completion in a different turn could vanish and leave the
- * dropped update unrepresented. The completion must also come *after* the
- * update within the turn — a later update belongs to a subsequent call that
- * reuses the same identity and is still in flight. Rows without a lifecycle
- * identity pass through, matching the clients, which never collapse them.
- * Deliberate divergence from client collapse: clients fold only *adjacent*
- * lifecycle rows, so a superseded update separated from its completion by an
- * interleaved parallel call renders as its own row today, and this drop
- * removes it. Measured against a real database, that affects 1.5% of dropped
- * rows (553 of 36,581), all pure in-flight state whose final result the
- * retained completion still shows. Dropping them is intentional; matching
- * adjacency server-side would forfeit most of the win for parallel-heavy
- * threads, which are exactly the heavy ones. Superseding completions always
- * carry a payload superset of their updates (verified across all 49,515
- * update rows: zero dropped rows held a client-merged field — detail, title,
- * command, item, kind, files — their completion lacked), so no expanded-row
- * content is lost.
- */
 function dropSupersededToolUpdatedActivities(
   activities: ReadonlyArray<OrchestrationThreadActivity>,
 ): ReadonlyArray<OrchestrationThreadActivity> {
@@ -667,8 +587,6 @@ export function projectActivityEvent(
   event: OrchestrationEvent,
   reasoningMessages = true,
 ): OrchestrationEvent {
-  // Preserve sequence watermarks and message identities for clients whose role
-  // decoder predates reasoning. Filtering would strand their history pages.
   if (
     !reasoningMessages &&
     event.type === "thread.message-sent" &&

@@ -85,9 +85,6 @@ const desktopEnvironmentLayer = Layer.unwrap(
   }),
 );
 
-// The remote runs the exact release this app is on, from its self-contained
-// archive, so it needs neither Node nor npm. Development points the remote at
-// a source checkout instead so the two sides can be iterated together.
 const resolveDesktopSshCliRunner = (
   environment: DesktopEnvironment.DesktopEnvironment["Service"],
 ): RemoteT3RunnerOptions => {
@@ -145,8 +142,6 @@ const desktopServerExposureLayer = DesktopServerExposure.layer.pipe(
 );
 
 const desktopPreviewLayer = PreviewManager.layer.pipe(
-  // Merged rather than provided so the IPC handlers can reach the import
-  // service alongside the manager; both sit on the same BrowserSession.
   Layer.provideMerge(BrowserImport.layer.pipe(Layer.provide(LinuxBrowserSecret.layer))),
   Layer.provideMerge(BrowserSession.layer),
   Layer.provideMerge(desktopFoundationLayer),
@@ -165,11 +160,6 @@ const desktopAppActivationLayer = DesktopAppActivation.layer.pipe(
   Layer.provide(desktopWindowLayer),
 );
 
-// Pool layer instantiates the backend factory once for the Windows
-// primary instance and exposes it via pool.primary. Consumers go through
-// the pool now; the legacy DesktopBackendManager service is gone. The
-// WSL second instance gets registered later in the migration. See
-// DesktopBackendPool.ts header for the full rollout plan.
 const desktopBackendLayer = DesktopBackendPool.layer.pipe(
   Layer.provideMerge(DesktopAppIdentity.layer),
   Layer.provideMerge(DesktopBackendConfiguration.layer),
@@ -179,9 +169,6 @@ const desktopBackendLayer = DesktopBackendPool.layer.pipe(
   Layer.provideMerge(desktopWindowLayer),
 );
 
-// WSL orchestrator hangs off the backend layer because it needs the
-// pool + configuration + serverExposure; it pulls NetService and the
-// foundation services through the same provideMerge chain.
 const desktopWslBackendLayer = DesktopWslBackend.layer.pipe(
   Layer.provideMerge(desktopBackendLayer),
 );
@@ -218,8 +205,6 @@ const desktopApplicationRuntimeLayer = desktopApplicationLayer.pipe(
   Layer.provideMerge(electronLayer),
 );
 
-// Acquire strict pre-ready setup before Clerk, whose userData resolution can
-// yield and let Electron emit ready.
 const desktopRuntimeLayer = desktopClerkLayer.pipe(
   Layer.flatMap((clerkContext) =>
     desktopApplicationRuntimeLayer.pipe(Layer.provideMerge(Layer.succeedContext(clerkContext))),

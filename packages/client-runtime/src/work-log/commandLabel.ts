@@ -62,9 +62,6 @@ const SKIPPABLE_SUDO_PROBES = new Set(["[", "[[", "test", "true"]);
 const NON_PROGRAM_PREFIX_CHARACTERS = "<>(){}[];|&$`#!%@:";
 const NON_PROGRAM_SUFFIX_CHARACTERS = "){]}`";
 
-// These tokens describe shell syntax or shell-local control flow, not a useful
-// executable name. Falling back to "command" is less misleading than labels
-// such as "Ran if", "Ran [", or "Ran function".
 const NON_DESCRIPTIVE_SHELL_PROGRAMS = new Set([
   "!",
   "#",
@@ -160,8 +157,6 @@ const NON_DESCRIPTIVE_SHELL_PROGRAMS = new Set([
   "while",
 ]);
 
-// Unlike setup builtins, these can make later segments part of control flow or
-// otherwise unreachable, so do not use a later program as the command label.
 const TERMINAL_SHELL_PROGRAMS = new Set([
   "and",
   "begin",
@@ -698,8 +693,6 @@ function transparentWrapperCommandIndex(
   }
 
   if (wrapper === "script") {
-    // BSD `script` takes an output file before the optional command. Requiring
-    // an option and both operands avoids guessing about a plain `script file`.
     return /^-[adkpqr]+$/u.test(tokens[index + 1] ?? "") && tokens[index + 3] !== undefined
       ? index + 3
       : null;
@@ -784,8 +777,6 @@ function powerShellAssignmentProgramName(
   );
   if (!assignment) return { matched: false, program: null };
 
-  // Environment assignments are setup. Their right-hand side is a value, not
-  // a command, so prefer the next top-level segment when one exists.
   if (assignment[1]?.toLowerCase() === "env") {
     return {
       matched: true,
@@ -796,8 +787,6 @@ function powerShellAssignmentProgramName(
   }
 
   const value = assignment[2]!.trim();
-  // The POSIX-oriented segment splitter does not balance PowerShell arrays or
-  // hashtables. Do not mistake a key after an internal semicolon for a command.
   if (/^(?:\[ordered\]\s*)?@\s*[{(]/iu.test(value)) {
     return { matched: true, program: null };
   }
@@ -922,9 +911,6 @@ function referencedCommandAlias(token: string): string | null {
   return reference?.[1] ?? reference?.[2] ?? null;
 }
 
-// Recover only literal aliases declared by an earlier top-level shell segment.
-// This covers common `SSH=(ssh ...)` and `TOOL=/path/to/tool` forms without
-// evaluating expansions or trying to model general shell state.
 function literalCommandAliasProgramName(command: string): string | null {
   const aliases = new Map<string, string>();
   let remainingCommand: string | null = command;
@@ -1087,8 +1073,6 @@ function parseCommandProgramName(
     return null;
   }
   if (/^[A-Za-z_][A-Za-z0-9_]*\s*\(\s*\)\s*\{/u.test(commandWithoutComments)) return null;
-  // `&&` and `||` inside a `[[ ... ]]` expression are not top-level command
-  // separators. Keep the label conservative instead of scanning the test body.
   if (commandWithoutComments.startsWith("[[")) return null;
   const commandSplit = splitFirstShellCommand(commandWithoutComments);
   if (/^@["'](?:\r?\n)/u.test(commandSplit.firstCommand.trimStart())) {

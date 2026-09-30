@@ -200,11 +200,6 @@ const commonNonHttpServer = Effect.acquireRelease(
     ),
 );
 
-/**
- * Integration tests against a real TCP listener. We provide the Windows host
- * platform so the tests exercise the TCP-probe fallback without depending on
- * `lsof` being installed.
- */
 effectIt.layer(TestPortDiscoveryLive)("PortDiscovery integration (TCP probe fallback)", (it) => {
   it.effect(
     "scan() returns an HTTP server we just opened on a curated dev port",

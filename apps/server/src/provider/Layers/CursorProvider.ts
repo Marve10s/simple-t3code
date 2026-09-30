@@ -53,7 +53,6 @@ import * as AcpSessionRuntime from "../acp/AcpSessionRuntime.ts";
 import { CursorListAvailableModelsResponse } from "../acp/CursorAcpExtension.ts";
 import type { ServerProviderShape } from "../Services/ServerProvider.ts";
 
-/** Session command catalogs stay scoped to their workspace across health refreshes. */
 export const makeCursorCommandCatalog = Effect.fn("makeCursorCommandCatalog")(function* (
   provider: ServerProviderShape,
 ) {
@@ -665,7 +664,6 @@ export const discoverCursorModelsViaAcp = (
   environment?: NodeJS.ProcessEnv,
 ) => discoverCursorModelsViaListAvailableModels(cursorSettings, environment);
 
-// Each driver instance owns its cache; version and account changes invalidate it.
 export const makeCursorModelDiscovery = Effect.fn("makeCursorModelDiscovery")(function* (
   cursorSettings: CursorSettings,
   environment?: NodeJS.ProcessEnv,
@@ -691,19 +689,13 @@ function getCursorFallbackModels(
   return providerModelsFromSettings([], cursorSettings.customModels, EMPTY_CAPABILITIES);
 }
 
-/** Timeout for `agent about` — it's slower than a simple `--version` probe. */
 const ABOUT_TIMEOUT_MS = 8_000;
 
-/** Strip ANSI escape sequences so we can parse plain key-value lines. */
 function stripAnsi(text: string): string {
   // eslint-disable-next-line no-control-regex
   return text.replace(/\x1b\[[0-9;]*[A-Za-z]|\x1b\].*?\x07/g, "");
 }
 
-/**
- * Extract a value from `agent about` key-value output.
- * Lines look like: `CLI Version         2026.03.20-44cb435`
- */
 function extractAboutField(plain: string, key: string): string | undefined {
   const regex = new RegExp(`^${key}\\s{2,}(.+)$`, "mi");
   const match = regex.exec(plain);
@@ -912,26 +904,6 @@ export function getCursorParameterizedModelPickerUnsupportedMessage(input: {
   return `${reasons.join(". ")}. Run \`agent set-channel lab && agent update\` and use Cursor Agent CLI 2026.04.08 or newer.`;
 }
 
-/**
- * Parse the output of `agent about` to extract version and authentication
- * status in a single probe.
- *
- * Example output (logged in):
- * ```
- * About Cursor CLI
- *
- * CLI Version         2026.03.20-44cb435
- * User Email          user@example.com
- * ```
- *
- * Example output (logged out):
- * ```
- * About Cursor CLI
- *
- * CLI Version         2026.03.20-44cb435
- * User Email          Not logged in
- * ```
- */
 export function parseCursorAboutOutput(result: CommandResult): CursorAboutResult {
   const jsonPayload = parseCursorAboutJsonPayload(result.stdout);
   if (jsonPayload) {
@@ -1002,7 +974,6 @@ export function parseCursorAboutOutput(result: CommandResult): CursorAboutResult
   const combined = `${result.stdout}\n${result.stderr}`;
   const lowerOutput = combined.toLowerCase();
 
-  // If the command itself isn't recognised, we're on an old CLI version.
   if (
     lowerOutput.includes("unknown command") ||
     lowerOutput.includes("unrecognized command") ||
@@ -1020,9 +991,7 @@ export function parseCursorAboutOutput(result: CommandResult): CursorAboutResult
   const version = extractAboutField(plain, "CLI Version") ?? null;
   const userEmail = extractAboutField(plain, "User Email");
 
-  // Determine auth from the User Email field.
   if (userEmail === undefined) {
-    // Field missing entirely — can't determine auth.
     if (result.code === 0) {
       return { version, status: "ready", auth: { status: "unknown" } };
     }
@@ -1048,7 +1017,6 @@ export function parseCursorAboutOutput(result: CommandResult): CursorAboutResult
     };
   }
 
-  // Any non-empty email value means authenticated.
   return {
     version,
     status: "ready",
@@ -1127,7 +1095,6 @@ export const checkCursorProviderStatus = Effect.fn("checkCursorProviderStatus")(
     });
   }
 
-  // Single `agent about` probe: returns version + auth status in one call.
   const aboutProbe = yield* runCursorAboutCommand(cursorSettings, environment).pipe(
     Effect.timeoutOption(ABOUT_TIMEOUT_MS),
     Effect.result,
@@ -1230,14 +1197,6 @@ export const checkCursorProviderStatus = Effect.fn("checkCursorProviderStatus")(
   });
 });
 
-/**
- * Background maintenance enrichment for a Cursor snapshot.
- *
- * Used by `CursorDriver` as the `makeManagedServerProvider.enrichSnapshot`
- * hook: republishes update/version advisory metadata without performing any
- * model or capability discovery. Cursor model data comes exclusively from
- * `cursor/list_available_models` during provider status checks.
- */
 export const enrichCursorSnapshot = (input: {
   readonly settings: CursorSettings;
   readonly snapshot: ServerProvider;

@@ -17,7 +17,6 @@ export const MessageCopyButton = memo(function MessageCopyButton({
   className,
 }: {
   text: string;
-  /** Additional clipboard types written beside `text/plain` when the platform allows it. */
   extraFlavors?: Readonly<Record<string, string>>;
   size?: "xs" | "icon-xs";
   variant?: "outline" | "ghost";

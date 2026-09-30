@@ -114,12 +114,10 @@ describe("queuedMessageStore", () => {
     markDispatching("thread-a", first.id, earlier);
     finishSend("thread-a", first.id);
 
-    // Fails before its turn start went out: the first send is still the one to wait on.
     beginSend("thread-a", second.id, null);
     failSend("thread-a", second.id);
     expect(lastDispatch()?.thread).toBe(earlier);
 
-    // Fails after going out: it never reached the server, so the first still counts.
     beginSend("thread-a", third.id, null);
     markDispatching("thread-a", third.id, { ...earlier, startedAt: "later" });
     failSend("thread-a", third.id);

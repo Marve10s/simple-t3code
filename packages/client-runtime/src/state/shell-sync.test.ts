@@ -93,8 +93,6 @@ describe("environment shell synchronization", () => {
         clearVcsRefs: () => Effect.void,
         clear: () => Effect.void,
       });
-      // Cold cache with no HTTP snapshot available → falls back to the
-      // socket-embedded snapshot.
       const snapshotLoader = ShellSnapshotLoader.of({
         load: () => Effect.succeedNone,
       });
@@ -154,7 +152,6 @@ describe("environment shell synchronization", () => {
 
   it.live.each([
     { bufferSize: Infinity, expectedSequences: [51] },
-    // RpcClient defaults to a 16-event buffer, which splits larger server chunks.
     { bufferSize: 16, expectedSequences: [17, 33, 49, 51] },
   ])("batches live events with a $bufferSize event buffer", ({ bufferSize, expectedSequences }) =>
     Effect.gen(function* () {
@@ -214,7 +211,6 @@ describe("environment shell synchronization", () => {
         Stream.runHead,
       );
 
-      // Observe before publishing so no batch can arrive before the subscription.
       const observed = yield* SubscriptionRef.changes(shellState).pipe(
         Stream.drop(1),
         Stream.takeUntil(
@@ -395,7 +391,6 @@ describe("environment shell synchronization", () => {
         ),
       );
 
-      // A new session starts from an authoritative HTTP snapshot.
       for (let attempt = 0; attempt < 100; attempt += 1) {
         if ((yield* Ref.get(capturedAfterSequences)).length >= 1) break;
         yield* Effect.yieldNow;
@@ -407,7 +402,6 @@ describe("environment shell synchronization", () => {
         Stream.runHead,
       );
 
-      // A newer snapshot arrives on the stream and advances the cursor.
       yield* Queue.offer(events, {
         kind: "snapshot",
         snapshot: { ...LIVE_SHELL_SNAPSHOT, snapshotSequence: 40 },
@@ -441,7 +435,6 @@ describe("environment shell synchronization", () => {
       expect((yield* Ref.get(capturedAfterSequences)).length).toBe(3);
       expect(yield* Ref.get(loaderCalls)).toBe(1);
 
-      // Replacing the session performs another authoritative refresh.
       yield* SubscriptionRef.set(activeSession, Option.some(session(client)));
       for (let attempt = 0; attempt < 100; attempt += 1) {
         if ((yield* Ref.get(capturedAfterSequences)).length >= 4) break;

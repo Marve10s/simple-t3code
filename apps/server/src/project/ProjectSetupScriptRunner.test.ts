@@ -296,25 +296,17 @@ describe("ProjectSetupScriptRunner", () => {
         if (result.status !== "started") return;
         expect(result.completion).toBeDefined();
 
-        // The subscription is attached before the command is written.
         expect(subscribe).toHaveBeenCalledTimes(1);
         expect(writes).toHaveLength(1);
-        // The block closes on its own line so a trailing comment in the
-        // command cannot swallow the sentinel, and the sentinel carries a
-        // per-run token so script output cannot spoof it.
         const written = writes[0] ?? "";
         const sentinel = /__T3_SETUP_DONE___[0-9a-f]{32}:/.exec(written)?.[0];
         expect(sentinel).toBeDefined();
         expect(written).toBe(`( bun install\r); printf '\\n${sentinel}%s\\n' "$?"\r`);
 
-        // Output arrives in chunks; partial lines are buffered until a newline,
-        // control sequences are stripped, and the echoed wrapper is hidden.
         yield* emit(`( bun install\r\n> ); printf '\\n${sentinel}%s\\n' "$?"\r\n`);
         yield* emit("\u001b[32mResolving");
         yield* emit(" deps\u001b[0m\r\n");
-        // Progress redraws separated by bare carriage returns are their own lines.
         yield* emit("Progress: 1/3\rProgress: 2/3\rProgress: 3/3\r\nDone in 2s\r\n");
-        // A spoofed sentinel from the script itself must not settle completion.
         yield* emit("__T3_SETUP_DONE__:0\r\n");
         yield* emit(`__T3_SETUP_DONE___${"0".repeat(32)}:0\r\n`);
         yield* emit(`${sentinel}3\r\n`);
@@ -330,9 +322,7 @@ describe("ProjectSetupScriptRunner", () => {
           "__T3_SETUP_DONE__:0",
           `__T3_SETUP_DONE___${"0".repeat(32)}:0`,
         ]);
-        // The subscription is torn down once the sentinel arrives.
         expect(listener).toBeNull();
-        // A failed run keeps its shell open for a look.
         expect(closeIdle).not.toHaveBeenCalled();
       }).pipe(
         Effect.provide(testLayer(project, { open, write, subscribe, closeIdle })),

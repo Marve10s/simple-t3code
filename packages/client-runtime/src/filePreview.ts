@@ -1,12 +1,10 @@
 import { decodeFilePreviewText, FILE_TEXT_PREVIEW_MAX_BYTES } from "@t3tools/shared/filePreview";
 
-/** Consume only a bounded prefix, even when a host ignores the requested HTTP range. */
 export async function readFilePreviewResponse(
   response: Pick<Response, "ok" | "body">,
   signal: AbortSignal,
 ) {
   if (!response.ok) {
-    // A streamed error body holds the connection open until GC otherwise.
     void response.body?.cancel().catch(() => undefined);
     throw new Error("The file could not be loaded. Reconnect and try again.");
   }

@@ -65,20 +65,16 @@ type AntigravityTextRuntime = Pick<
 
 export interface AntigravityTextGenerationOptions {
   readonly profileDirectory: string;
-  /** Model the provider default alias selects, when the account offers it. */
   readonly defaultModel?: Effect.Effect<string | undefined>;
-  /** Uses the instance's personal Google login, with no injected MCP servers or client tools. */
   readonly makeRuntime: (
     cwd: string,
   ) => Effect.Effect<AntigravityTextRuntime, AcpError | ProviderSetupError, Scope.Scope>;
-  /** Registers the whole helper so sign-out can stop it before clearing credentials. */
   readonly withProcess: <A, E, R>(
     stop: Effect.Effect<void>,
     task: Effect.Effect<A, E, R>,
   ) => Effect.Effect<A, E | ProviderSetupError, R | Scope.Scope>;
 }
 
-/** Global hooks and MCP servers can run before a helper can deny a tool request. */
 export const isAntigravityTextGenerationAvailable = Effect.fn(
   "isAntigravityTextGenerationAvailable",
 )(function* (profileDirectory: string) {
@@ -108,7 +104,6 @@ export const isAntigravityTextGenerationAvailable = Effect.fn(
   return true;
 });
 
-/** Runs short-lived subscription helpers without giving them the user's workspace. */
 export const makeAntigravityTextGeneration = Effect.fn("makeAntigravityTextGeneration")(function* (
   options: AntigravityTextGenerationOptions,
 ) {

@@ -10,7 +10,6 @@ function actionFor(
   permission: string,
   target = "*",
 ) {
-  // OpenCode uses the last matching rule. Its wildcards match directory separators.
   return buildOpenCodePermissionRules(runtimeMode).findLast(
     (rule) =>
       (rule.permission === "*" || rule.permission === permission) &&
@@ -27,8 +26,6 @@ describe("buildOpenCodePermissionRules", () => {
     NodeAssert.equal(actionFor("approval-required", "edit"), "ask");
   });
 
-  // Documented in docs/user/permission-modes.md: providers without an AI
-  // reviewer, OpenCode among them, fall back to Supervised for "auto".
   it("leaves auto asking, as the docs say it does without a reviewer", () => {
     NodeAssert.equal(actionFor("auto", "edit"), "ask");
   });

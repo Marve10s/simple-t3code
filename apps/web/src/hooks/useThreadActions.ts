@@ -95,9 +95,6 @@ export class ThreadSnoozeBlockedError extends Schema.TaggedError<ThreadSnoozeBlo
   }
 }
 
-/** Key that sorts before every arranged pinned thread, so a fresh pin lands
-    at the top of the run. Undefined (keyless, sorts with the legacy block)
-    when key math can't produce one — pinning must never fail on placement. */
 function topOfPinnedRunOrderKey(): string | undefined {
   let firstKey: string | null = null;
   for (const shell of readThreadShells()) {
@@ -175,7 +172,6 @@ export async function requestThreadUnpinConfirmation(input: {
   );
 }
 
-/** Report navigation separately so a completed deletion can still finish worktree cleanup. */
 export async function navigateAfterThreadDeletion(navigate: () => Promise<void>) {
   const result = await settlePromise(navigate);
   if (result._tag === "Failure") {
@@ -246,10 +242,6 @@ export function useThreadActions() {
   const markThreadVisited = useUiStateStore((state) => state.markThreadVisited);
   const router = useRouter();
   const handleNewThread = useNewThreadHandler();
-  // Keep a ref so archiveThread can call handleNewThread without appearing in
-  // its dependency array — handleNewThread is inherently unstable (depends on
-  // the projects list) and would otherwise cascade new references into every
-  // sidebar row via archiveThread → attemptArchiveThread.
   const handleNewThreadRef = useRef(handleNewThread);
   handleNewThreadRef.current = handleNewThread;
 
@@ -330,7 +322,6 @@ export function useThreadActions() {
       showThreadUndoNotice({
         action: "Archived",
         claim: action,
-        // Undo also brings the reader back when archiving moved them to a draft.
         undo: () => unarchiveThread(threadRef, { navigate: shouldNavigateToDraft }),
         failureTitle: "Failed to undo archive",
       });
@@ -360,7 +351,6 @@ export function useThreadActions() {
     async (target: ScopedThreadRef, opts: { deletedThreadKeys?: ReadonlySet<string> } = {}) => {
       const resolved = resolveThreadTarget(target);
       if (!resolved) {
-        // Thread not in main store (e.g. archived thread) — dispatch delete directly.
         const result = await deleteThreadMutation({
           environmentId: target.environmentId,
           input: { threadId: target.threadId },
@@ -528,8 +518,6 @@ export function useThreadActions() {
               : message,
           }),
         );
-        // The thread was deleted. Cleanup has its own toast; returning its
-        // failure would make callers incorrectly report a thread deletion error.
       }
       return deleteResult;
     },
@@ -562,8 +550,6 @@ export function useThreadActions() {
         );
       }
       ThreadUndo.invalidate("settle", scopedThreadKey(target));
-      // reason "user" pins the thread active: auto-settle (PR merged /
-      // inactivity) stays suppressed until real activity clears the pin.
       return unsettleThreadMutation({
         environmentId: target.environmentId,
         input: { threadId: target.threadId, reason: "user" },
@@ -572,7 +558,6 @@ export function useThreadActions() {
     [unsettleThreadMutation],
   );
 
-  /** Turns automatic settlement (inactivity, merged PR) on or off for one thread. */
   const setThreadAutoSettle = useCallback(
     async (target: ScopedThreadRef, enabled: boolean) => {
       if (!readEnvironmentSupportsAutoSettleOptOut(target.environmentId)) {
@@ -595,7 +580,6 @@ export function useThreadActions() {
 
   const pinThread = useCallback(
     async (target: ScopedThreadRef, opts: { orderKey?: string } = {}) => {
-      // Version skew: never send the command to a server that predates it.
       if (!readEnvironmentSupportsPinning(target.environmentId)) {
         return AsyncResult.failure(
           Cause.fail(
@@ -606,12 +590,6 @@ export function useThreadActions() {
           ),
         );
       }
-      // Every pin path places the thread at the top of the arranged run:
-      // callers with a better anchor (the sidebar, which knows the displayed
-      // order) pass their own key; everyone else (chat header, context menus)
-      // gets the default so the same action never places differently.
-      // orderKey rides only to servers that decode it; pre-reorder servers
-      // get the bare pin they understand and the thread stays keyless.
       const orderKey = readEnvironmentSupportsPinReorder(target.environmentId)
         ? (opts.orderKey ?? topOfPinnedRunOrderKey())
         : undefined;
@@ -663,8 +641,6 @@ export function useThreadActions() {
 
   const settleThread = useCallback(
     async (target: ScopedThreadRef) => {
-      // Version skew: never send the command to a server that predates it —
-      // the raw protocol rejection would read as a random failure.
       if (!readEnvironmentSupportsSettlement(target.environmentId)) {
         return AsyncResult.failure(
           Cause.fail(
@@ -679,13 +655,9 @@ export function useThreadActions() {
       const wokeAt = resolved
         ? threadWokeAt(resolved.thread, { now: new Date().toISOString() })
         : null;
-      // Settling also drops the pin and the snooze server-side, so Undo
-      // has to put those back as well.
       const pinOrderKey = resolved?.thread.pinnedAt != null ? resolved.thread.pinOrderKey : null;
       const wasPinned = resolved?.thread.pinnedAt != null;
       const snoozedUntil = resolved?.thread.snoozedUntil ?? null;
-      // An older unpin/snooze Undo would re-pin or re-snooze, and the server
-      // treats either as a promotion that un-settles; settling supersedes them.
       ThreadUndo.invalidate("pin", scopedThreadKey(target));
       ThreadUndo.invalidate("snooze", scopedThreadKey(target));
       const action = ThreadUndo.begin("settle", scopedThreadKey(target));
@@ -757,9 +729,6 @@ export function useThreadActions() {
 
   const reorderPinnedThread = useCallback(
     async (target: ScopedThreadRef, orderKey: string) => {
-      // Callers (the sidebar drag handler) only enable dragging on
-      // reorder-capable environments; this guard covers races around
-      // capability changes mid-drag.
       if (!readEnvironmentSupportsPinReorder(target.environmentId)) {
         return AsyncResult.failure(
           Cause.fail(
@@ -822,7 +791,6 @@ export function useThreadActions() {
 
   const snoozeThread = useCallback(
     async (target: ScopedThreadRef, snoozedUntil: string) => {
-      // Version skew: never send the command to a server that predates it.
       if (!readEnvironmentSupportsSnooze(target.environmentId)) {
         return AsyncResult.failure(
           Cause.fail(
@@ -834,9 +802,6 @@ export function useThreadActions() {
         );
       }
       const resolved = resolveThreadTarget(target);
-      // Blocked-on-you work and queued turns can't be snoozed away —
-      // client-side twin of the server invariants so the UI rejects before
-      // a round trip.
       if (resolved && !canSnooze(resolved.thread, { now: new Date().toISOString() })) {
         return AsyncResult.failure(
           Cause.fail(
@@ -856,7 +821,6 @@ export function useThreadActions() {
         action.finish();
         return result;
       }
-      // Snooze hides the row, so keep its confirmation in the sidebar.
       showThreadUndoNotice({
         action: "Snoozed",
         claim: action,

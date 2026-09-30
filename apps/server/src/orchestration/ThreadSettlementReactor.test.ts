@@ -178,7 +178,6 @@ function makeBranchPullRequest(
 
 interface HarnessOptions {
   readonly snapshot: OrchestrationShellSnapshot;
-  /** Serve full sweep reads from this instead of `snapshot`. */
   readonly getShellSnapshot?: ProjectionSnapshotQueryShape["getShellSnapshot"];
   readonly settings?: ServerSettings;
   readonly branchPullRequest?: GitManager["Service"]["branchPullRequest"];
@@ -193,7 +192,6 @@ const makeHarness = Effect.fn("makeThreadSettlementHarness")(function* (options:
   const activation = yield* Deferred.make<void>();
   const snapshots = yield* Ref.make(options.snapshot);
   const snapshotReadCount = yield* Ref.make(0);
-  // Each shell read: a thread id for a one-thread read, null for a full read.
   const snapshotReads = yield* Queue.unbounded<ThreadId | null>();
   const settings = yield* Ref.make(options.settings ?? DEFAULT_SERVER_SETTINGS);
   const settingsReads = yield* Queue.unbounded<ServerSettings>();
@@ -671,7 +669,6 @@ describe("ThreadSettlementReactor", () => {
           yield* fixture.updateSettings({ sidebarAutoSettleAfterDays: 1 });
           yield* Queue.take(fixture.snapshotReads);
           yield* reactor.drain;
-          // Inactive threads settle without a PR lookup, so only the dispatches prove work resumed.
           assert.deepStrictEqual(
             (yield* Ref.get(fixture.commands)).map((command) => command.threadId).toSorted(),
             [ThreadId.make("branch-thread"), ThreadId.make("linked-thread")],
@@ -716,15 +713,12 @@ describe("ThreadSettlementReactor", () => {
             [ThreadId.make("overridden-thread")],
           );
 
-          // Clearing the override is a settlement change, so the sweep re-arms.
           yield* fixture.updateSettings({
             projectSettingsOverrides: { [overriddenProject]: null },
             sidebarAutoSettleAfterDays: 1,
           });
           yield* Queue.take(fixture.snapshotReads);
           yield* reactor.drain;
-          // The static snapshot never records the first settlement, so the
-          // second sweep dispatches for both; the inheriting thread is new.
           assert.include(
             (yield* Ref.get(fixture.commands)).map((command) => command.threadId),
             ThreadId.make("inherits-thread"),
@@ -985,9 +979,6 @@ describe("ThreadSettlementReactor", () => {
           ]),
           pullRequestSummary: (input) =>
             Ref.updateAndGet(lookupCount, (count) => count + 1).pipe(
-              // The initial sweep looks up both linked threads; the merge
-              // sweep only looks up the unrelated one, since the merged
-              // thread settles from the event itself.
               Effect.tap((count) =>
                 count === 3 ? Deferred.succeed(mergeLookupStarted, undefined) : Effect.void,
               ),
@@ -1078,7 +1069,6 @@ describe("ThreadSettlementReactor", () => {
 
           yield* fixture.updateSettings({ sidebarAutoSettleOnMerge: false });
           yield* Deferred.succeed(releaseFirstLookup, undefined);
-          // The in-flight decision and the newly queued sweep both read the disabled settings.
           yield* Queue.take(fixture.settingsReads);
           yield* Queue.take(fixture.settingsReads);
           yield* reactor.drain;
@@ -1508,8 +1498,6 @@ describe("ThreadSettlementReactor", () => {
       const { readThreadIds: unsettledReads, ...unsettled } = yield* sweep(query.getShellSnapshot);
       const { readThreadIds: fullReads, ...full } = yield* sweep(() => query.getShellSnapshot());
       assert.deepStrictEqual(unsettled, full);
-      // A settle for inactivity, for a synced merged link, and for a saved
-      // branch PR whose project only that PR names.
       assert.deepStrictEqual(unsettled.commands, [
         "idle 2026-08-20T00:00:00.000Z",
         "linked 2026-08-27T00:00:00.000Z",

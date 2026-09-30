@@ -485,7 +485,6 @@ it.layer(NodeServices.layer)("keybindings", (it) => {
     }).pipe(Effect.provide(makeKeybindingsLayer())),
   );
 
-  // chmod cannot make a directory unwritable on Windows, so the write succeeds.
   it.effect.skipIf(HostProcessPlatform.defaultValue() === "win32")(
     "fails when config directory is not writable",
     () =>

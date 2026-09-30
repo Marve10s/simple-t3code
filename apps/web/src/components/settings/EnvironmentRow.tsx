@@ -12,10 +12,6 @@ export function formatDesktopSshTarget(target: DesktopSshEnvironmentTarget): str
   return target.port ? `${authority}:${target.port}` : authority;
 }
 
-/**
- * How this client reaches a machine, printed first in every environment row so
- * T3 Connect, SSH, WSL, and plain remote links are told apart without a legend.
- */
 export function environmentTransportLabel(environment: EnvironmentPresentation): string {
   const { entry } = environment;
   if (entry.target._tag === "PrimaryConnectionTarget") return "This machine";
@@ -31,11 +27,6 @@ export function environmentTransportLabel(environment: EnvironmentPresentation):
   return environment.displayUrl ?? "Remote link";
 }
 
-/**
- * One machine in a grouped settings list: icon, name, a single subtitle line,
- * and controls on the right. Every environment list on the Connections page
- * uses this so the lists share one rhythm.
- */
 export function EnvironmentRow({
   kind,
   label,
@@ -48,7 +39,6 @@ export function EnvironmentRow({
   readonly kind: EnvironmentMachineKind;
   readonly label: string;
   readonly subtitle: ReactNode;
-  /** Extra content under the subtitle, such as update progress. */
   readonly below?: ReactNode;
   readonly dimmed?: boolean;
   readonly className?: string;

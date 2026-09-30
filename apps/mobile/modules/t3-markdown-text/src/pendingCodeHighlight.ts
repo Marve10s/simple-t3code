@@ -1,6 +1,5 @@
 import type { MarkdownHighlightedToken } from "./SelectableMarkdownText.types";
 
-/** Keep finished lines colored while the current line awaits highlighting. */
 export function pendingCodeHighlight(
   previousCode: string,
   code: string,

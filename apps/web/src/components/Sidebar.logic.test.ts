@@ -642,10 +642,6 @@ describe("orderItemsByPreferredIds", () => {
   });
 
   it("honors projectOrder physical keys via getProjectOrderKey", async () => {
-    // Regression guard for #1904 / the regression introduced by #2055:
-    // `projectOrder` is populated with physical keys (envId + cwd-derived)
-    // by the store and by drag-end handlers. Readers must identify projects
-    // with the same key format, or manual sort silently snaps back.
     const { getProjectOrderKey } = await import("../logicalProject");
     const projects = [
       {
@@ -1029,8 +1025,6 @@ describe("pinOrderKeyBetween", () => {
   });
 
   it("stays strictly ordered under repeated top insertion", () => {
-    // Every new pin lands at the head of the arranged run; keys must keep
-    // sorting before the previous head without ever bottoming out.
     let head: string | null = null;
     const keys: string[] = [];
     for (let i = 0; i < 100; i += 1) {
@@ -1115,7 +1109,6 @@ describe("resolveSidebarDropTarget", () => {
     section,
   });
   const marker = (marker: SidebarListMarker): SidebarListItem => ({ kind: "marker", marker });
-  // Pinned p1 p2 | Active a1 a2 | Snoozed z1 | Settled s1
   const items: readonly SidebarListItem[] = [
     marker("pinned-header"),
     thread("p1", "pinned"),
@@ -1166,23 +1159,16 @@ describe("resolveSidebarDropTarget", () => {
   });
 
   it("uses arrayMove placement, so a marker hovered from below lands above it", () => {
-    // Dragging a1 up onto the divider: the divider shifts down, a1 becomes
-    // the last pinned row.
     expect(resolve("a1", sidebarMarkerId("pinned-divider"))).toEqual({
       section: "pinned",
       pinnedOrder: ["p1", "p2", "a1"],
       activeOrder: ["a2"],
     });
-    // Dragging p2 down onto the divider: the divider shifts up, p2 is the
-    // first inbox row — an unpin.
     expect(resolve("p2", sidebarMarkerId("pinned-divider"))).toEqual({
       section: "active",
       pinnedOrder: ["p1"],
       activeOrder: ["p2", "a1", "a2"],
     });
-    // Same on the Settled header: from above it settles; from below the
-    // gap lands in whatever is above the header — here the snoozed shelf,
-    // which is never a target.
     expect(resolve("a2", sidebarMarkerId("settled-header"))?.section).toBe("settled");
     expect(resolve("s1", sidebarMarkerId("settled-header"))).toBeNull();
   });
@@ -2341,8 +2327,6 @@ describe("sortProjectsForSidebar", () => {
     "matches the per-comparison %s order on a shuffled list with ties",
     (sortOrder) => {
       const minute = (value: number) => `2026-03-09T10:0${value}:00.000Z`;
-      // (index * 7) % 24 scrambles the input order. Titles repeat, and
-      // projects 16-23 have no threads, so they use their own stamps.
       const projects = Array.from({ length: 24 }, (_, index) => {
         const n = (index * 7) % 24;
         return makeProject({
@@ -2358,8 +2342,6 @@ describe("sortProjectsForSidebar", () => {
         updatedAt: minute(n % 3),
         latestUserMessageAt: n % 4 === 0 ? null : minute(n % 5),
       }));
-      // The comparator this sort replaced: it walked each project's threads
-      // on every call.
       const timestamp = (project: Project) =>
         getProjectSortTimestamp(
           project,

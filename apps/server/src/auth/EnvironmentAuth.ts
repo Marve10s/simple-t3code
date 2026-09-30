@@ -597,7 +597,7 @@ export function selectRequestCredential(
   return undefined;
 }
 
-/** @public Service construction is part of the canonical Effect module API. */
+/** @public */
 export const make = Effect.gen(function* () {
   const policy = yield* EnvironmentAuthPolicy.EnvironmentAuthPolicy;
   const bootstrapCredentials = yield* PairingGrantStore.PairingGrantStore;
@@ -821,8 +821,6 @@ export const make = Effect.gen(function* () {
                       ttl: Duration.hours(1),
                     }
                   : {}),
-                // Desktop restarts forget the previous bearer token. Replace
-                // its session, including stale entries left by older versions.
                 replaceActiveForSubjectAndMethod: grant.method === "desktop-bootstrap",
                 client: {
                   ...requestMetadata,

@@ -38,7 +38,6 @@ const noSpawner = ChildProcessSpawner.make(() =>
   Effect.die("Disabled Grok must not spawn a process"),
 );
 
-// The `#!/bin/sh` stub below cannot be resolved as an executable on Windows.
 const windowsHost = HostProcessPlatform.defaultValue() === "win32";
 
 it.layer(testLayer)("GrokDriver", (it) => {
@@ -68,7 +67,6 @@ it.layer(testLayer)("GrokDriver", (it) => {
         executable: binaryPath,
         args: ["update"],
       });
-      // `grok update` installs under GROK_HOME, so it must target this instance's home.
       expect(capabilities.update?.env?.GROK_HOME).toBe(grokHome);
     }).pipe(
       Effect.provideService(ChildProcessSpawner.ChildProcessSpawner, noSpawner),

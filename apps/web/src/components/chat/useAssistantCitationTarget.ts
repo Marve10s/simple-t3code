@@ -12,7 +12,6 @@ export interface CitationHistoryPage {
   readonly onLoadEarlier: () => void;
 }
 
-/** Fetch, unfold, and mount the source before its measured quote owns scrolling. */
 export function useAssistantCitationTarget({
   request,
   entries,
@@ -62,7 +61,6 @@ export function useAssistantCitationTarget({
         onComplete: () => {
           if (navigationRef.current?.target !== target) return;
           navigationRef.current.done = true;
-          // ChatView's thread-open effect can run after our initial opt-out.
           onManualNavigation();
           setFinishedKey(target.key);
         },

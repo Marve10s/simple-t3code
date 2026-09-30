@@ -12,7 +12,6 @@ export function mergeProviderInstanceEnvironment(
 
   const next: NodeJS.ProcessEnv = { ...baseEnv };
   for (const variable of environment) {
-    // Child processes do not apply shell expansion to environment values.
     next[variable.name] =
       variable.name === "CODEX_HOME" || variable.name === "CLAUDE_CONFIG_DIR"
         ? expandHomePath(variable.value)

@@ -98,8 +98,6 @@ export function androidAlertForAggregate(input: {
     };
   }
   return {
-    // Every contributing queue job identifies the same group, including after
-    // retries or a different database row order. The native handler deduplicates it.
     alert_id: JSON.stringify(
       activities
         .map((row) => [row.environmentId, row.threadId, row.phase, row.updatedAt])
@@ -197,8 +195,6 @@ export const make = Effect.gen(function* () {
       const preferences = decodePreferences(target.preferences_json);
       if (Option.isNone(preferences)) return;
 
-      // Re-read links and state when consuming: queued messages must honor
-      // sign-out, token rotation, disabled publishing, and newer thread states.
       const states = preferences.value.liveActivitiesEnabled
         ? yield* rows.listForUser({ userId: job.userId })
         : [];
@@ -211,9 +207,6 @@ export const make = Effect.gen(function* () {
         ? Option.getOrNull(decodePreviousActivity(target.last_aggregate_json))
         : null;
       let alert: ReturnType<typeof androidAlertForState> = null;
-      // Deletion jobs can observe another thread's newly completed state. They
-      // update the card, but must leave that transition for its own alert job.
-      // Registration replay deliberately establishes a silent baseline.
       let acknowledgeAggregate = job.state !== null || job.replay === true || aggregate === null;
       if (job.state && preferences.value.notificationsEnabled) {
         const state = yield* rows.getForUserThread({
@@ -237,8 +230,6 @@ export const make = Effect.gen(function* () {
             })
           : [];
         const deliveryUser = deliveryUsers.find((user) => user.userId === job.userId);
-        // A notification-only job must not acknowledge transitions on another
-        // environment's live card before that environment's own job can alert.
         acknowledgeAggregate =
           deliveryUser?.liveActivitiesEnabled === true || !preferences.value.liveActivitiesEnabled;
         if (
@@ -288,8 +279,6 @@ export const make = Effect.gen(function* () {
           ? aggregate
           : null;
       const active = (displayedAggregate?.activeCount ?? 0) > 0;
-      // A registration replay must clear an orphan even when the relay has
-      // already forgotten its baseline. Finished cards are visible, but idle.
       if (!displayedAggregate && !alert && !previousAggregate && job.state !== null) return;
       const data = {
         t3_kind: "agent_activity",
@@ -300,8 +289,6 @@ export const make = Effect.gen(function* () {
         ...alert,
       };
       if (alert) {
-        // Group identities can contain five sets of IDs. Hash the full,
-        // stable identity rather than spending the payload budget on it.
         const digest = yield* crypto.digest("SHA-256", new TextEncoder().encode(alert.alert_id));
         data.alert_id = Array.from(digest, (byte) => byte.toString(16).padStart(2, "0")).join("");
       }
@@ -332,8 +319,6 @@ export const make = Effect.gen(function* () {
           userId: job.userId,
           deviceId: job.deviceId,
           kind: active ? "live_activity_update" : "live_activity_end",
-          // Keep the delivered terminal rows as the next transition baseline,
-          // so replaying the finished card cannot alert again.
           aggregate: preferences.value.liveActivitiesEnabled ? aggregate : null,
           deliveredAt: DateTime.formatIso(now),
         });

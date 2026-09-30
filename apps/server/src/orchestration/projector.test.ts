@@ -210,7 +210,6 @@ describe("orchestration projector", () => {
             occurredAt: now,
             commandId: "cmd-invalid",
             payload: {
-              // missing required threadId
               projectId: "project-1",
               title: "demo",
               modelSelection: {
@@ -428,8 +427,6 @@ describe("orchestration projector", () => {
         expect(thread?.latestTurn?.turnId).toBe("turn-1");
         expect(thread?.session?.status).toBe("running");
 
-        // Leaving the "running" session status settles the running turn with the
-        // session timestamp as the turn end.
         const settledThread = afterReady.threads[0];
         expect(settledThread?.latestTurn?.turnId).toBe("turn-1");
         expect(settledThread?.latestTurn?.state).toBe(state);

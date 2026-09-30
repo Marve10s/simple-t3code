@@ -79,8 +79,6 @@ export const ExpandedImageDialog = memo(function ExpandedImageDialog({
     document.activeElement instanceof HTMLElement ? document.activeElement : null,
   );
   const closeButtonRef = useRef<HTMLButtonElement>(null);
-  // The offset accumulates without bound, so wrap it into range in both directions:
-  // JavaScript `%` keeps the sign of the dividend, and a negative index blanks the dialog.
   const imageCount = preview.images.length;
   const index =
     imageCount > 0 ? (((preview.index + imageOffset) % imageCount) + imageCount) % imageCount : 0;
@@ -105,9 +103,6 @@ export const ExpandedImageDialog = memo(function ExpandedImageDialog({
     setImageOffset((current) => current + direction);
   }, []);
 
-  // The element that opened the preview gets focus back on close. Without
-  // this a close button click leaves focus on the unmounted dialog, and the
-  // composer that owned the opener reads that as a blur and rests.
   const openerRef = useRef<Element | null>(null);
   useEffect(() => {
     openerRef.current = document.activeElement;

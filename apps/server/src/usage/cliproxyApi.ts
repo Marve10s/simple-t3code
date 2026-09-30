@@ -99,7 +99,6 @@ const decodeConsumeResponse = Schema.decodeUnknownEffect(
 const CODEX_BASE = "https://chatgpt.com/backend-api/wham";
 const CREDIT_URL = `${CODEX_BASE}/rate-limit-reset-credits`;
 
-// UUIDv5 per account and credit also deduplicates retries across T3 environments.
 export function creditRedeemRequestId(accountId: string, creditId: string): string {
   const bytes = NodeCrypto.createHash("sha1")
     .update(Buffer.from("6f1c2a9e2d4b4c1e9a7f3b8d5e0c1a42", "hex"))
@@ -249,7 +248,6 @@ export const makeCliproxyApi = Effect.gen(function* () {
                 : { windowDurationMins: window.limit_window_seconds / 60 }),
             }
           : null;
-      // A credits outage must not hide successfully fetched quota windows.
       const available = yield* credits(config, account).pipe(Effect.orElseSucceed(() => undefined));
       const next = available?.[0];
       return {

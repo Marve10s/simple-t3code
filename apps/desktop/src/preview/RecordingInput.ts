@@ -16,7 +16,6 @@ export interface RecordingKeyPress {
   readonly shiftKey: boolean;
 }
 
-/** Formats a single chord without duplicating a modifier pressed on its own. */
 export function recordingKeyLabel(input: RecordingKeyPress, isMac: boolean): string | null {
   if (["Dead", "Process", "Unidentified", ""].includes(input.key)) return null;
   const modifiers = [
@@ -46,7 +45,6 @@ export function recordingKeyLabel(input: RecordingKeyPress, isMac: boolean): str
   return modifiers.join(isMac ? "" : " + ");
 }
 
-/** Unknown iframe or closed-shadow focus is excluded because its field type cannot be checked. */
 export function recordingKeysAreSensitive(document: Document): boolean {
   let element = document.activeElement;
   while (element?.shadowRoot?.activeElement) element = element.shadowRoot.activeElement;

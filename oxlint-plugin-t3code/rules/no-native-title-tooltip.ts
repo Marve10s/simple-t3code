@@ -2,9 +2,6 @@ import { defineRule } from "@oxlint/plugins";
 
 const INTRINSIC_ELEMENT_PATTERN = /^[a-z]/u;
 
-// On these elements the title attribute names the embedded content for
-// accessibility (and does not reliably produce a hover tooltip), so the styled
-// Tooltip component is not a drop-in replacement.
 const TITLE_IS_AN_ACCESSIBLE_NAME = new Set(["embed", "frame", "iframe", "math", "object"]);
 
 export default defineRule({

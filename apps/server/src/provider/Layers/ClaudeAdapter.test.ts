@@ -54,7 +54,6 @@ import { makeClaudeAdapter, type ClaudeAdapterLiveOptions } from "./ClaudeAdapte
 const decodeClaudeSettings = Schema.decodeSync(ClaudeSettings);
 const encodeUnknownJsonString = Schema.encodeSync(Schema.fromJsonString(Schema.Unknown));
 
-// Test-local service tag so the rest of the file can keep using `yield* ClaudeAdapter`.
 class ClaudeAdapter extends Context.Service<ClaudeAdapter, ClaudeAdapterShape>()(
   "t3/provider/Layers/ClaudeAdapter.test/ClaudeAdapter",
 ) {}
@@ -73,7 +72,6 @@ class FakeClaudeQuery implements AsyncIterable<SDKMessage> {
   public readonly setMaxThinkingTokensCalls: Array<number | null> = [];
   public closeCalls = 0;
   public closeError: unknown | undefined;
-  /** Set by tests that exercise Claude's graceful interrupt. */
   public interrupt?: () => Promise<unknown>;
 
   emit(message: SDKMessage): void {
@@ -291,7 +289,6 @@ async function readFirstPromptMessage(
   return next.value;
 }
 
-/** Drains the first `count` queued prompts so consecutive turns can be compared. */
 async function readPromptMessages(
   input:
     | {
@@ -498,7 +495,6 @@ describe("ClaudeAdapterLive", () => {
       const createInput = harness.getLastCreateQueryInput();
       assert.equal(createInput?.options.permissionMode, "bypassPermissions");
       assert.equal(createInput?.options.allowDangerouslySkipPermissions, true);
-      // The honored flag is dropped from extraArgs so the CLI sees it once.
       assert.deepEqual(createInput?.options.extraArgs, {
         verbose: null,
         "thinking-display": "summarized",
@@ -1006,10 +1002,6 @@ describe("ClaudeAdapterLive", () => {
     );
   });
 
-  // The Claude CLI reads a streamed user message as a slash-command invocation
-  // only when the final content block is text. Leading with the text block sent
-  // every image-carrying turn down the plain-prompt path, so `/skill args`
-  // reached the agent unexpanded with no error anywhere.
   it.effect("puts the command text last so attachments do not suppress expansion", () => {
     const baseDir = NodeFS.mkdtempSync(NodePath.join(NodeOS.tmpdir(), "claude-attachments-"));
     const harness = makeHarness({
@@ -1091,9 +1083,6 @@ describe("ClaudeAdapterLive", () => {
         },
         commandBlock,
       ]);
-      // Non-image attachments never become content blocks. Claude reaches them
-      // through the path line ProviderService writes into the prompt, so the
-      // text block stays last on its own.
       assert.deepEqual(prompts[2]?.message.content, [commandBlock]);
     }).pipe(
       Effect.provideService(Random.Random, makeDeterministicRandomService()),
@@ -1102,8 +1091,6 @@ describe("ClaudeAdapterLive", () => {
   });
 
   it.effect("dispatches a $skill mention as a trailing slash command block", () => {
-    // Claude Code only runs `/name` from the message's last text block, so a
-    // chip picked mid-prompt is moved there and the surrounding prose kept.
     const homeDir = NodeFS.mkdtempSync(NodePath.join(NodeOS.tmpdir(), "claude-skills-home-"));
     NodeFS.mkdirSync(NodePath.join(homeDir, "skills", "implement"), { recursive: true });
     NodeFS.writeFileSync(
@@ -1142,8 +1129,6 @@ describe("ClaudeAdapterLive", () => {
   });
 
   it.effect("keeps the skill command block after image attachments", () => {
-    // A command block followed by an image is not expanded by the CLI; the
-    // image must come first.
     const baseDir = NodeFS.mkdtempSync(NodePath.join(NodeOS.tmpdir(), "claude-skill-image-"));
     const homeDir = NodePath.join(baseDir, "claude-home");
     NodeFS.mkdirSync(NodePath.join(homeDir, "skills", "review"), { recursive: true });
@@ -1446,9 +1431,6 @@ describe("ClaudeAdapterLive", () => {
         runtimeMode: "full-access",
       });
 
-      // Before any probe names the bucket the event has nowhere to land.
-      // Collecting through the turn's completion proves the SDK message was
-      // handled, not merely still queued.
       const firstTurnFiber = yield* adapter.streamEvents.pipe(
         Stream.takeUntil((event) => event.type === "turn.completed"),
         Stream.runCollect,
@@ -1459,7 +1441,6 @@ describe("ClaudeAdapterLive", () => {
       harness.query.emit(resultMessage("result-1"));
       assert.deepStrictEqual(limitsUpdates(yield* Fiber.join(firstTurnFiber)), []);
 
-      // The status probe reads `get_usage` and records the model it saw.
       yield* Ref.set(scopedLimitNames, { overageIncluded: "Fable" });
       const secondTurnFiber = yield* adapter.streamEvents.pipe(
         Stream.takeUntil((event) => event.type === "turn.completed"),
@@ -1493,9 +1474,6 @@ describe("ClaudeAdapterLive", () => {
     return Effect.gen(function* () {
       const adapter = yield* ClaudeAdapter;
 
-      // Collect through session.exited so the window after the second result
-      // is deterministically inside the collection: both results are queued
-      // after sendTurn returns and drain in order on the one stream consumer.
       const runtimeEventsFiber = yield* adapter.streamEvents.pipe(
         Stream.takeUntil((event) => event.type === "session.exited"),
         Stream.runCollect,
@@ -1524,10 +1502,6 @@ describe("ClaudeAdapterLive", () => {
         uuid: "result-real",
       } as unknown as SDKMessage);
 
-      // Second result with no turn in flight — the shape the resume
-      // handshake (system/init + result(num_turns: 0)) delivers, and the
-      // same completeTurn branch every no-turnState result lands in. This
-      // used to emit an untargeted turn.completed; it must emit nothing.
       harness.query.emit({
         type: "result",
         subtype: "success",
@@ -1543,8 +1517,6 @@ describe("ClaudeAdapterLive", () => {
 
       const runtimeEvents = Array.from(yield* Fiber.join(runtimeEventsFiber));
       const completions = runtimeEvents.filter((event) => event.type === "turn.completed");
-      // Exactly one completion — the real turn's, targeted at its turn id.
-      // The buggy branch produced a second, untargeted one here.
       assert.equal(completions.length, 1);
       const completed = completions[0];
       if (completed?.type === "turn.completed") {
@@ -1579,8 +1551,6 @@ describe("ClaudeAdapterLive", () => {
         attachments: [],
       });
 
-      // Steer: a second sendTurn while the turn is still running continues
-      // the same turn — the message is queued into the live agent loop.
       const steeredTurn = yield* adapter.sendTurn({
         threadId: session.threadId,
         input: "actually run 15",
@@ -1612,8 +1582,6 @@ describe("ClaudeAdapterLive", () => {
       const turnStartedEvents = runtimeEvents.filter((event) => event.type === "turn.started");
       const turnCompletedEvents = runtimeEvents.filter((event) => event.type === "turn.completed");
 
-      // One turn boundary for the whole run: the steer produced no
-      // turn.completed/turn.started pair.
       assert.equal(turnStartedEvents.length, 1);
       assert.equal(String(turnStartedEvents[0]?.turnId), String(turn.turnId));
       assert.equal(turnCompletedEvents.length, 1);
@@ -2334,8 +2302,6 @@ describe("ClaudeAdapterLive", () => {
         attachments: [],
       });
 
-      // Exact shape the CLI emits when Stop lands mid-tool-call: is_error
-      // is true and the only error is internal diagnostic telemetry.
       harness.query.emit({
         type: "result",
         subtype: "error_during_execution",
@@ -2395,9 +2361,6 @@ describe("ClaudeAdapterLive", () => {
         attachments: [],
       });
 
-      // The CLI stamps subtype success with an empty error list when it
-      // gives up after exhausting API retries; the terminal_reason is the
-      // only structured failure signal.
       harness.query.emit({
         type: "result",
         subtype: "success",
@@ -2474,7 +2437,6 @@ describe("ClaudeAdapterLive", () => {
       state: "failed",
       errorMessage: /claude auth login/,
     },
-    // Every other outcome names its own cause, and the latch must not speak over it.
     {
       name: "a terminal reason of its own",
       result: {
@@ -3030,7 +2992,6 @@ describe("ClaudeAdapterLive", () => {
       "tool_deferred_unavailable",
       "turn_setup_failed",
     ];
-    // One harness per reason: the fake query settles a single turn.
     const runDeadTurn = (reason: string) => {
       const harness = makeHarness();
       return Effect.gen(function* () {
@@ -3088,7 +3049,6 @@ describe("ClaudeAdapterLive", () => {
           runtimeMode: "full-access",
         });
         yield* adapter.sendTurn({ threadId: session.threadId, input: "hello", attachments: [] });
-        // An installed CLI can send a terminal reason newer than the bundled SDK.
         harness.query.emit({
           type: "result",
           subtype,
@@ -3174,9 +3134,6 @@ describe("ClaudeAdapterLive", () => {
     return Effect.gen(function* () {
       const adapter = yield* ClaudeAdapter;
 
-      // Wait for the three task.* runtime events to prove the lifecycle
-      // handlers processed the emissions (no wall-clock sleeps under the
-      // test clock).
       const taskEventsFiber = yield* adapter.streamEvents.pipe(
         Stream.filter((event) => event.type.startsWith("task.")),
         Stream.take(3),
@@ -3234,8 +3191,6 @@ describe("ClaudeAdapterLive", () => {
       );
       yield* adapter.interruptTurn(session.threadId);
 
-      // Closing the session is the hard stop because SDK interrupt can leave
-      // resumed background work alive.
       assert.equal(harness.query.closeCalls, 1);
 
       const sessions = yield* adapter.listSessions();
@@ -3834,13 +3789,9 @@ describe("ClaudeAdapterLive", () => {
     return Effect.gen(function* () {
       const adapter = yield* ClaudeAdapter;
 
-      // Collect task.progress until member-0's tick-3 emission lands, then
-      // evaluate member emissions.
       const progressFiber = yield* adapter.streamEvents.pipe(
         Stream.filter((event) => event.type === "task.progress"),
         Stream.takeUntil(
-          // Sentinel: member-0's tick-3 emission (tokens 20) — members are
-          // emitted after the coordinator row within a tick.
           (event) =>
             (event.payload as { taskId?: string }).taskId === "wf-coalesce:wf:0" &&
             (event.payload as { typedUsage?: { totalTokens?: number } }).typedUsage?.totalTokens ===
@@ -3892,12 +3843,8 @@ describe("ClaudeAdapterLive", () => {
           session_id: "sdk-session",
         } as unknown as SDKMessage);
 
-      // Tick 1: both members are new -> 2 member events.
       tick(100, memberSnapshot(10));
-      // Tick 2: IDENTICAL member snapshot -> 0 member events (coordinator
-      // usage changed, but members did not).
       tick(200, memberSnapshot(10));
-      // Tick 3: member-0's tokens advanced -> exactly 1 member event.
       tick(300, memberSnapshot(20));
 
       const progressEvents = Array.from(yield* Fiber.join(progressFiber));
@@ -3907,8 +3854,6 @@ describe("ClaudeAdapterLive", () => {
         if (!taskId.includes(":wf:")) continue;
         byMember.set(taskId, (byMember.get(taskId) ?? 0) + 1);
       }
-      // member-0: tick 1 + tick 3. member-1: tick 1 only (tick 2 identical,
-      // tick 3 unchanged).
       assert.equal(byMember.get("wf-coalesce:wf:0"), 2);
       assert.equal(byMember.get("wf-coalesce:wf:1"), 1);
     }).pipe(
@@ -3945,8 +3890,6 @@ describe("ClaudeAdapterLive", () => {
         attachments: [],
       });
 
-      // No explicit model/effort on the launch input: the task inherits the
-      // session's selection.
       harness.query.emit({
         type: "system",
         subtype: "task_started",
@@ -3957,8 +3900,6 @@ describe("ClaudeAdapterLive", () => {
         uuid: "task-model-uuid",
         session_id: "sdk-session",
       } as unknown as SDKMessage);
-      // The subagent's assistant snapshot carries the authoritative API
-      // model id, which refines the linkage on later rows.
       harness.query.emit({
         type: "assistant",
         parent_tool_use_id: "toolu_agent_m",
@@ -4026,8 +3967,6 @@ describe("ClaudeAdapterLive", () => {
         attachments: [],
       });
 
-      // The subagent streams its first assistant snapshot before the task is
-      // registered, so there is no agent to refine yet.
       harness.query.emit({
         type: "assistant",
         parent_tool_use_id: "toolu_agent_early",
@@ -4267,12 +4206,6 @@ describe("ClaudeAdapterLive", () => {
   });
 
   it.effect("stopSession does not throw into the SDK prompt consumer", () => {
-    // The SDK consumes user messages via `for await (... of prompt)`.
-    // Stopping a session must end that loop cleanly — not throw an error.
-    //
-    // FakeClaudeQuery.close() masks this by resolving pending iterators
-    // before the shutdown propagates. Override it to match real SDK behavior
-    // where close() does not resolve the prompt consumer.
     const query = new FakeClaudeQuery();
     (query as { close: () => void }).close = () => {
       query.closeCalls += 1;
@@ -4286,11 +4219,9 @@ describe("ClaudeAdapterLive", () => {
         const claudeConfig = decodeClaudeSettings({});
         return yield* makeClaudeAdapter(claudeConfig, {
           createQuery: (input) => {
-            // Simulate the SDK consuming the prompt iterable
             (async () => {
               try {
                 for await (const _message of input.prompt) {
-                  /* SDK processes user messages */
                 }
               } catch (error) {
                 promptConsumerError = error;
@@ -4408,9 +4339,6 @@ describe("ClaudeAdapterLive", () => {
         runtimeMode: "full-access",
       });
 
-      // Undeclared wire-only roster snapshot + every typed UX-internal
-      // subtype and top-level type consumed silently: none may surface as
-      // unknown-subtype warnings.
       for (const message of [
         {
           type: "system",
@@ -4492,7 +4420,6 @@ describe("ClaudeAdapterLive", () => {
       ]) {
         harness.query.emit(message as unknown as SDKMessage);
       }
-      // Safety model-fallback notices DO surface as a warning row.
       harness.query.emit({
         type: "system",
         subtype: "model_refusal_fallback",
@@ -4507,7 +4434,6 @@ describe("ClaudeAdapterLive", () => {
         session_id: "session",
         uuid: "mrf",
       } as unknown as SDKMessage);
-      // High-priority notifications DO surface as a warning row.
       harness.query.emit({
         type: "system",
         subtype: "notification",
@@ -4517,8 +4443,6 @@ describe("ClaudeAdapterLive", () => {
         session_id: "session",
         uuid: "notif-high",
       } as unknown as SDKMessage);
-      // Warning-level informational notes and refusals without a fallback
-      // model surface as warning rows too.
       harness.query.emit({
         type: "system",
         subtype: "informational",
@@ -4538,7 +4462,6 @@ describe("ClaudeAdapterLive", () => {
         session_id: "session",
         uuid: "mrnf",
       } as unknown as SDKMessage);
-      // session_state_changed maps to the matching session states.
       for (const [state, uuid] of [
         ["running", "ssc-run"],
         ["requires_action", "ssc-req"],
@@ -4552,7 +4475,6 @@ describe("ClaudeAdapterLive", () => {
           uuid,
         } as unknown as SDKMessage);
       }
-      // api_retry maps to a session heartbeat, not a warning row.
       harness.query.emit({
         type: "system",
         subtype: "api_retry",
@@ -4567,8 +4489,6 @@ describe("ClaudeAdapterLive", () => {
       const runtimeEvents = Array.from(yield* Fiber.join(runtimeEventsFiber));
 
       const warnings = runtimeEvents.filter((event) => event.type === "runtime.warning");
-      // Exactly four warnings: the fallback notice, high-priority notification,
-      // warning-level informational note, and the refusal. Nothing else.
       assert.deepEqual(
         warnings.map((event) => event.payload.message),
         [
@@ -4624,7 +4544,6 @@ describe("ClaudeAdapterLive", () => {
       ).pipe(Effect.forkChild);
       const drainSdkMessages = Effect.gen(function* () {
         receipt = yield* Deferred.make<void>();
-        // The heartbeat follows queued SDK messages without adding a warning.
         query.emit({
           type: "system",
           subtype: "api_retry",
@@ -4656,7 +4575,6 @@ describe("ClaudeAdapterLive", () => {
 
       yield* adapter.sendTurn({ threadId: THREAD_ID, input: "hello", attachments: [] });
 
-      // resetsAt is epoch seconds, so the window reopens 4h 1m30s out.
       const nowMs = yield* Clock.currentTimeMillis;
       const rateLimitInfo = {
         status: "rejected",
@@ -4670,12 +4588,8 @@ describe("ClaudeAdapterLive", () => {
         session_id: "sdk-session-limit",
         uuid: "rate-limit-rejected",
       };
-      // Sibling fields drift while the window is parked, so the same rendered
-      // line can arrive more than once inside one turn.
       harness.query.emit(rejected as unknown as SDKMessage);
       yield* drainSdkMessages;
-      // The repeat lands minutes later, so the remaining wait has visibly
-      // shrunk. Deduping on the rendered row would let that drift through.
       yield* TestClock.adjust("5 minutes");
       harness.query.emit(rejected as unknown as SDKMessage);
       yield* drainSdkMessages;
@@ -4685,25 +4599,19 @@ describe("ClaudeAdapterLive", () => {
           .filter((event) => event.type === "runtime.warning")
           .map((event) => (event.type === "runtime.warning" ? event.payload.message : ""));
       assert.equal(usageLimitRows().length, 1);
-      // A wait, not a wall clock: the server renders this row but clients read
-      // it from other timezones. Reading resetsAt as milliseconds would put the
-      // window minutes out instead of hours, so the hour also pins the scale.
       assert.match(
         usageLimitRows()[0] ?? "",
         /^Claude usage limit reached\. This turn is paused until the 5-hour limit resets in 4h( \d{1,2}m)?\.$/,
       );
-      // The exact instant still rides along for clients that want to render it.
       assert.deepEqual(
         runtimeEvents.find((event) => event.type === "runtime.warning")?.payload.detail,
         rateLimitInfo,
       );
-      // The raw telemetry event still flows for every copy.
       assert.equal(
         runtimeEvents.filter((event) => event.type === "account.rate-limits.updated").length,
         2,
       );
 
-      // Same window, drifting siblings: still the one pause.
       harness.query.emit({
         ...rejected,
         rate_limit_info: { ...rateLimitInfo, utilization: 0.99 },
@@ -4712,8 +4620,6 @@ describe("ClaudeAdapterLive", () => {
       yield* drainSdkMessages;
       assert.equal(usageLimitRows().length, 1);
 
-      // Retrying inside the same window renders the identical line. Staying
-      // quiet there would put the new turn right back to a silent spin.
       harness.query.emit({
         type: "result",
         subtype: "success",
@@ -4748,14 +4654,11 @@ describe("ClaudeAdapterLive", () => {
         provider: ProviderDriverKind.make("claudeAgent"),
         runtimeMode: "full-access",
       });
-      // A turn is in flight, so silence here is the status filter doing its job
-      // rather than the between-turns guard.
       yield* adapter.sendTurn({ threadId: THREAD_ID, input: "hello", attachments: [] });
 
       for (const rateLimitInfo of [
         { status: "allowed", rateLimitType: "five_hour", utilization: 0.4 },
         { status: "allowed_warning", rateLimitType: "five_hour", utilization: 0.9 },
-        // Undeclared shape from an older/newer CLI must not take the session down.
         undefined,
       ]) {
         harness.query.emit({
@@ -4798,8 +4701,6 @@ describe("ClaudeAdapterLive", () => {
 
       const nowMs = yield* Clock.currentTimeMillis;
       const resetsAt = Math.floor(nowMs / 1000) + 60 * 60;
-      // The stream stays live between turns, so a reject can land with nothing
-      // to pause; claiming "this turn is paused" there would be a lie.
       harness.query.emit({
         type: "rate_limit_event",
         rate_limit_info: {
@@ -4814,8 +4715,6 @@ describe("ClaudeAdapterLive", () => {
       yield* drainSdkMessages;
 
       yield* adapter.sendTurn({ threadId: THREAD_ID, input: "hello", attachments: [] });
-      // Provisioned overage carries the request even though the base window
-      // rejected it, so the turn keeps running and needs no row.
       for (const overage of [
         { overageStatus: "allowed" },
         { overageStatus: "allowed_warning" },
@@ -4841,7 +4740,6 @@ describe("ClaudeAdapterLive", () => {
         runtimeEvents.filter((event) => event.type === "runtime.warning"),
         [],
       );
-      // Idle and overage-covered events still reach the account telemetry stream.
       assert.equal(
         runtimeEvents.filter((event) => event.type === "account.rate-limits.updated").length,
         5,
@@ -4870,11 +4768,6 @@ describe("ClaudeAdapterLive", () => {
 
       const nowMs = yield* Clock.currentTimeMillis;
       const resetsAt = Math.floor(nowMs / 1000) + 60 * 60;
-      // The overage-exhausted / out-of-credits shape: the base window and the
-      // overage it would have spent both reject, with neither isUsingOverage
-      // nor overageInUse set to say anything is still covered. Nothing is
-      // carrying the turn here, so staying quiet would be the silent spin
-      // this row exists to prevent.
       harness.query.emit({
         type: "rate_limit_event",
         rate_limit_info: {
@@ -4920,8 +4813,6 @@ describe("ClaudeAdapterLive", () => {
         uuid,
       });
 
-      // One turn can park on more than one window; each deserves its own row,
-      // and a later repeat of an earlier window deserves none.
       for (const message of [
         rejection("five_hour", nowSeconds + 2 * 60 * 60, "limit-five-hour"),
         rejection("seven_day", nowSeconds + 48 * 60 * 60, "limit-seven-day"),
@@ -4987,8 +4878,6 @@ describe("ClaudeAdapterLive", () => {
       } as unknown as SDKMessage);
       yield* drainSdkMessages;
 
-      // A background agent answering between prompts auto-starts a synthetic
-      // turn, which parks on the same window and needs its own row.
       harness.query.emit({
         type: "assistant",
         session_id: "sdk-session-synthetic",
@@ -5028,7 +4917,6 @@ describe("ClaudeAdapterLive", () => {
 
       for (const [rateLimitType, resetsAt] of [
         ["five_hour", undefined],
-        // Implausibly far out once scaled to milliseconds: no credible wait.
         ["seven_day", 1e20],
       ] as const) {
         harness.query.emit({
@@ -5049,14 +4937,12 @@ describe("ClaudeAdapterLive", () => {
           "Claude usage limit reached. This turn is paused until the 7-day limit resets.",
         ],
       );
-      // A throw inside the telemetry handler would tear the session down.
       assert.deepEqual(
         runtimeEvents
           .filter((event) => event.type === "session.exited" || event.type === "runtime.error")
           .map((event) => event.type),
         [],
       );
-      // Still live enough to take the next turn.
       yield* adapter.sendTurn({ threadId: THREAD_ID, input: "still here", attachments: [] });
 
       runtimeEventsFiber.interruptUnsafe();
@@ -6249,8 +6135,6 @@ describe("ClaudeAdapterLive", () => {
         yield* Stream.take(adapter.streamEvents, 1).pipe(Stream.runDrain);
       });
 
-      // MCP tools frequently arrive with no usable suggestion (Claude Code
-      // sends an empty array); the decision must still stick for the session.
       const mcpPermissionPromise = canUseTool(
         "mcp__linear__create_issue",
         { title: "hello" },
@@ -6276,8 +6160,6 @@ describe("ClaudeAdapterLive", () => {
         },
       ]);
 
-      // Received suggestions are reused but rescoped to the session —
-      // echoing "localSettings" would persist a session-only choice to disk.
       const bashPermissionPromise = canUseTool(
         "Bash",
         { command: "git status" },
@@ -7582,7 +7464,6 @@ describe("ClaudeAdapterLive", () => {
           runtimeMode,
         });
 
-        // First turn in plan mode
         yield* adapter.sendTurn({
           threadId: session.threadId,
           input: "plan this",
@@ -7590,7 +7471,6 @@ describe("ClaudeAdapterLive", () => {
           attachments: [],
         });
 
-        // Complete the turn so we can send another
         const turnCompletedFiber = yield* Stream.filter(
           adapter.streamEvents,
           (event) => event.type === "turn.completed",
@@ -7607,7 +7487,6 @@ describe("ClaudeAdapterLive", () => {
 
         yield* Fiber.join(turnCompletedFiber);
 
-        // Second turn back to default
         yield* adapter.sendTurn({
           threadId: session.threadId,
           input: "now do it",
@@ -7845,14 +7724,12 @@ describe("ClaudeAdapterLive", () => {
     return Effect.gen(function* () {
       const adapter = yield* ClaudeAdapter;
 
-      // Start session in approval-required mode so canUseTool fires.
       const session = yield* adapter.startSession({
         threadId: THREAD_ID,
         provider: ProviderDriverKind.make("claudeAgent"),
         runtimeMode: "approval-required",
       });
 
-      // Drain the session startup events (started, configured, state.changed).
       yield* Stream.take(adapter.streamEvents, 3).pipe(Stream.runDrain);
 
       yield* adapter.sendTurn({
@@ -7888,7 +7765,6 @@ describe("ClaudeAdapterLive", () => {
         return;
       }
 
-      // Simulate Claude calling AskUserQuestion with structured questions.
       const askInput = {
         questions: [
           {
@@ -7909,7 +7785,6 @@ describe("ClaudeAdapterLive", () => {
         toolUseID: "tool-ask-1",
       });
 
-      // The adapter should emit a user-input.requested event.
       const requestedEvent = yield* Stream.runHead(adapter.streamEvents);
       assert.equal(requestedEvent._tag, "Some");
       if (requestedEvent._tag !== "Some") {
@@ -7923,19 +7798,15 @@ describe("ClaudeAdapterLive", () => {
       assert.equal(typeof requestId, "string");
       assert.equal(requestedEvent.value.payload.questions.length, 1);
       assert.equal(requestedEvent.value.payload.questions[0]?.question, "Which framework?");
-      // Regression for #2388: `id` must equal the full question text so the
-      // UI's draft-answer key matches what the SDK looks up downstream.
       assert.equal(requestedEvent.value.payload.questions[0]?.id, "Which framework?");
       assert.deepEqual(requestedEvent.value.providerRefs, {
         providerItemId: ProviderItemId.make("tool-ask-1"),
       });
 
-      // Respond with the user's answers.
       yield* adapter.respondToUserInput(session.threadId, ApprovalRequestId.make(requestId!), {
         "Which framework?": "React",
       });
 
-      // The adapter should emit a user-input.resolved event.
       const resolvedEvent = yield* Stream.runHead(adapter.streamEvents);
       assert.equal(resolvedEvent._tag, "Some");
       if (resolvedEvent._tag !== "Some") {
@@ -7952,33 +7823,23 @@ describe("ClaudeAdapterLive", () => {
         providerItemId: ProviderItemId.make("tool-ask-1"),
       });
 
-      // The canUseTool promise should resolve with the answers in SDK format.
       const permissionResult = yield* Effect.promise(() => permissionPromise);
       assert.equal((permissionResult as PermissionResult).behavior, "allow");
       const updatedInput = (permissionResult as { updatedInput: Record<string, unknown> })
         .updatedInput;
       assert.deepEqual(updatedInput.answers, { "Which framework?": "React" });
-      // Original questions should be passed through.
       assert.deepEqual(updatedInput.questions, askInput.questions);
 
-      // Compatibility check for #2388: the answers shape we hand to the SDK
-      // must produce a non-empty rendered tool_result on BOTH SDK iteration
-      // patterns we have seen, so we don't regress the issue and we don't
-      // break users still on the older Claude CLI.
       const sdkAnswers = updatedInput.answers as Record<string, unknown>;
       const sdkQuestions = updatedInput.questions as ReadonlyArray<{
         readonly question: string;
       }>;
 
-      // Claude CLI 2.1.119 — key-agnostic Object.entries iteration. Any key
-      // works here, but it must at least round-trip into a non-empty string.
       const v119Rendered = Object.entries(sdkAnswers)
         .map(([key, value]) => `"${key}"="${String(value)}"`)
         .join(", ");
       assert.equal(v119Rendered, '"Which framework?"="React"');
 
-      // Claude CLI 2.1.121 — lookup by full question text. This is the path
-      // that regressed in #2388 when the answers were keyed by `header`.
       const v121Rendered = sdkQuestions
         .map(({ question }) => {
           const answer = sdkAnswers[question];
@@ -7999,8 +7860,6 @@ describe("ClaudeAdapterLive", () => {
     return Effect.gen(function* () {
       const adapter = yield* ClaudeAdapter;
 
-      // In full-access mode, regular tools are auto-approved.
-      // AskUserQuestion should still go through the user-input flow.
       const session = yield* adapter.startSession({
         threadId: THREAD_ID,
         provider: ProviderDriverKind.make("claudeAgent"),
@@ -8036,7 +7895,6 @@ describe("ClaudeAdapterLive", () => {
         toolUseID: "tool-ask-2",
       });
 
-      // Should still get user-input.requested even in full-access mode.
       const requestedEvent = yield* Stream.runHead(adapter.streamEvents);
       assert.equal(requestedEvent._tag, "Some");
       if (requestedEvent._tag !== "Some" || requestedEvent.value.type !== "user-input.requested") {
@@ -8049,7 +7907,6 @@ describe("ClaudeAdapterLive", () => {
         "Deploy to which env?": "Staging",
       });
 
-      // Drain the resolved event.
       yield* Stream.runHead(adapter.streamEvents);
 
       const permissionResult = yield* Effect.promise(() => permissionPromise);
@@ -8156,8 +8013,6 @@ describe("ClaudeAdapterLive", () => {
         Effect.forkChild,
       );
 
-      // Abort before the call so the adapter's listener registration can
-      // never observe the abort event, only the recheck can.
       const controller = new AbortController();
       controller.abort();
       const permissionPromise = canUseTool(
@@ -8244,7 +8099,6 @@ describe("ClaudeAdapterLive", () => {
         return;
       }
 
-      // The session dies while the question is still on screen.
       yield* adapter.stopSession(THREAD_ID);
 
       const resolvedEvent = yield* Stream.runHead(adapter.streamEvents);

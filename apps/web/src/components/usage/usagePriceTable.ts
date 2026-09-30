@@ -46,7 +46,6 @@ export function usagePriceCell(
   };
 }
 
-/** Only edited cells replace rates; untouched cells retain each environment's own values. */
 export function usagePriceTableChanges(
   target: UsagePriceTarget,
   drafts: readonly UsagePriceDraft[],
@@ -84,7 +83,6 @@ export function usagePriceTableChanges(
   return { changes, errors };
 }
 
-/** Unavailable destinations report a save failure without blocking writable environments. */
 export function usagePriceTableErrors(
   targets: readonly UsagePriceTarget[],
   drafts: readonly UsagePriceDraft[],

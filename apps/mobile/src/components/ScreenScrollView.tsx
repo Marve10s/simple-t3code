@@ -1,7 +1,6 @@
 import type { ComponentProps } from "react";
 import { Platform, ScrollView } from "react-native";
 
-/** Keeps forms and settings readable inside a wide pane while its surface fills the screen. */
 export function ScreenScrollView(props: ComponentProps<typeof ScrollView>) {
   return (
     <ScrollView

@@ -20,7 +20,6 @@ import {
   resolveProjectAutoPull,
 } from "./serverSettings.ts";
 
-/** Settings after the server has folded legacy per-project fields into `projectSettingsOverrides`. */
 const FOLDED_SERVER_SETTINGS = { ...DEFAULT_SERVER_SETTINGS, projectSettingsFolded: true };
 
 describe("serverSettings helpers", () => {
@@ -61,7 +60,6 @@ describe("serverSettings helpers", () => {
       runOnWorktreeCreate: false,
     };
     const existing = { ...project, scripts: [{ ...action, command: "npm run lint" }] };
-    // Before the one-time fold, scripts stored on the project aggregate still apply.
     const unfolded = applyServerSettingsPatch(DEFAULT_SERVER_SETTINGS, {
       defaultProjectScripts: [action],
     });

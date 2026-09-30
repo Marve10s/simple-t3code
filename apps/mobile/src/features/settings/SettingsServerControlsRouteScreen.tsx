@@ -57,7 +57,6 @@ const SUBMODULE_CHOICES: ReadonlyArray<{
   readonly label: string;
   readonly description: string;
 }> = [
-  // Only offered at environment scope; a project falls back through "Use defaults".
   {
     mode: null,
     label: "Inherit",
@@ -77,7 +76,6 @@ const WORKSPACE_CHOICES: ReadonlyArray<{
   readonly label: string;
   readonly description: string;
 }> = [
-  // Only offered at environment scope; a project falls back through "Use defaults".
   {
     mode: null,
     label: "Inherit",
@@ -156,7 +154,6 @@ function ServerSettingsDetail(props: { readonly page: SettingsPage }) {
     const value = reference.settings[key];
     return displayTargets.every((entry) => entry.settings[key] === value) ? value : null;
   };
-  // `uniform` folds a real null into "mixed"; nullable keys need the distinction.
   const isMixed = (key: keyof ServerSettings) =>
     reference === null ||
     displayTargets.some((entry) => entry.settings[key] !== reference.settings[key]);

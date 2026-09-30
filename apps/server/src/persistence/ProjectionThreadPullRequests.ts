@@ -94,7 +94,7 @@ export class ProjectionThreadPullRequestRepository extends Context.Service<
   }
 >()("t3/persistence/ProjectionThreadPullRequests/ProjectionThreadPullRequestRepository") {}
 
-/** @public Service construction is part of the canonical Effect module API. */
+/** @public */
 export const make = Effect.gen(function* () {
   const sql = yield* SqlClient.SqlClient;
 

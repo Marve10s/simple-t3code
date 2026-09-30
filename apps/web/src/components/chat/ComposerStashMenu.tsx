@@ -9,7 +9,6 @@ import { ComposerBanner } from "./ComposerBanner";
 
 const SNIPPET_MAX_CHARS = 90;
 
-/** Images that did not make it into the entry, whatever the reason. */
 function missingImageCount(entry: PromptStashEntry): number {
   return entry.droppedImageNames.length + (entry.unreadableImageNames?.length ?? 0);
 }
@@ -29,12 +28,6 @@ function stashEntrySnippet(entry: PromptStashEntry): string {
   return `(${attachmentCount} ${label}${attachmentCount === 1 ? "" : "s"})`;
 }
 
-/**
- * Attached banner listing the stashed prompts. Opened by the stash badge or ⌘S
- * when the empty composer cannot restore a single entry. Navigated with arrows,
- * restored with Enter, dismissed with Escape. The listener runs capture-phase
- * on window so it wins over the composer's handlers while the menu is open.
- */
 export const ComposerStashMenu = memo(function ComposerStashMenu(props: {
   entries: ReadonlyArray<PromptStashEntry>;
   stashShortcutLabel: string | null;
@@ -90,8 +83,6 @@ export const ComposerStashMenu = memo(function ComposerStashMenu(props: {
         return;
       }
       if (event.key === "Enter") {
-        // A focused control inside the row (the delete button) owns its own
-        // activation; swallowing Enter here would restore instead of delete.
         if (event.target instanceof HTMLElement && event.target.closest("button[aria-label]")) {
           return;
         }

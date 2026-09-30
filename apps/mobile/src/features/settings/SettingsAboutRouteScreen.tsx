@@ -40,8 +40,6 @@ function AppSettingsSection() {
   const hiddenUpdateTapCount = useRef(0);
 
   const version = Constants.expoConfig?.version ?? "0.0.0";
-  // Fall back to "production" to match resolveAppVariant in app.config.ts, so a
-  // missing variant never mislabels a production build as development.
   const variant = (Constants.expoConfig?.extra?.appVariant as string | undefined) ?? "production";
   const variantLabel = variant === "production" ? "" : capitalize(variant);
   const versionLabel = variantLabel ? `${version} · ${variantLabel}` : version;
@@ -49,8 +47,6 @@ function AppSettingsSection() {
   const busy =
     updateState === "checking" || updateState === "downloading" || updateState === "restarting";
 
-  // "Up to date" is a transient acknowledgement, not a state worth persisting —
-  // return the version row to its normal, deliberately quiet state.
   useEffect(() => {
     if (updateState !== "current") return;
     const timer = setTimeout(() => setUpdateState("idle"), 3000);
@@ -58,13 +54,9 @@ function AppSettingsSection() {
   }, [updateState]);
 
   const checkForUpdate = useCallback(async () => {
-    // `disabled={busy}` only takes effect on the next render, so two taps in the
-    // same frame would both get through. The ref closes that window.
     if (updateInFlight.current) return;
     updateInFlight.current = true;
     try {
-      // The user asked for this restart by tapping the version row, so it may
-      // apply immediately instead of prompting.
       await runAppUpdateCheck({
         applyMode: "immediate",
         onFailure: (message) => Alert.alert("Update failed", message),
@@ -89,9 +81,7 @@ function AppSettingsSection() {
       ? "Checking…"
       : updateState === "downloading"
         ? "Downloading…"
-        : // "ready" appears only when this check joined an in-flight background-mode
-          // check; that download installs at the next backgrounding.
-          updateState === "ready"
+        : updateState === "ready"
           ? "Update ready"
           : updateState === "restarting"
             ? "Restarting…"

@@ -1,11 +1,3 @@
-/**
- * Anonymous PostHog telemetry service.
- *
- * Persists an installation-scoped anonymous identifier, buffers events in
- * memory, and flushes batches over Effect's HTTP client.
- *
- * @module AnalyticsService
- */
 import { HostProcessArchitecture, HostProcessPlatform } from "@t3tools/shared/hostProcess";
 import type { ClientOs } from "@t3tools/contracts";
 import * as Config from "effect/Config";
@@ -47,17 +39,14 @@ const TelemetryEnvConfig = Config.all({
 export class AnalyticsService extends Context.Service<
   AnalyticsService,
   {
-    /** Record an anonymous event for best-effort buffered delivery. */
     readonly record: (
       event: string,
       properties?: Readonly<Record<string, unknown>>,
     ) => Effect.Effect<void>;
 
-    /** Flush all currently queued telemetry events. */
     readonly flush: Effect.Effect<void>;
   }
 >()("t3/telemetry/AnalyticsService") {
-  /** No-op layer for callers that intentionally disable telemetry. */
   static readonly layerTest = Layer.succeed(
     AnalyticsService,
     AnalyticsService.of({
@@ -82,7 +71,7 @@ function serverOsFromNodePlatform(platform: string): ClientOs {
   }
 }
 
-/** @public Service construction is part of the canonical Effect module API. */
+/** @public */
 export const make = Effect.gen(function* () {
   const telemetryConfig = yield* TelemetryEnvConfig;
   const httpClient = yield* HttpClient.HttpClient;

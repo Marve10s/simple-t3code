@@ -53,11 +53,7 @@ export const ManagedEndpointZone = RelayDeploymentConfig.pipe(
         )
       : Cloudflare.Zone.Zone.ref("ManagedEndpointZone", {
           stage: MANAGED_ENDPOINT_ZONE_OWNER_STAGE,
-        }).pipe(
-          // Alchemy beta's DNS binding policy uses LogicalId to derive a
-          // stable SID, but Resource.ref returns a lazy output proxy.
-          Effect.map((zone) => withLogicalId(zone, "ManagedEndpointZone")),
-        ),
+        }).pipe(Effect.map((zone) => withLogicalId(zone, "ManagedEndpointZone"))),
   ),
 );
 

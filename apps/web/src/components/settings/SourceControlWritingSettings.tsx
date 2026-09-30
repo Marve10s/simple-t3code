@@ -62,12 +62,9 @@ export function SourceControlWritingSettingsSection() {
   const updateSettings = useUpdateScopedSettings();
   const navigate = useNavigate();
   const { environment, connectedEnvironments, targets } = useSettingsScope();
-  // The representative supplies the provider list; a model choice is checked
-  // against every target before it fans out.
   const environmentId = environment?.environmentId ?? null;
   const hasServerTargets = connectedEnvironments.length > 0;
   const serverProviders = environment?.serverConfig?.providers ?? EMPTY_SERVER_PROVIDERS;
-  // The writing style is one object; each control only cares about its own field.
   const styleFieldMixed = (field: keyof ServerSettings["sourceControlWritingStyle"]) => {
     const first = targets[0];
     return (

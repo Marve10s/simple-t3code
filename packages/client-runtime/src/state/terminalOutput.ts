@@ -1,5 +1,4 @@
 export interface TerminalOutputChunk {
-  /** UTF-16 string offset within this generation and reset. */
   readonly startOffset: number;
   readonly data: string;
   readonly byteLength: number;
@@ -19,7 +18,6 @@ export interface TerminalOutputCursor {
   readonly offset: number;
 }
 
-/** Forces the first `readTerminalOutputUpdate` to resynchronize from a reset. */
 export const INITIAL_TERMINAL_OUTPUT_CURSOR = Object.freeze<TerminalOutputCursor>({
   generation: -1,
   resetVersion: -1,
@@ -46,7 +44,6 @@ export const DEFAULT_MAX_TERMINAL_BUFFER_BYTES = 512 * 1024;
 const DEFAULT_TERMINAL_CHUNK_BYTES = 16 * 1024;
 const MAX_TERMINAL_OUTPUT_CHUNKS = 1_024;
 const textEncoder = new TextEncoder();
-// A BOM at a retained chunk boundary is terminal data, not an encoding marker.
 const textDecoder = new TextDecoder("utf-8", { ignoreBOM: true });
 
 export const EMPTY_TERMINAL_OUTPUT_STATE = Object.freeze<TerminalOutputState>({
@@ -62,14 +59,6 @@ interface Utf8Chunk {
   readonly byteLength: number;
 }
 
-/**
- * Split a string into chunks of at most `maxBytes` UTF-8 bytes without cutting
- * a code point in half. The retained-output budget always supplies a positive
- * size. Only new output is encoded on live updates.
- *
- * A chunk that fits whole is returned as the original string, so the common
- * small-write path pays one encode and no decode.
- */
 function splitStringByUtf8Bytes(data: string, maxBytes: number): ReadonlyArray<Utf8Chunk> {
   if (data.length === 0) return [];
 
@@ -85,8 +74,6 @@ function splitStringByUtf8Bytes(data: string, maxBytes: number): ReadonlyArray<U
     while (end < encoded.byteLength && ((encoded[end] ?? 0) & 0xc0) === 0x80) {
       end -= 1;
     }
-    // A degenerate budget smaller than one code point still has to advance:
-    // include the whole code point rather than looping forever.
     if (end === offset) {
       end = Math.min(offset + maxBytes, encoded.byteLength);
       while (end < encoded.byteLength && ((encoded[end] ?? 0) & 0xc0) === 0x80) {
@@ -153,10 +140,6 @@ function splitOutputChunks(
   };
 }
 
-/**
- * Merge adjacent chunks without changing their string positions. A reader can
- * still append the unread suffix when its cursor falls inside a merged chunk.
- */
 function compactRetainedChunks(chunks: ReadonlyArray<TerminalOutputChunk>) {
   const compacted: TerminalOutputChunk[] = [];
   for (const chunk of chunks) {
@@ -178,7 +161,6 @@ function compactRetainedChunks(chunks: ReadonlyArray<TerminalOutputChunk>) {
   return compacted;
 }
 
-// Scan only the removed prefix instead of encoding retained output again.
 function trimOutputChunkStart(
   chunk: TerminalOutputChunk,
   bytesToDrop: number,

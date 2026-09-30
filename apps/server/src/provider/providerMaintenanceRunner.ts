@@ -86,11 +86,6 @@ const runProviderMaintenanceCommandWithSpawner = Effect.fn("ProviderMaintenanceR
   }) {
     const collectCommandResult = Effect.fn("ProviderMaintenanceRunner.collectCommandResult")(
       function* () {
-        // Resolve the executable for the host platform before spawning. On
-        // Windows the update tools are batch shims (e.g. `npm` -> `npm.cmd`),
-        // which a bare ChildProcess.spawn cannot launch (spawn npm ENOENT);
-        // resolveSpawnCommand finds the real `.cmd` and routes it through the
-        // shell. On Linux/macOS (incl. the WSL backend) this is a no-op.
         const resolved = yield* resolveSpawnCommand(input.command, input.args);
         const child = yield* input.spawner
           .spawn(
@@ -216,7 +211,7 @@ function makeUpdateState(input: {
   };
 }
 
-/** @public Service construction is part of the canonical Effect module API. */
+/** @public */
 export const make = Effect.fn("ProviderMaintenanceRunner.make")(function* () {
   const providerRegistry = yield* ProviderRegistry;
   const manifestService = yield* ModelManifest.ModelManifest;
@@ -364,9 +359,6 @@ export const make = Effect.fn("ProviderMaintenanceRunner.make")(function* () {
               }),
             );
 
-            // The cached capabilities chose the lock; re-derive ownership
-            // now so the command that runs matches the executable as it is
-            // at click time, not as it was at the last health refresh.
             const fresh = yield* providerRegistry.getProviderMaintenanceCapabilitiesForInstance(
               instanceId,
               provider,
@@ -434,7 +426,6 @@ export const make = Effect.fn("ProviderMaintenanceRunner.make")(function* () {
               );
             }
 
-            // Homebrew's "latest" moves once the upgrade lands; read it again.
             const verified = yield* providerRegistry.getProviderMaintenanceCapabilitiesForInstance(
               instanceId,
               provider,
@@ -445,10 +436,6 @@ export const make = Effect.fn("ProviderMaintenanceRunner.make")(function* () {
               verified,
               instanceId,
             );
-            // "Succeeded" needs the provider to still be installed: an
-            // installer that exits 0 and leaves the binary missing is not a
-            // success. A missing version alone is not held against it, since
-            // Cursor's `about` probe can fail transiently on a healthy binary.
             const couldNotVerify =
               verifiedProviders.length === 0 ||
               verifiedProviders.some(

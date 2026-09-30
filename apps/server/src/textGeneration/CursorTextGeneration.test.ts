@@ -224,8 +224,6 @@ it.layer(CursorTextGenerationTestLayer)("CursorTextGeneration", (it) => {
     ),
   );
 
-  // Closing the runtime on Windows is taskkill /F, which never lets the mock
-  // agent reach its exit handler, so there is no exit log to assert on.
   it.effect.skipIf(HostProcessPlatform.defaultValue() === "win32")(
     "closes the ACP child process after text generation completes",
     () => {

@@ -39,9 +39,7 @@ export type ConnectionProfile = typeof ConnectionProfile.Type;
 export interface ConnectionCatalogEntry {
   readonly target: ConnectionTarget;
   readonly profile: Option.Option<ConnectionProfile>;
-  /** False when the user switched the environment off: saved, but never connects. */
   readonly enabled: boolean;
-  /** Discovery rejection stays visible while the saved connection is switched off. */
   readonly unsupportedReason?: string;
 }
 
@@ -93,15 +91,6 @@ export const ConnectionRegistration = Schema.Union([
 ]);
 export type ConnectionRegistration = typeof ConnectionRegistration.Type;
 
-/**
- * Platform-managed registrations are reconciled from the host (the desktop
- * bootstrap IPC) rather than persisted by the user. They cover the primary
- * local environment plus any additional desktop-local backends running
- * alongside it (e.g. a parallel WSL backend). The primary stays on same-origin
- * cookie auth (`PrimaryConnectionRegistration`); secondary local backends live
- * on a separate loopback origin and authenticate with a bearer token minted
- * from their bootstrap credential (`BearerConnectionRegistration`).
- */
 export const PlatformConnectionRegistration = Schema.Union([
   PrimaryConnectionRegistration,
   BearerConnectionRegistration,

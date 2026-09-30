@@ -148,11 +148,6 @@ export class ManagedEndpointProvider extends Context.Service<
       readonly origin: RelayManagedEndpointOrigin;
       readonly endpoint: RelayManagedEndpoint;
     }) => Effect.Effect<ManagedEndpointOriginSyncResult, ManagedEndpointProviderError>;
-    /**
-     * Captures the allocation generation owned by an unlink before its link
-     * revocation commits. Passing this target to `deprovision` prevents a
-     * concurrent relink from having its newer allocation torn down.
-     */
     readonly prepareDeprovision: (input: {
       readonly userId: string;
       readonly environmentId: string;
@@ -165,18 +160,6 @@ export class ManagedEndpointProvider extends Context.Service<
       readonly environmentId: string;
       readonly target?: ManagedEndpointDeprovisionTarget | null;
     }) => Effect.Effect<boolean, ManagedEndpointDeprovisioningFailed>;
-    /**
-     * Deletes the provisioned Cloudflare tunnel while keeping the allocation
-     * (hostname + tunnel name reservation) and DNS record. Cloudflare bills per
-     * provisioned tunnel, so environments release the tunnel when they shut
-     * down; the next `provision` recreates it under the same name and repoints
-     * the CNAME, preserving the endpoint URL.
-     *
-     * Resolves to whether the caller's connector token is now dead: true when
-     * the tunnel was deleted (or none was recorded to begin with), false when
-     * a concurrent provision outbid the release claim and the recorded tunnel
-     * — and any token issued for it — stays live.
-     */
     readonly release: (input: {
       readonly userId: string;
       readonly environmentId: string;
@@ -749,13 +732,6 @@ export const make = Effect.gen(function* () {
       if (input.expectedTunnelId !== undefined && input.expectedTunnelId !== tunnelId) {
         return false;
       }
-      // Claim the release against the allocation's current generation before
-      // touching Cloudflare. A provision racing this release (fast environment
-      // restart) increments the generation when it records its tunnel, so a stale
-      // claim means the recorded tunnel may already back a fresh connector and
-      // must be left alive. A provision that starts after the claim instead
-      // fails loudly on the deleted tunnel and the client-side retry
-      // provisions a replacement.
       const claimedGeneration = yield* allocations
         .claimRelease({
           userId: input.userId,
@@ -878,12 +854,6 @@ export const make = Effect.gen(function* () {
               ),
           }),
         );
-      // The recorded tunnelId is now stale, but the allocation row is left
-      // untouched deliberately: connect/status authorization requires a fully
-      // recorded allocation, and an offline environment must keep reporting
-      // "offline" (health probe fails) rather than "not authorized". The next
-      // provision lists tunnels by name, finds none, creates a replacement and
-      // re-records the fresh id.
       return Option.getOrElse(released, () => false);
     }),
     provision: Effect.fn("relay.managed_endpoint_provider.provision")(function* (input) {
@@ -1024,8 +994,6 @@ export const make = Effect.gen(function* () {
           ),
         );
       if (tunnelGeneration === null) {
-        // A newer provision can adopt this tunnel by name at any point after
-        // our claim fails. Leave it available for that provision or a retry.
         return yield* new ManagedEndpointProvisioningFailed({
           userId: input.userId,
           environmentId: input.environmentId,

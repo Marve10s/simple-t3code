@@ -85,7 +85,6 @@ function firstEnter(highlighter: DiffsHighlighter, file: FileContents, language:
     const end = document.positionAt(file.contents.length);
     const change = document.applyEdits([{ range: { start: end, end }, newText: "\n" }]);
     expect(change).toBeDefined();
-    // This is the synchronous first edit, before the tokenizer's debounced prebuild.
     const dirtyLines = tokenizer.tokenize(change!);
     expect([...dirtyLines.keys()]).toEqual([0, 1]);
     expect(document.getText()).toBe(`${file.contents}\n`);
@@ -103,7 +102,6 @@ beforeEach(async () => {
   vi.stubGlobal("window", { matchMedia: () => ({ matches: true }) });
   await disposeHighlighter();
   pool = new WorkerPoolManager(
-    // Adapt transport only. The installed Pierre worker resolves and highlights the file.
     { workerFactory: () => new WorkerTransport() as unknown as globalThis.Worker, poolSize: 1 },
     options,
   );
@@ -116,7 +114,6 @@ afterEach(async () => {
   pool?.terminate();
   await Promise.all(terminationPromises);
   await disposeHighlighter();
-  // Drain the pool's final state broadcast before removing the animation frame stubs.
   await new Promise<void>((resolve) => setImmediate(resolve));
   vi.unstubAllGlobals();
 });
@@ -134,7 +131,6 @@ describe("editable file language readiness", () => {
       });
       expect(mainHighlighter.getLoadedLanguages()).not.toContain("tsx");
       renderer[method](file);
-      // Read-only worker rendering must not load editor grammars on the main thread.
       expect(mainHighlighter.getLoadedLanguages()).not.toContain("tsx");
       const highlighter = await renderer.initializeHighlighter();
       firstEnter(highlighter, file, "tsx");

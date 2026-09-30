@@ -69,9 +69,6 @@ const previewSessionSyncAtom = Atom.family((threadKey: string) => {
     });
     queueMicrotask(() => {
       if (disposed) return;
-      // The cached list can predate an automation-created tab. Keep the local
-      // snapshot visible until an authoritative refresh arrives instead of
-      // reconciling against a stale empty result when the panel first mounts.
       get.refresh(sessionsAtom);
       if (eventsVersion === 0) applyLatestEvent(initialEvent);
     });

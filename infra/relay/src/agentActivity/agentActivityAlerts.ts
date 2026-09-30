@@ -53,7 +53,6 @@ export function alertAllowedForPhase(
   }
 }
 
-// A missing baseline is a replay, not a transition that should buzz the phone.
 export function attentionTransitionRows(input: TransitionInput) {
   if (input.previousAggregate === null) return [];
   const previouslyAttention = new Set(
@@ -67,8 +66,6 @@ export function attentionTransitionRows(input: TransitionInput) {
   );
 }
 
-// Reconciliation uses only observed transitions. Event-driven delivery can
-// include fresh completions whose running update never reached the device.
 export function newlyTerminalRows(
   previousAggregate: RelayAgentActivityAggregateState | null,
   nextAggregate: RelayAgentActivityAggregateState,

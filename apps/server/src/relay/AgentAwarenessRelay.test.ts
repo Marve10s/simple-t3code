@@ -978,9 +978,6 @@ describe.sequential("signRelayAgentActivityPublishProof", () => {
 });
 
 describe.sequential("startup catch-up", () => {
-  // An unlinked relay with publishing off. `link` writes the link secrets and
-  // `enablePublishing` the opt-in. Counts link checks (relay URL reads) and
-  // catch-up publishes (shell snapshot reads).
   function makeUnlinkedRelay() {
     const secrets = makeMemorySecretStore();
     const counts = { linkChecks: 0, catchUpPublishes: 0 };
@@ -1038,7 +1035,6 @@ describe.sequential("startup catch-up", () => {
       yield* enablePublishing;
       yield* relay.start();
 
-      // Get past the backoff ramp, then count checks in a steady window.
       yield* TestClock.adjust("10 minutes");
       const checksBeforeWindow = counts.linkChecks;
       yield* TestClock.adjust("10 minutes");
@@ -1058,7 +1054,6 @@ describe.sequential("startup catch-up", () => {
       yield* enablePublishing;
       yield* relay.start();
 
-      // Backed off to 60 s: the next check is still seconds away.
       yield* TestClock.adjust("10 minutes");
       yield* link;
       yield* TestClock.adjust("1 second");
@@ -1080,7 +1075,6 @@ describe.sequential("startup catch-up", () => {
       yield* TestClock.adjust("10 minutes");
       expect(counts.catchUpPublishes).toBe(0);
 
-      // `t3 connect publish` writes the opt-in without waking this process.
       yield* enablePublishing;
       yield* TestClock.adjust("5 seconds");
       expect(counts.catchUpPublishes).toBe(1);

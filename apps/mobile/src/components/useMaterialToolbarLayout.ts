@@ -4,7 +4,6 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useScaledTextRole } from "../features/settings/appearance/useScaledTextRole";
 import { useAndroidControlSizing } from "./useAndroidControlSizing";
 
-/** Shared Android header geometry; class-based spacing uses the app's 14dp rem. */
 export function useMaterialToolbarLayout(embedded = false) {
   const insets = useSafeAreaInsets();
   const title = useScaledTextRole("title");

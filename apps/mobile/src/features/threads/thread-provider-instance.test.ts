@@ -116,8 +116,6 @@ describe("createThreadRowProviderInstanceResolver", () => {
     const resolve = createThreadRowProviderInstanceResolver(serverConfigs);
     const first = resolve(makeThread(environmentId, "codex"));
     const second = resolve(makeThread(environmentId, "codex"));
-    // Memoized rows compare props by reference: a fresh object per call would
-    // re-render every row on every parent render (minute tick included).
     expect(first).not.toBeNull();
     expect(second).toBe(first);
   });

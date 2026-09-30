@@ -25,7 +25,6 @@ import {
 } from "../../../providerInstances";
 import type { ModelEsque } from "../../chat/providerIconUtils";
 
-/** What the composer already passes to the upstream effort picker. */
 export interface CodexPickerTraits {
   readonly provider: ProviderDriverKind;
   readonly instanceId?: ProviderInstanceId;
@@ -42,7 +41,6 @@ export interface CodexPickerTraits {
 export interface CodexPickerProvider {
   readonly entry: ProviderInstanceEntry;
   readonly models: ReadonlyArray<ModelEsque>;
-  /** Why the provider cannot be used right now, or null when it can. */
   readonly unavailableReason: string | null;
 }
 
@@ -63,7 +61,6 @@ export interface CodexPickerTraitState {
     readonly lockedByPrompt: boolean;
   } | null;
   readonly fastMode: { readonly on: boolean } | null;
-  /** Remaining toggles and choices (thinking, context window, agent, …). */
   readonly extras: ReadonlyArray<ProviderOptionDescriptor>;
   readonly setEffort: (value: string) => void;
   readonly setFastMode: (on: boolean) => void;
@@ -91,11 +88,6 @@ function replaceValue(
   );
 }
 
-/**
- * Effort, fast mode and the other per-model options for the selected model,
- * read and written exactly like upstream's TraitsMenuContent: descriptors from
- * the model's capabilities, saved through the composer draft store.
- */
 export function useCodexPickerTraits(traits: CodexPickerTraits): CodexPickerTraitState {
   const setProviderModelOptions = useComposerDraftStore((store) => store.setProviderModelOptions);
 
@@ -200,7 +192,6 @@ export function useCodexPickerTraits(traits: CodexPickerTraits): CodexPickerTrai
   }, [setProviderModelOptions, traits]);
 }
 
-/** Providers in picker order, each with its selectable models. */
 export function useCodexPickerProviders(input: {
   instanceEntries: ReadonlyArray<ProviderInstanceEntry>;
   modelOptionsByInstance: ReadonlyMap<ProviderInstanceId, ReadonlyArray<ModelEsque>>;
@@ -239,7 +230,6 @@ export function useCodexPickerProviders(input: {
   );
 }
 
-/** Favourite models, shared with upstream's picker (client setting `favorites`). */
 export function useCodexPickerFavorites() {
   const favorites = useClientSettings((settings) => settings.favorites ?? []);
   const updateSettings = useUpdateClientSettings();

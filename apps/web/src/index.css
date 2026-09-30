@@ -2,11 +2,8 @@
 
 @custom-variant dark (&:is(.dark, .dark *));
 @custom-variant light (&:not(.dark, .dark *));
-/* Window Controls Overlay: active when Electron exposes native titlebar control geometry. */
 @custom-variant wco (&:is(.wco, .wco *));
 
-/* On mobile, morph the expanded hero composer into the compact docked
-   composer while it moves; the rest of the app remains visually stationary. */
 html[data-mobile-composer-route-transition="true"]::view-transition-old(root),
 html[data-mobile-composer-route-transition="true"]::view-transition-new(root) {
   animation: none;
@@ -31,9 +28,6 @@ html[data-mobile-composer-route-transition="true"]::view-transition-new(t3-mobil
   mix-blend-mode: normal;
 }
 
-/* The expanded and compact composers have different internal layouts. Use a
-   brief crossfade while their shared wrapper moves so the layout change does
-   not read as a single-frame cut. */
 @keyframes t3-mobile-composer-old {
   0%,
   35% {
@@ -85,10 +79,6 @@ html[data-mobile-composer-route-transition="true"]::view-transition-old(t3-mobil
   --appearance-contrast-target: black;
   --app-scrollbar-thumb: rgb(217 217 217);
   --app-scrollbar-thumb-hover: rgb(191 191 191);
-  /*
-   * Compact UI geometry. Keep these values semantic so sidebar, palette,
-   * tooltip, and toolbar controls cannot quietly drift apart.
-   */
   --control-radius: 0.5rem;
   --sidebar-content-inset: 0.5rem;
   --sidebar-control-gap: 0.5rem;
@@ -101,8 +91,6 @@ html[data-mobile-composer-route-transition="true"]::view-transition-old(t3-mobil
   --command-shell-inset: 0.5rem;
   --command-content-inset: 1rem;
   --floating-content-inset: 0.75rem;
-  /* App layer order: docked sheets, then the floating preview player (47–49, see
-     previewMiniPlayerLayout.ts), then dialogs and popovers (50 and up). */
   --z-sheet: 46;
   --glass-blur: 12px;
   --glass-opacity: 80%;
@@ -116,10 +104,7 @@ html[data-mobile-composer-route-transition="true"]::view-transition-old(t3-mobil
   --workspace-titlebar-control-size: 1.75rem;
   --workspace-titlebar-control-gap: 0.75rem;
   --workspace-titlebar-scroll-fade-height: 1.5rem;
-  /* The prompt on phones: iOS zooms into any input under 16px on focus. */
   --font-size-prompt-touch: max(var(--font-size-prompt, 1rem), 16px);
-  /* Horizontal gutter shared by the page header and the chat column, clear of
-     the device's safe area. */
   --workspace-gutter: 0.75rem;
   --workspace-gutter-start: calc(env(safe-area-inset-left) + var(--workspace-gutter));
   --workspace-gutter-end: calc(env(safe-area-inset-right) + var(--workspace-gutter));
@@ -149,9 +134,6 @@ html[data-mobile-composer-route-transition="true"]::view-transition-old(t3-mobil
   );
 }
 
-/* The font tokens are declared outside the inline theme so utilities reference
-   the variables and Settings -> Appearance can override them at runtime. The
-   default stacks are mirrored in `appearanceFonts.ts`. */
 @theme {
   --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
   --font-mono:
@@ -159,11 +141,6 @@ html[data-mobile-composer-route-transition="true"]::view-transition-old(t3-mobil
 }
 
 @theme inline {
-  /* Two steps below Tailwind's text-xs (12px) for dense UI: metadata rows,
-     badges, counters, keyboard hints and diagnostics tables. 2xs is 11px,
-     3xs is 10px. Provider icon overlays use 4xs (8px) and 5xs (7px) to fit
-     their smaller badges. Registered with tailwind-merge in
-     lib/utils.ts so cn() treats them as font sizes, not colours. */
   --text-2xs: 0.6875rem;
   --text-2xs--line-height: calc(1 / 0.6875);
   --text-3xs: 0.625rem;
@@ -172,17 +149,9 @@ html[data-mobile-composer-route-transition="true"]::view-transition-old(t3-mobil
   --text-4xs--line-height: 1;
   --text-5xs: 0.4375rem;
   --text-5xs--line-height: 1;
-  /* Motion. drawer is the decelerating curve for surfaces that slide or pop in
-     (composer context, pills). */
   --ease-drawer: cubic-bezier(0.32, 0.72, 0, 1);
-  /* The composer's elevation: a soft drop pulled in under the surface, shared
-     by the composer, its context strip and attached banners. */
   --shadow-composer: 0 12px 28px -18px rgb(0 0 0 / 40%);
   --shadow-composer-dark: 0 14px 32px -18px rgb(0 0 0 / 75%);
-  /* Dark-mode shade where an attached surface meets the composer: 10px of
-     shadow fading away from the seam. Inline, so the offsets resolve on the
-     element. below: the context strip under the composer (1rem seam, faint
-     white fill). above: an attached banner over it (its tint on top). */
   --background-image-composer-seam-below:
     linear-gradient(
       to bottom,
@@ -201,8 +170,6 @@ html[data-mobile-composer-route-transition="true"]::view-transition-old(t3-mobil
     );
   --color-zinc-25: oklch(99.2% 0 0);
   --animate-skeleton: skeleton 2.4s infinite;
-  /* Duty-cycled indicator animations: long holds with stepped ramps, so the
-     compositor updates discrete frames instead of every vsync. */
   --animate-status-pulse: status-pulse 2s infinite;
   --animate-status-ping: status-ping 2s infinite;
   --color-warning-foreground: var(--warning-foreground);
@@ -268,10 +235,6 @@ html[data-mobile-composer-route-transition="true"]::view-transition-old(t3-mobil
   --radius-2xl: calc(var(--radius) + 8px);
   --radius-3xl: calc(var(--radius) + 12px);
   @keyframes skeleton {
-    /* The single loading-bar breath used by every skeleton: one opacity pulse
-       per container, stepped so however many bars sit under it, the compositor
-       draws a handful of discrete frames per cycle rather than one per vsync —
-       which on a 120Hz display is the difference between ~14 and ~288 updates. */
     0%,
     42% {
       opacity: 1;
@@ -302,9 +265,6 @@ html[data-mobile-composer-route-transition="true"]::view-transition-old(t3-mobil
     }
   }
   @keyframes status-ping {
-    /* Burst first (immediate feedback for click ripples), then hold
-       invisible for the rest of the cycle. Mirrors animate-ping's
-       75%-scale start. */
     0% {
       opacity: 0.9;
       scale: 0.75;
@@ -443,9 +403,6 @@ html[data-mobile-composer-route-transition="true"]::view-transition-old(t3-mobil
     var(--app-scrollbar-width) 100%;
 }
 
-/* Virtualizers own their native scroll element, so they cannot use ScrollArea's
-   viewport fade. Keep the scrollbar lane opaque while sharing the same fade
-   contract across those lists. */
 @utility virtualized-scroll-fade {
   -webkit-mask-image: var(--virtualized-scroll-fade-mask), linear-gradient(black, black);
   mask-image: var(--virtualized-scroll-fade-mask), linear-gradient(black, black);
@@ -461,8 +418,6 @@ html[data-mobile-composer-route-transition="true"]::view-transition-old(t3-mobil
     var(--app-scrollbar-width) 100%;
 }
 
-/* Stage-channel art needs a mask and pseudo-element gradient, so keep the
-   behavior composable without tying it to the global components layer. */
 @utility sidebar-stage-backdrop {
   --stage-fade: var(--sidebar-stage-fade, var(--app-chrome-background));
   mask-image: linear-gradient(to bottom, black 0%, black 55%, transparent 92%);
@@ -615,8 +570,6 @@ html[data-mobile-composer-route-transition="true"]::view-transition-old(t3-mobil
     background-color: color-mix(in oklab, var(--primary) 45%, transparent);
   }
   :root {
-    /* Keep the original T3 Code artwork palettes as the defaults. Built-in
-       themes override them with their own pigments in the components layer. */
     --stage-art-top: oklch(0.782169 0.123386 240.226);
     --stage-art-mid: oklch(0.616111 0.195824 259.735);
     --stage-art-bottom: oklch(0.441553 0.232394 265.474);
@@ -670,9 +623,6 @@ html[data-mobile-composer-route-transition="true"]::view-transition-old(t3-mobil
 }
 
 @layer components {
-  /* AnimatedHeight owns resizing for its contents. Nested collapsibles must
-     expose their final layout immediately, otherwise each animation frame
-     restarts the parent's transition and the dialog trails behind its content. */
   [data-slot="animated-height"] [data-slot="collapsible-panel"] {
     height: auto !important;
     transition: none !important;
@@ -682,10 +632,6 @@ html[data-mobile-composer-route-transition="true"]::view-transition-old(t3-mobil
     display: none;
   }
 
-  /* Each maintainer palette gives the same line art its own material: rose
-     vellum, forest drafting paper, marine cyanotype, copper, and violet ink.
-     These colors stay deliberately deep at the top edge so the white stage
-     wordmark and controls retain contrast in both appearance modes. */
   html[data-theme-id="t3-chat"] {
     --stage-art-top: oklch(0.760675 0.141361 348.019);
     --stage-art-mid: oklch(0.588093 0.188832 353.138);
@@ -868,8 +814,6 @@ html[data-mobile-composer-route-transition="true"]::view-transition-old(t3-mobil
     border-radius: 0.75rem;
   }
 
-  /* The pulse is the destination indicator; without it (reduced motion), the
-     focus outline takes over, so exactly one indicator shows at a time. */
   [data-settings-page-scroll] .settings-search-target-pulse:focus {
     outline: none;
   }
@@ -990,9 +934,6 @@ html[data-mobile-composer-route-transition="true"]::view-transition-old(t3-mobil
   }
 }
 
-/* Safe-area inset utilities for surfaces that opt into edge-to-edge rendering.
-   Insets resolve to 0 when the browser already constrains the layout viewport
-   to the safe area. */
 @utility pt-safe {
   padding-top: max(env(safe-area-inset-top), 0px);
 }
@@ -1006,16 +947,12 @@ html[data-mobile-composer-route-transition="true"]::view-transition-old(t3-mobil
   padding-right: max(env(safe-area-inset-right), 0px);
 }
 
-/* Grain texture for chrome surfaces that float above the body (see the
-   --surface-grain note). Layered over the element's background-color, so it
-   composes with bg-* utilities. */
 @utility surface-grain {
   background-image: var(--surface-grain);
   background-repeat: repeat;
   background-size: var(--surface-grain-size);
 }
 
-/* Suppress all transitions during theme changes */
 .no-transitions,
 .no-transitions *,
 .no-transitions *::before,
@@ -1076,8 +1013,6 @@ html[data-mobile-composer-route-transition="true"]::view-transition-old(t3-mobil
   --update: var(--primary);
   --update-foreground: var(--primary);
   --update-surface: color-mix(in srgb, var(--update) 12%, transparent);
-  /* Keep every sidebar primitive on the same light surface hierarchy, including
-     portaled mobile sheets and settings navigation outside the app sidebar. */
   --sidebar: var(--color-zinc-50);
   --sidebar-foreground: var(--foreground);
   --sidebar-muted-foreground: var(--muted-foreground);
@@ -1096,8 +1031,6 @@ html[data-mobile-composer-route-transition="true"]::view-transition-old(t3-mobil
 
   @variant dark {
     color-scheme: dark;
-    /* Keep controls and floating surfaces close to the neutral-black canvas.
-       Borders and hover states provide separation without milky gray fills. */
     --background: var(--color-neutral-950);
     --surface-raised: color-mix(in srgb, var(--background) 97%, var(--color-white));
     --foreground: var(--color-neutral-100);
@@ -1135,9 +1068,6 @@ html[data-mobile-composer-route-transition="true"]::view-transition-old(t3-mobil
   }
 }
 
-/* Keep both sidebar implementations (default and legacy) on the same quiet
-   zinc hierarchy: zinc-50 navigation, zinc-25 hover, and white selected/raised
-   surfaces. */
 [data-app-sidebar] {
   --background: var(--color-zinc-25);
   --foreground: var(--color-zinc-800);
@@ -1182,14 +1112,6 @@ html[data-mobile-composer-route-transition="true"]::view-transition-old(t3-mobil
   }
 }
 
-/* Theme files are expressed in app color roles and mapped to the existing
-   semantic surface tokens here. Keep this block after the sidebar-version
-   compatibility overrides so both navigation implementations receive the
-   same palette. Success, info, provider, and channel identity colors remain
-   independent; error, warning, and update roles are themeable below. */
-
-/* The non-empty marker adds enough specificity to outrank the generated root
-   dark variant without reintroducing raw `.dark` selectors. */
 html[data-theme-id]:not([data-theme-id=""]) {
   --background: var(--app-theme-canvas);
   --app-chrome-background: var(--app-theme-chrome);
@@ -1205,10 +1127,6 @@ html[data-theme-id]:not([data-theme-id=""]) {
   --card-foreground: var(--app-theme-text);
   --popover: var(--app-theme-surface-overlay);
   --popover-foreground: var(--app-theme-text);
-  /* Solid controls (CTAs, switches, sliders, the send button) all share the
-     theme's action color so every "act now" affordance reads consistently;
-     the accent keeps driving surfaces, selection, and focus. Palettes without
-     a distinct action color make these identical. */
   --primary: var(--app-theme-message-action);
   --primary-foreground: var(--app-theme-message-action-foreground);
   --secondary: var(--app-theme-secondary);
@@ -1257,8 +1175,6 @@ html[data-theme-id]:not([data-theme-id=""]) {
   --terminal-selection-background: var(--app-theme-terminal-selection-background);
 }
 
-/* Theme-token dependency probes are restored synchronously, before paint. Keep
-   transitions from observing the temporary sentinel color in between. */
 html[data-theme-token-probe],
 html[data-theme-token-probe] *,
 html[data-theme-token-probe] *::before,
@@ -1330,9 +1246,6 @@ html[data-theme-token-probe] *::after {
   top: calc(100% + 0.35rem);
 }
 
-/* Workspace actions use a small, separate chrome hierarchy. Keeping these
-   roles explicit prevents the thread toolbar from falling back to the default
-   dark-mode whites while preserving the same theme file across clients. */
 html[data-theme-id] [data-chat-header] {
   background-color: var(--toolbar-background);
   color: var(--contrast-toolbar-foreground);
@@ -1347,11 +1260,6 @@ html[data-theme-id] [data-chat-header] [data-toolbar-control] {
   color: var(--contrast-toolbar-control-foreground);
 }
 
-/* The panel layout toggles stay ghost: they render both inside the header and
-   in the titlebar strip, so filling them would make them change appearance as
-   the panel opens. They only take the themed foreground; hover and pressed
-   keep the base ghost accent. The tooltip trigger's data-slot wins over the
-   toggle's when the trigger renders the toggle, so match both. */
 html[data-theme-id] [data-panel-layout-controls] [data-slot="toggle"],
 html[data-theme-id] [data-panel-layout-controls] [data-slot="tooltip-trigger"],
 html[data-theme-id] [data-workspace-titlebar-controls] [data-slot="toggle"],
@@ -1385,9 +1293,6 @@ html[data-theme-id] [data-chat-header] [data-slot="separator"] {
   background-color: var(--contrast-toolbar-border);
 }
 
-/* Chat code blocks join the other code surfaces on the code tokens. The
-   default look keeps its secondary/input tints; themed palettes tint those
-   surfaces with the accent, which fights syntax highlighting. */
 html[data-theme-id] .chat-markdown .chat-markdown-codeblock {
   background-color: var(--code-background);
   border-color: var(--contrast-border);
@@ -1407,9 +1312,6 @@ html[data-theme-id] .chat-markdown .chat-markdown-codeblock-header {
   color: color-mix(in srgb, var(--code-foreground) 72%, transparent);
 }
 
-/* T3 Chat renders inline code and compact chat artifacts with its translucent
-   secondary surface flattened over the light chat canvas. The raw muted and
-   secondary tokens are substantially darker than those visible pixels. */
 html[data-theme-id="t3-chat"] {
   @variant light {
     & .chat-markdown :not(pre) > code,
@@ -1456,15 +1358,12 @@ html[data-theme-id] [data-app-sidebar] {
   }
 }
 
-/* T3 Chat's panel divider is deliberately pink, and its resize affordance
-   keeps that color while hovered. Do not neutralize this branded edge. */
 html[data-theme-id="t3-chat"] [data-app-sidebar] {
   @variant dark {
     border-color: var(--contrast-sidebar-border);
   }
 }
 
-/* Recompute contrast wherever a subtree owns its own semantic color palette. */
 :root,
 [data-app-sidebar] {
   --contrast-toolbar-foreground: color-mix(
@@ -1580,8 +1479,6 @@ html[data-theme-id="t3-chat"] [data-app-sidebar] {
 }
 
 body {
-  /* Reference the theme token (not a literal stack) so the Settings ->
-     Appearance runtime override of --font-sans reaches all interface text. */
   font-family: var(--font-sans);
   margin: 0;
   padding: 0;
@@ -1614,21 +1511,11 @@ body {
   --desktop-window-right-resize-inset: 6px;
 }
 
-/* App-chrome grain. Baked into each surface's own background (behind
-   content) rather than a fixed overlay on top: a full-viewport overlay
-   forces the compositor to re-blend every frame any animation produces,
-   which multiplied idle GPU cost. The overlay's 0.035 opacity lives in the
-   SVG rect instead. Surfaces that float over the body (e.g. the inset main
-   card) must opt in via the surface-grain utility, or they lose the
-   grain's subtle brightening and stand out against the body. */
 :root {
   --surface-grain: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.035'/%3E%3C/svg%3E");
   --surface-grain-size: 256px 256px;
 }
 
-/* The live T3 Chat texture is a 128px grayscale tile with a constant 7/255
-   alpha. Keep our procedural texture cheap while matching that scale and
-   strength for the branded preset. */
 html[data-theme-id="t3-chat"] {
   --surface-grain: url("data:image/svg+xml,%3Csvg viewBox='0 0 128 128' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.02745'/%3E%3C/svg%3E");
   --surface-grain-size: 128px 128px;
@@ -1645,35 +1532,20 @@ code {
   font-family: var(--font-mono);
 }
 
-/* Code blocks in chat carry the size preference. Scoped to chat markdown
-   rather than every pre: a global rule would beat text-size utilities and
-   inherited sizes on unrelated pre surfaces (terminal previews, approvals).
-   Inline code stays relative to its sentence so it never towers over prose;
-   diffs and file previews take the size through --diffs-font-size. */
 .chat-markdown .chat-markdown-shiki .shiki,
 .chat-markdown pre code {
   font-size: var(--font-size-code, inherit);
 }
 
-/* @pierre/diffs surfaces (diffs, file previews, annotatable code, search
-   lines) render inside shadow roots but consult these hooks with their own
-   literal stacks as fallback. Custom properties inherit across the shadow
-   boundary, so defining them once here routes every code surface through the
-   appearance font tokens. */
 :root {
   --diffs-font-family: var(--font-mono);
   --diffs-header-font-family: var(--font-sans);
 }
 
-/* Window drag region (frameless titlebar) */
 .drag-region {
   -webkit-app-region: drag;
 }
 
-/* Electron 44 inherits app-region. Reset children to the initial value so they
-   do not add drag rectangles over fixed controls. Explicit `none` is treated
-   as `no-drag` and breaks titlebar dragging; `initial` emits no rectangle.
-   The base layer lets explicit drag/no-drag utilities take precedence. */
 @layer base {
   .drag-region > * {
     -webkit-app-region: initial;
@@ -1688,7 +1560,6 @@ code {
   -webkit-app-region: no-drag;
 }
 
-/* Scrollbar styling */
 ::-webkit-scrollbar {
   width: var(--app-scrollbar-width);
 }
@@ -1705,8 +1576,6 @@ code {
 ::-webkit-scrollbar-thumb:hover {
   background: var(--app-scrollbar-thumb-hover);
 }
-
-/* Chat markdown rendering */
 
 .chat-markdown > :first-child {
   margin-top: 0;
@@ -1760,19 +1629,11 @@ code {
 }
 
 .chat-markdown ul {
-  /* Reset for nested uls under a widened ol. --list-gutter is an inherited
-     custom property, so without this a task-list under a multi-digit ordered
-     list would inherit the outer gutter instead of its own default. */
   --list-gutter: 1.25rem;
   padding-left: 1.25rem;
   list-style-type: disc;
 }
 
-/* --list-gutter defaults to the same 1.25rem as .chat-markdown ul, but
-   ChatMarkdown's `ol` renderer widens it (via inline style) for lists whose
-   widest marker has multiple characters so it isn't clipped by list-style-position:
-   outside painting the marker past the padding box. Reset it here too so a
-   nested ol without its own widened marker doesn't inherit the outer one. */
 .chat-markdown ol {
   --list-gutter: 1.25rem;
   padding-left: var(--list-gutter, 1.25rem);
@@ -1803,7 +1664,6 @@ code {
   margin-top: 0.25rem;
 }
 
-/* GitHub-style task lists: the checkbox replaces the list marker. */
 .chat-markdown li.task-list-item {
   list-style-type: none;
 }
@@ -1813,8 +1673,6 @@ code {
   vertical-align: middle;
 }
 
-/* Markdown assumes inline images — GitHub comments lay button images out in a row — and the
-   Tailwind preflight's block-level img would stack them one per line. */
 .chat-markdown img {
   display: inline-block;
 }
@@ -1823,7 +1681,6 @@ code {
   text-decoration: none;
 }
 
-/* File links are Chips and own their color and focus ring. */
 .chat-markdown a:not(.chat-markdown-file-link) {
   color: var(--info-foreground);
 }
@@ -1925,11 +1782,6 @@ code {
   background: transparent !important;
 }
 
-/* Paragraphs and code blocks arrive in chunks while a response streams. Fade
-   each new block in so the chunk does not pop. @starting-style only applies
-   when an element is first inserted, and the rule is gated on data-streaming,
-   so opening a finished thread never replays the fade. Opacity only, one
-   shot, no layout change. */
 @media (prefers-reduced-motion: no-preference) {
   .chat-markdown[data-streaming] > *,
   .chat-markdown[data-streaming] .chat-markdown-shiki {
@@ -1941,11 +1793,6 @@ code {
   }
 }
 
-/* Diagnostics-style tables: row separators only, uppercase headers, and a
-   scroll-fade container for horizontal overflow. The root chat-markdown
-   wrapping rules (overflow-wrap: anywhere) would let columns shrink to single
-   characters and defeat the overflow — restore word-boundary wrapping so the
-   min column width is the longest word. */
 .chat-markdown table {
   width: 100%;
   min-width: max-content;
@@ -1972,8 +1819,6 @@ code {
   border-bottom: 1px solid color-mix(in srgb, var(--contrast-border) 60%, transparent);
 }
 
-/* Collapsed (default): single-line cells truncate so arbitrary chat content
-   cannot blow the column out; the footer toggle expands cells to wrap. */
 .chat-markdown .chat-markdown-table-container[data-expanded="false"] th,
 .chat-markdown .chat-markdown-table-container[data-expanded="false"] td {
   overflow: hidden;
@@ -1994,7 +1839,6 @@ code {
   --diff-deletion-foreground: light-dark(var(--color-red-600), var(--color-red-400));
 }
 
-/* Chat timeline and composer column width, set from the Chat width setting. */
 :root {
   --chat-max-width: 48rem;
 }
@@ -2030,8 +1874,6 @@ code {
   color: var(--code-foreground);
 }
 
-/* Pierre's file renderer owns its own surface tokens. Keep the root of a file
-   preview on the same themeable code surface as the diff panel. */
 .diff-render-surface diffs-container,
 .file-preview-virtualizer diffs-container {
   --diffs-bg: var(--code-background) !important;
@@ -2119,8 +1961,6 @@ code {
   }
 }
 
-/* Let the sortable rows open label clearance before painting the dividers.
-   This runs once per pickup; rows retain dnd-kit's normal 200ms transitions. */
 .sidebar-drag-boundary-label {
   animation: sidebar-drag-label-reveal 200ms step-end;
 }
@@ -2134,9 +1974,6 @@ code {
   }
 }
 
-/* Rich text composer (Tiptap). The stored prompt stays markdown; only the
-   surface renders styled text. Markers (** * ` ~~) appear as non-editable
-   widgets while the caret is on styled text. */
 .composer-tiptap {
   position: relative;
 }
@@ -2168,7 +2005,6 @@ code {
   pointer-events: none;
 }
 
-/* Selected chips (node selection from arrowing into or clicking a chip). */
 .composer-tiptap .ProseMirror-selectednode {
   outline: 2px solid var(--ring);
   outline-offset: 1px;
@@ -2189,10 +2025,6 @@ code {
   pointer-events: none;
 }
 
-/* Rich-text task lists render as real checkboxes. Tiptap's TaskItem NodeView
-   builds the <li> imperatively with only a data-checked attribute (no
-   data-type), so items are targeted that way. Indentation comes from list
-   nesting (two spaces per level from Tab), matching the stored Markdown. */
 .composer-tiptap ul[data-type="taskList"] {
   list-style: none;
   margin: 0;

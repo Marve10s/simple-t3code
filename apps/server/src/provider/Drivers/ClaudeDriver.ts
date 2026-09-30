@@ -1,17 +1,3 @@
-/**
- * ClaudeDriver — `ProviderDriver` for the Claude Agent SDK runtime.
- *
- * Mirrors `CodexDriver`: a plain value whose `create()` returns one
- * `ProviderInstance` bundling `snapshot` / `adapter` / `textGeneration`
- * closures captured over the per-instance `ClaudeSettings`.
- *
- * Unlike Codex, the Claude snapshot probe may invoke a secondary probe
- * (`probeClaudeCapabilities`) to read Anthropic account + slash-command
- * metadata. That probe is per-instance and keyed by binary + resolved HOME so
- * two concurrent Claude instances don't cross-contaminate account metadata.
- *
- * @module provider/Drivers/ClaudeDriver
- */
 import { ClaudeSettings, ProviderDriverKind } from "@t3tools/contracts";
 import * as Cache from "effect/Cache";
 import * as Duration from "effect/Duration";
@@ -161,8 +147,6 @@ export const ClaudeDriver: ProviderDriver<ClaudeSettings, ClaudeDriverEnv> = {
         continuationGroupKey,
       });
 
-      // One per instance: the status probe writes the model-scoped bucket
-      // names it saw, the adapter reads them to place turn-driven events.
       const scopedLimitNames = yield* makeClaudeScopedLimitNames;
       const adapterOptions = {
         instanceId,
@@ -178,8 +162,6 @@ export const ClaudeDriver: ProviderDriver<ClaudeSettings, ClaudeDriverEnv> = {
         modelCatalog,
       );
 
-      // Per-instance capabilities cache: keyed on binary + resolved HOME so
-      // account-specific probes never share auth metadata across instances.
       const capabilitiesProbeCache = yield* Cache.make({
         capacity: 1,
         timeToLive: CAPABILITIES_PROBE_TTL,
@@ -194,8 +176,6 @@ export const ClaudeDriver: ProviderDriver<ClaudeSettings, ClaudeDriverEnv> = {
         processEnv,
       );
 
-      // Start the TTL-gated refresh without delaying provider readiness. The
-      // next check observes a remote manifest after the background fetch lands.
       const checkProvider = modelManifest.refreshInBackground.pipe(
         Effect.andThen(
           modelManifest.current.pipe(
@@ -270,9 +250,6 @@ export const ClaudeDriver: ProviderDriver<ClaudeSettings, ClaudeDriverEnv> = {
               Effect.provideService(Path.Path, path),
             );
 
-      // Same rules as Codex: serialised on the config directory that holds the
-      // login, one request id kept until Claude answers (a cooldown or rate
-      // limit is an answer), then a re-probe.
       const consumeResetCredit: NonNullable<ProviderInstance["consumeResetCredit"]> = () =>
         Effect.gen(function* () {
           const current = yield* snapshot.getSnapshot;
@@ -307,8 +284,6 @@ export const ClaudeDriver: ProviderDriver<ClaudeSettings, ClaudeDriverEnv> = {
                 cause,
               }),
           ),
-          // Re-probe after any answer, but only a reset claims the limits
-          // changed, so only a reset reports an unconfirmed refresh.
           Effect.tap((outcome) =>
             Effect.gen(function* () {
               const before = (yield* snapshot.getSnapshot).usageLimits?.checkedAt;

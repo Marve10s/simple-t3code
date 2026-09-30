@@ -1,34 +1,14 @@
-/**
- * Pure parsers for the provider CLIs' on-disk session transcripts.
- *
- * Each parser is a line-at-a-time reducer so callers can stream large files
- * without materialising them. None of them touch the filesystem.
- *
- * @module usageTranscripts
- */
 import type { UsageProviderKind, UsageTokenTotals } from "@t3tools/contracts";
 
 export interface UsageRecord {
   readonly provider: UsageProviderKind;
   readonly timestampMs: number;
   readonly model: string;
-  /**
-   * Rate-table key when the provider's display name carries tiers the table
-   * does not know, such as Cursor's `claude-opus-5-5-high`. Defaults to `model`.
-   */
   readonly rateModel?: string;
   readonly sessionId: string;
   readonly totals: UsageTokenTotals;
   readonly reportedCostUsd: number | null;
-  /**
-   * Whether the request ran in fast mode, which bills at a model-specific
-   * multiple of the standard rate. Only Claude Code records this.
-   */
   readonly fast: boolean;
-  /**
-   * Key for cross-file de-duplication, or `null` when the record is inherently
-   * unique and needs no dedup.
-   */
   readonly dedupeKey: string | null;
 }
 
@@ -61,7 +41,6 @@ export function addTotals(a: UsageTokenTotals, b: UsageTokenTotals): UsageTokenT
 }
 
 export function totalTokens(totals: UsageTokenTotals): number {
-  // reasoningTokens is a subset of outputTokens and must not be added again.
   return (
     totals.uncachedInputTokens +
     totals.cachedInputTokens +
@@ -70,23 +49,12 @@ export function totalTokens(totals: UsageTokenTotals): number {
   );
 }
 
-/**
- * Cheap substring gate applied before `JSON.parse`.
- *
- * Transcripts are mostly tool output; only a minority of lines carry usage. On
- * a 30-day window this skips roughly half the lines outright and is worth about
- * an order of magnitude.
- */
 export function mightCarryUsage(line: string, provider: UsageProviderKind): boolean {
   if (provider === "claude") return line.includes('"usage"');
   if (provider === "grok") return line.includes('"turn_completed"');
   return line.includes('"token_count"');
 }
 
-/**
- * Grok reports cost in integer ticks where `1 USD = 10^10` ticks. See Grok
- * headless `total_cost_usd_ticks`. Convert to dollars for pricing.
- */
 export const GROK_COST_USD_TICKS_PER_DOLLAR = 10_000_000_000;
 
 function grokCostTicksToUsd(ticks: unknown): number | null {
@@ -94,18 +62,6 @@ function grokCostTicksToUsd(ticks: unknown): number | null {
   return ticks / GROK_COST_USD_TICKS_PER_DOLLAR;
 }
 
-/* -------------------------------------------------------------------------- */
-/* Claude Code                                                                */
-/* -------------------------------------------------------------------------- */
-
-/**
- * Parses one line of a Claude Code transcript.
- *
- * T3 Code writes one record per assistant *content block*, and every one of
- * those records repeats the same complete `usage` object for the parent
- * message. Summing them overcounts by roughly 2.4x on a real workload, so the
- * caller must drop repeats by `dedupeKey` and keep the first.
- */
 export function parseClaudeLine(line: string): UsageRecord | null {
   let parsed: unknown;
   try {
@@ -138,8 +94,6 @@ export function parseClaudeRecord(parsed: unknown): UsageRecord | null {
 
   const messageId = typeof messageRecord["id"] === "string" ? messageRecord["id"] : null;
   const requestId = typeof record["requestId"] === "string" ? record["requestId"] : null;
-  // Matches ccusage: prefer the message/request pair, fall back to whichever
-  // half exists. Records with neither cannot be de-duplicated.
   const dedupeKey =
     messageId === null && requestId === null ? null : `${messageId ?? ""}:${requestId ?? ""}`;
 
@@ -155,7 +109,6 @@ export function parseClaudeRecord(parsed: unknown): UsageRecord | null {
       cachedInputTokens: int(usageRecord["cache_read_input_tokens"]),
       cacheCreationTokens: int(usageRecord["cache_creation_input_tokens"]),
       outputTokens: int(usageRecord["output_tokens"]),
-      // Anthropic folds thinking tokens into output and does not break them out.
       reasoningTokens: 0,
     },
     reportedCostUsd: typeof cost === "number" && Number.isFinite(cost) ? cost : null,
@@ -164,23 +117,11 @@ export function parseClaudeRecord(parsed: unknown): UsageRecord | null {
   };
 }
 
-/* -------------------------------------------------------------------------- */
-/* Codex                                                                      */
-/* -------------------------------------------------------------------------- */
-
-/**
- * Rolling state for a single Codex rollout file.
- *
- * Codex `token_count` events carry no model, so the model is carried forward
- * from the most recent `turn_context`. Sessions that switch models mid-run
- * attribute correctly from the switch onward.
- */
 export interface CodexScanState {
   model: string;
   sessionId: string;
   lastUsageSignature: string | null;
   sawSessionMeta: boolean;
-  /** While true, leading usage events are re-stamped copies of parent history. */
   suppressingForkCopies: boolean;
   forkCopyAnchorMs: number;
 }
@@ -196,16 +137,8 @@ export function initialCodexScanState(): CodexScanState {
   };
 }
 
-/**
- * A forked or subagent rollout opens with the parent's full history copied in,
- * every line re-stamped to the fork instant. Those copies are written in one
- * synchronous burst (observed gaps 0-40ms), while the child's first genuine
- * usage event only lands after a real model turn (observed 5s+). One second of
- * separation splits the two cleanly; `ccusage` uses the same threshold.
- */
 const FORK_COPY_MAX_GAP_MS = 1000;
 
-/** Whether a `session_meta` payload marks the rollout as a fork or subagent. */
 function isForkedSessionMeta(payload: Record<string, unknown>): boolean {
   if (typeof payload["forked_from_id"] === "string") return true;
   const source = payload["source"];
@@ -217,14 +150,6 @@ function isForkedSessionMeta(payload: Record<string, unknown>): boolean {
   return typeof (spawn as Record<string, unknown>)["parent_thread_id"] === "string";
 }
 
-/**
- * Feeds one line of a Codex rollout into `state`, returning a record when the
- * line was a usage event.
- *
- * Deltas come from `last_token_usage`. Summing those across a session
- * reconciles with the session's final `total_token_usage`, provided
- * consecutive duplicate events are dropped, which this does.
- */
 export function parseCodexLine(line: string, state: CodexScanState): UsageRecord | null {
   let parsed: unknown;
   try {
@@ -245,9 +170,6 @@ export function parseCodexRecord(parsed: unknown, state: CodexScanState): UsageR
   const payloadType = payloadRecord["type"];
 
   if (record["type"] === "session_meta") {
-    // Only the first meta describes this file's own session. A forked rollout
-    // repeats the ancestors' metas right after it; letting those through would
-    // reassign every subsequent record to an ancestor session.
     if (state.sawSessionMeta) return null;
     state.sawSessionMeta = true;
     const id = payloadRecord["id"] ?? payloadRecord["session_id"];
@@ -273,23 +195,14 @@ export function parseCodexRecord(parsed: unknown, state: CodexScanState): UsageR
   if (typeof last !== "object" || last === null) return null;
   const lastRecord = last as Record<string, unknown>;
 
-  // Only an event that is otherwise eligible may consume the duplicate
-  // signature. A token_count arriving before its turn_context (no model yet)
-  // must not poison it, or the re-emitted copy after the model is known would
-  // be skipped as a duplicate and those tokens never counted.
   const timestampMs = parseTimestampMs(record["timestamp"]);
   if (timestampMs === null) return null;
   if (state.model.length === 0) return null;
 
-  // Codex re-emits an unchanged token_count on some stream boundaries. Summing
-  // those would double count, so identical consecutive payloads are skipped.
   const signature = JSON.stringify(lastRecord);
   if (signature === state.lastUsageSignature) return null;
   state.lastUsageSignature = signature;
 
-  // In a forked rollout the copied parent history was already counted from the
-  // parent's own file. Drop the leading burst; the first usage event separated
-  // from its predecessor by a real turn's worth of time ends it for good.
   if (state.suppressingForkCopies) {
     if (timestampMs - state.forkCopyAnchorMs < FORK_COPY_MAX_GAP_MS) {
       state.forkCopyAnchorMs = timestampMs;
@@ -304,12 +217,10 @@ export function parseCodexRecord(parsed: unknown, state: CodexScanState): UsageR
   const outputTokens = int(lastRecord["output_tokens"]);
 
   const totals: UsageTokenTotals = {
-    // Codex reports `input_tokens` inclusive of the cached portion.
     uncachedInputTokens: Math.max(0, inputTokens - cachedInputTokens - cacheCreationTokens),
     cachedInputTokens,
     cacheCreationTokens,
     outputTokens,
-    // Reported inside output_tokens, surfaced separately for the token mix.
     reasoningTokens: Math.min(outputTokens, int(lastRecord["reasoning_output_tokens"])),
   };
 
@@ -321,18 +232,11 @@ export function parseCodexRecord(parsed: unknown, state: CodexScanState): UsageR
     model: state.model,
     sessionId: state.sessionId,
     totals,
-    // Codex does not report cost in the rollout.
     reportedCostUsd: null,
     fast: false,
-    // Events surviving the fork-copy suppression above are unique to this
-    // rollout, so they need no global dedup.
     dedupeKey: null,
   };
 }
-
-/* -------------------------------------------------------------------------- */
-/* Grok Build                                                                 */
-/* -------------------------------------------------------------------------- */
 
 interface GrokUsageTotals {
   readonly inputTokens: number;
@@ -362,7 +266,6 @@ function readGrokUsageTotals(value: unknown): GrokUsageTotals | null {
 function grokTotalsToUsage(totals: GrokUsageTotals): UsageTokenTotals {
   const cachedInputTokens = totals.cachedReadTokens;
   const cacheCreationTokens = totals.cacheCreationTokens;
-  // Grok reports `inputTokens` inclusive of the cached portion, matching Codex.
   const uncachedInputTokens = Math.max(
     0,
     totals.inputTokens - cachedInputTokens - cacheCreationTokens,
@@ -377,15 +280,6 @@ function grokTotalsToUsage(totals: GrokUsageTotals): UsageTokenTotals {
   };
 }
 
-/**
- * Parses one line of a Grok Build `updates.jsonl` session log.
- *
- * Usage lands on `turn_completed` session updates. Per-model breakdowns live
- * under `usage.modelUsage`; when present each model becomes its own record.
- *
- * Returns every record for the line (0 or more). Callers stream line-by-line
- * and flatten.
- */
 export function parseGrokLine(line: string): readonly UsageRecord[] {
   let parsed: unknown;
   try {
@@ -416,7 +310,6 @@ export function parseGrokRecord(parsed: unknown): readonly UsageRecord[] {
   const sessionId = typeof paramsRecord["sessionId"] === "string" ? paramsRecord["sessionId"] : "";
   const promptId = typeof updateRecord["prompt_id"] === "string" ? updateRecord["prompt_id"] : null;
 
-  // Prefer the high-resolution agent clock; fall back to the outer unix seconds.
   const meta = paramsRecord["_meta"];
   let timestampMs: number | null = null;
   if (typeof meta === "object" && meta !== null) {
@@ -458,20 +351,11 @@ export function parseGrokRecord(parsed: unknown): readonly UsageRecord[] {
         totals: grokTotalsToUsage(topLevel),
         reportedCostUsd: grokCostTicksToUsd(topLevel.costUsdTicks),
         fast: false,
-        // No prompt id means we cannot tell two same-second updates apart.
         dedupeKey: promptId === null ? null : `${sessionId}:${promptId}:grok`,
       },
     ];
   }
 
-  // Cost allocation:
-  // 1. Emitted models with their own costUsdTicks keep those values.
-  // 2. Remaining aggregate cost (top-level minus those per-model ticks,
-  //    clamped at 0) is pro-rated across emitted models that lack ticks,
-  //    by token share among the unticked models only.
-  // 3. When no model has per-model ticks, remaining equals the full
-  //    aggregate and every emitted model gets a token-share slice.
-  // Zero-token rows are never emitted and never count toward used ticks.
   const topLevelCostUsd = grokCostTicksToUsd(topLevel.costUsdTicks);
   let usedTickedCostUsd = 0;
   let untickedTokenDenominator = 0;

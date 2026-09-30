@@ -8,7 +8,6 @@ import { type EventLoopReadings, layerWith, stallMs } from "./EventLoopMonitor.t
 
 const ms = (value: number) => value * 1e6;
 
-// Node reports a stall of S as a gap of up to S + 1 s, the histogram resolution.
 const stalled: EventLoopReadings = {
   delayMaxNs: ms(5_950),
   activeMs: 6_200,
@@ -22,7 +21,6 @@ const stalled: EventLoopReadings = {
   },
   rssBytes: 1536 * 1024 * 1024,
 };
-// Over the threshold as read, but not once the resolution is subtracted.
 const quiet: EventLoopReadings = { ...stalled, delayMaxNs: ms(2_950) };
 
 describe("EventLoopMonitor", () => {
@@ -36,7 +34,6 @@ describe("EventLoopMonitor", () => {
           return span;
         },
       });
-      // The first sample covers startup, so the monitor discards it.
       const samples = [stalled, quiet, stalled];
 
       yield* Effect.gen(function* () {
@@ -69,7 +66,6 @@ describe("EventLoopMonitor", () => {
   );
 
   it("ignores delay the loop spent idle, such as a system sleep", () => {
-    // Waking from sleep reads as a long gap, but the loop was idle in poll for it.
     const asleep: EventLoopReadings = { ...stalled, delayMaxNs: ms(600_000), activeMs: 900 };
     assert.isUndefined(stallMs(asleep));
     assert.strictEqual(stallMs({ ...asleep, activeMs: 600_000 }), 599_000);

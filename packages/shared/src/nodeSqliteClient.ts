@@ -1,9 +1,3 @@
-/**
- * Port of `@effect/sql-sqlite-node` that uses the native `node:sqlite`
- * bindings instead of `better-sqlite3`.
- *
- * @module SqliteClient
- */
 import * as NodeSqlite from "node:sqlite";
 
 import * as Cache from "effect/Cache";
@@ -58,13 +52,6 @@ export class UnsupportedNodeSqliteOperationError extends Schema.TaggedError<Unsu
   }
 }
 
-/**
- * Verify that the current Node.js version includes the `node:sqlite` APIs
- * used by `NodeSqliteClient` — specifically `StatementSync.columns()` (added
- * in Node 22.16.0 / 23.11.0).
- *
- * @see https://github.com/nodejs/node/pull/57490
- */
 const checkNodeSqliteCompat = () => {
   const parts = process.versions.node.split(".").map(Number);
   const major = parts[0] ?? 0;
@@ -147,7 +134,6 @@ const make = Effect.fn("makeWithDatabase")(function* (
 
     const prepareCache = yield* Cache.makeWith(prepare, {
       capacity: options.prepareCacheSize ?? 200,
-      // A transient prepare failure must not outlive the lock or missing schema.
       timeToLive: (exit) =>
         Exit.isSuccess(exit) ? (options.prepareCacheTTL ?? Duration.minutes(10)) : Duration.zero,
     });
@@ -191,7 +177,6 @@ const make = Effect.fn("makeWithDatabase")(function* (
             try: () => {
               if (hasRows(statement)) {
                 statement.setReturnArrays(true);
-                // Safe to cast to array after we've setReturnArrays(true)
                 return statement.all(...(params as any)) as unknown as ReadonlyArray<
                   ReadonlyArray<unknown>
                 >;

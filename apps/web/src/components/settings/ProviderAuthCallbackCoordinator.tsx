@@ -5,7 +5,6 @@ import { useEnvironments } from "../../state/environments";
 import { useAtomCommand } from "../../state/use-atom-command";
 import { toastManager } from "../ui/toast";
 
-/** Hosted web receives only the one-time code; the selected environment verifies and stores tokens. */
 export function ProviderAuthCallbackCoordinator() {
   const completeAuth = useAtomCommand(serverEnvironment.completeProviderAuth, {
     reportFailure: false,

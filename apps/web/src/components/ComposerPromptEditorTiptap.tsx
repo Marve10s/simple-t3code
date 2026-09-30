@@ -90,31 +90,17 @@ export interface ComposerPromptEditorHandle {
     expandedCursor: number;
     contextIds: string[];
   };
-  /**
-   * True when a collapsed caret sits on the first ("start") or last ("end")
-   * visual line, counting soft wraps. Prompt history only claims ArrowUp and
-   * ArrowDown at these edges so arrows still move the caret inside multiline
-   * text.
-   */
   isCaretOnVisualEdge: (edge: "start" | "end") => boolean;
 }
 
 export interface ComposerPromptEditorProps {
   value: string;
   cursor: number;
-  /**
-   * Render Markdown styling (bold, italic, code, strike, task checkboxes).
-   * Off renders the same Tiptap engine as plain text: every marker stays a
-   * literal character.
-   */
   richTextEnabled?: boolean;
-  /** Draft records behind the prompt's context references, keyed by context id. */
   contextRecords: ComposerDraftContextRecords;
-  /** Structured clipboard payload for the given referenced ids, or null to skip. */
   buildContextClipboardFragment?:
     | ((contextIds: ReadonlyArray<string>) => string | null)
     | undefined;
-  /** Imports a structured paste's records; returns ids that changed. */
   importContextFragment?:
     | ((fragment: ComposerContextClipboardFragment) => ReadonlyMap<string, string>)
     | undefined;
@@ -184,12 +170,6 @@ function resolvedThemeFromDocument(): "light" | "dark" {
   return document.documentElement.classList.contains("dark") ? "dark" : "light";
 }
 
-// ── Inline atom nodes (chips) ─────────────────────────────────────────────
-
-/**
- * Wraps an inline chip node view: keeps the caret and text selection out of the chip and
- * paints the editor's node selection over it.
- */
 const CHIP_NODE_SELECTION_CLASS_NAME =
   "relative inline-flex select-none items-center align-middle leading-none data-[composer-chip-selected]:after:pointer-events-none data-[composer-chip-selected]:after:absolute data-[composer-chip-selected]:after:inset-0 data-[composer-chip-selected]:after:rounded-sm data-[composer-chip-selected]:after:bg-[Highlight] data-[composer-chip-selected]:after:opacity-30 data-[composer-chip-selected]:after:content-['']";
 
@@ -372,7 +352,6 @@ function ComposerCitationNodeView({ node, editor, getPos }: NodeViewProps) {
       .run();
   }, [editor, nodePos]);
 
-  // Put the caret right after the chip so Enter sends and typing continues the prompt.
   const onRestoreFocus = useCallback(() => {
     if (!editor.isEditable) return;
     const pos = nodePos();
@@ -390,7 +369,6 @@ function ComposerCitationNodeView({ node, editor, getPos }: NodeViewProps) {
       spellCheck={false}
       data-composer-citation-chip="true"
       onKeyDown={(event: ReactKeyboardEvent<HTMLElement>) => {
-        // Tab from the comment button returns to the caret after the chip.
         if (
           !editor.isEditable ||
           event.key !== "Tab" ||
@@ -467,8 +445,6 @@ function ComposerContextReferenceNodeView({ node }: NodeViewProps) {
     </NodeViewWrapper>
   );
 }
-
-// ── Marker reveal (show ** when the cursor is on styled text) ──────────────
 
 type StyledRange = {
   from: number;
@@ -566,16 +542,9 @@ const ComposerMarkersExtension = Extension.create({
   },
 });
 
-// Document model (markdown ⇄ ProseMirror) lives in ~/composer-rich-text-doc so
-// unit tests can round-trip it without a browser.
-// ── Editor component ───────────────────────────────────────────────────────
-
 type TiptapEditor = NonNullable<ReturnType<typeof useEditor>>;
 
 export function ComposerPromptEditorTiptap(props: ComposerPromptEditorProps) {
-  // Extensions are creation-time: flipping the setting remounts the editor.
-  // Both halves initialize from the controlled Markdown value, so the draft
-  // survives the flip.
   return (
     <ComposerPromptEditorTiptapInner key={props.richTextEnabled ? "rich" : "plain"} {...props} />
   );
@@ -605,8 +574,6 @@ function ComposerPromptEditorTiptapInner(props: ComposerPromptEditorProps) {
     onPaste,
     editorRef,
   } = props;
-  // The setting toggles styling, not the engine: both modes are Tiptap.
-  // Plain mode disables the mark extensions, so markers stay literal text.
   const richText = richTextEnabled ?? false;
 
   const onChangeRef = useRef(onChange);
@@ -616,8 +583,6 @@ function ComposerPromptEditorTiptapInner(props: ComposerPromptEditorProps) {
   const importFragmentRef = useRef(importContextFragment);
   const skillsRef = useRef(skills);
   const latestValueRef = useRef(value);
-  // The editor instance for callbacks created before it exists (paste).
-  // Effects flush before any user interaction, so this is always set.
   const editorHolder = useRef<TiptapEditor | null>(null);
 
   useEffect(() => {
@@ -720,9 +685,6 @@ function ComposerPromptEditorTiptapInner(props: ComposerPromptEditorProps) {
       }
       return;
     }
-    // A selection-only update while a newer prompt waits to be applied (a chip
-    // was just inserted through the store) would report stale text and clobber
-    // the prompt. Let the controlled rewrite land instead.
     if (previousSnapshot.value === nextValue && nextValue !== latestValueRef.current) {
       return;
     }
@@ -774,7 +736,6 @@ function ComposerPromptEditorTiptapInner(props: ComposerPromptEditorProps) {
           gapcursor: false,
           trailingNode: false,
           code: false,
-          // Plain mode has no marks: typed markers stay literal characters.
           ...(richText ? {} : { bold: false, italic: false, strike: false }),
         }),
         ComposerMentionExtension,
@@ -885,8 +846,6 @@ function ComposerPromptEditorTiptapInner(props: ComposerPromptEditorProps) {
               return true;
             }
           }
-          // Shift+Tab from just after a citation reaches its comment button, which
-          // native tab order skips because the chip lives inside the editor.
           if (
             event.key === "Tab" &&
             event.shiftKey &&
@@ -915,8 +874,6 @@ function ComposerPromptEditorTiptapInner(props: ComposerPromptEditorProps) {
             event.stopPropagation();
             return true;
           }
-          // Enter on a focused task checkbox must not send the prompt (or
-          // split anything): Space toggles it, Enter does nothing.
           if (event.key === "Enter" && event.target instanceof HTMLInputElement) {
             event.preventDefault();
             return true;
@@ -941,10 +898,7 @@ function ComposerPromptEditorTiptapInner(props: ComposerPromptEditorProps) {
             ) {
               return true;
             }
-            // Split the paragraph so a single newline visibly advances the caret.
             return splitBlockKeepMarks(view.state, (tr) => {
-              // The split is programmatic, so the browser won't follow the
-              // caret into view on its own.
               view.dispatch(tr.scrollIntoView());
             });
           }
@@ -971,8 +925,6 @@ function ComposerPromptEditorTiptapInner(props: ComposerPromptEditorProps) {
           if (text.length !== 1) return false;
           const closer = SURROUND_CLOSE[text];
           if (!closer || from === to) return false;
-          // Never wrap chips or other atoms, and never wrap styled text: the
-          // default replace keeps marks intact, wrapping would drop them.
           let touchesSpecial = false;
           view.state.doc.nodesBetween(from, to, (node) => {
             if (
@@ -1004,7 +956,6 @@ function ComposerPromptEditorTiptapInner(props: ComposerPromptEditorProps) {
           let text = importFragment
             ? importPastedComposerText(clipboardData, importFragment)
             : pastedText;
-          // Complete chips at paste boundaries just as autocomplete does.
           const tokens = collectComposerPromptInlineTokens(`${text}\n`);
           const lastToken = tokens.at(-1);
           if (
@@ -1049,12 +1000,6 @@ function ComposerPromptEditorTiptapInner(props: ComposerPromptEditorProps) {
     editorHolder.current = editor;
   }, [editor]);
 
-  // Tiptap forwards option changes to the view from a passive effect, so a
-  // class change here would reach the ProseMirror element one tick after
-  // React commits. The chat composer measures its resting and expanded
-  // geometry in layout effects that run first, and it clamps the prompt
-  // through `className`, so the attributes are pushed to the view here for
-  // those measurements to see the layout they are about to reserve for.
   useLayoutEffect(() => {
     if (!editor?.isInitialized) return;
     editor.view.setProps({ attributes: editorAttributes });
@@ -1081,7 +1026,6 @@ function ComposerPromptEditorTiptapInner(props: ComposerPromptEditorProps) {
     return next;
   }, [editor]);
 
-  // Controlled value/cursor from the store (history recall, chip insertion…).
   useLayoutEffect(() => {
     if (!editor) return;
     const initialSelection = !hasAppliedControlledSelectionRef.current;
@@ -1152,9 +1096,6 @@ function ComposerPromptEditorTiptapInner(props: ComposerPromptEditorProps) {
     (nextCursor: number) => {
       if (!editor) return;
       editor.view.dom.focus({ preventScroll: true });
-      // A newer prompt is waiting to be applied (a chip was just inserted
-      // through the store). Reporting the editor's stale text now would
-      // overwrite that prompt; the pending rewrite places the caret instead.
       if (snapshotRef.current.value !== latestValueRef.current) return;
       const boundedCursor = clampCollapsedComposerCursor(snapshotRef.current.value, nextCursor);
       const map = serializeEditorDoc(editor.state.doc);
@@ -1361,13 +1302,6 @@ function ComposerPromptEditorTiptapInner(props: ComposerPromptEditorProps) {
   );
 }
 
-/**
- * Insert pasted markdown at the selection, rebuilding inline tokens as chips
- * and styled spans as marks.
- *
- * Newlines always become paragraph splits — never trailing hard breaks, which
- * render no visible line — so pasted text lands exactly as typed.
- */
 function insertMarkdownParagraphs(
   value: string,
   skillLabelFor: (name: string) => SkillMeta,
@@ -1384,26 +1318,16 @@ function insertMarkdownParagraphs(
   insertContent(blocks as JSONContent[]);
 }
 
-/**
- * Follow a programmatically placed caret: native scrolling only happens for
- * real input, so controlled rewrites, pastes, and focus restores scroll the
- * composer to the caret explicitly.
- */
 function scrollTiptapCaretIntoView(editor: TiptapEditor): void {
   editor.view.dispatch(editor.state.tr.scrollIntoView());
 }
 
-/**
- * Client rect of the caret's visual line, so prompt history keeps claiming
- * ArrowUp/Down only at the first and last soft-wrapped lines.
- */
 function caretLineRect(range: Range, edge: "start" | "end"): DOMRect | null {
   const collapsedRects = Array.from(range.getClientRects()).filter((rect) => rect.height > 0);
   const collapsedRect = edge === "start" ? collapsedRects.at(-1) : collapsedRects[0];
   if (collapsedRect) return collapsedRect;
 
   const container = range.startContainer;
-  // TEXT_NODE without importing the DOM lib's Node (shadowed by Tiptap's).
   if (container.nodeType === 3) {
     const textNode = container as Text;
     if (textNode.data.length === 0) return null;

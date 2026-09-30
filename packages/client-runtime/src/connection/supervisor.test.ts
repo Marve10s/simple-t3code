@@ -992,7 +992,6 @@ describe("EnvironmentSupervisor", () => {
       expect(reconnecting.attempt).toBe(1);
       expect(Option.isNone(yield* SubscriptionRef.get(supervisor.session))).toBe(true);
 
-      // No TestClock advance: a failed wake probe skips the first backoff rung.
       yield* Deferred.succeed(allowReconnect, undefined);
       yield* awaitState(
         supervisor.state,
@@ -1018,8 +1017,6 @@ describe("EnvironmentSupervisor", () => {
 
       yield* awaitState(supervisor.state, (state) => state.phase === "connected");
       yield* harness.wake("application-active");
-      // The immediate follow-up attempt fails: only the first attempt after
-      // the wake probe skips the ladder, so this failure backs off normally.
       yield* awaitState(
         supervisor.state,
         (state) => state.phase === "backoff" && state.attempt === 1,
@@ -1071,8 +1068,6 @@ describe("EnvironmentSupervisor", () => {
       yield* awaitState(supervisor.state, (state) => state.phase === "connected");
       yield* harness.wake("application-active-probe");
       yield* TestClock.adjust("3 seconds");
-      // The timed-out wake probe reconnects immediately without a backoff
-      // sleep: no further clock advance is needed.
       yield* awaitState(
         supervisor.state,
         (state) => state.phase === "connected" && state.generation === 2 && state.attempt === 1,

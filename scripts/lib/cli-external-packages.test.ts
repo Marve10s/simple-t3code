@@ -18,11 +18,6 @@ import {
   shouldBundleCliDependency,
 } from "./cli-external-packages.ts";
 
-// Only the field this test cares about; decoding ignores everything else.
-// optionalDependencies matter as much as dependencies here: every native family
-// in the list declares its actual platform bindings there (ffi-rs -> @yuuang/*,
-// fff-node -> @ff-labs/fff-bin-*), so reading only `dependencies` would check
-// nothing for exactly those packages.
 const PackageManifest = Schema.Struct({
   dependencies: Schema.optional(Schema.Record(Schema.String, Schema.String)),
   optionalDependencies: Schema.optional(Schema.Record(Schema.String, Schema.String)),
@@ -57,9 +52,6 @@ describe("shouldBundleCliDependency", () => {
     }
   });
 
-  // The real package is `node-gyp-build-optional-packages`, reached by prefix.
-  // It is transitive to a selected dependency root, so the runtime closure test
-  // below ensures it follows that root into the sidecar.
   it("treats prefix-matched siblings as external", () => {
     assert.strictEqual(shouldBundleCliDependency("node-gyp-build-optional-packages"), false);
   });
@@ -88,23 +80,7 @@ describe("selectCliRuntimeExternalDependencies", () => {
   });
 });
 
-// An external package is loaded from the real filesystem, so its own `require`
-// also resolves from the real filesystem. If one of its dependencies was
-// bundled away instead of left external, that dependency does not follow the
-// selected root into the sidecar.
-//
-// Found the hard way: msgpackr-extract's node-gyp-build-optional-packages
-// required detect-libc, which was bundled. Windows was fine; WSL got
-// MODULE_NOT_FOUND.
 it.layer(NodeServices.layer)("external package dependency closure", (it) => {
-  // Read manifests off disk from the pnpm store rather than resolving them.
-  // `require("<name>/package.json")` cannot do this job: under pnpm isolation a
-  // transitive package (node-addon-api, ffi-rs) is not reachable
-  // by name from this file at all, and an `exports` map can refuse the
-  // `/package.json` subpath outright (@ff-labs/fff-node). Both surface as "not
-  // installed", which would let this test skip everything and pass while
-  // checking nothing. The store contains the dependency graph the sidecar's
-  // minimal production install resolves.
   const readInstalledPackages = Effect.gen(function* () {
     const fileSystem = yield* FileSystem.FileSystem;
     const path = yield* Path.Path;
@@ -113,10 +89,6 @@ it.layer(NodeServices.layer)("external package dependency closure", (it) => {
       "../../node_modules/.pnpm",
     );
 
-    // The store holds regular files too (lock.yaml), so a path built under one
-    // raises ENOTDIR rather than reporting absence. That throws on Linux while
-    // Windows quietly returns false, which is exactly the kind of difference
-    // this test exists to catch, so treat any failure as "not there".
     const isPresent = (candidate: string) =>
       fileSystem.exists(candidate).pipe(Effect.orElseSucceed(() => false));
 
@@ -145,13 +117,9 @@ it.layer(NodeServices.layer)("external package dependency closure", (it) => {
     return installed;
   }).pipe(Effect.cached, Effect.runSync);
 
-  // Runtime-external only. The build-only entries resolve `bun:*` and are never
-  // loaded by Node, so their closure genuinely does not need to be external.
   const isRuntimeExternal = (name: string) =>
     CLI_RUNTIME_EXTERNAL_PREFIXES.some((prefix) => name.startsWith(prefix));
 
-  // A cold walk of the pnpm store can exceed the root timeout when the Windows
-  // lane runs four filesystem-heavy workspace suites at once.
   it.effect(
     "finds the runtime-external packages on disk",
     () =>
@@ -159,10 +127,6 @@ it.layer(NodeServices.layer)("external package dependency closure", (it) => {
         const installed = yield* readInstalledPackages;
         const found = [...installed.keys()].filter(isRuntimeExternal);
 
-        // Without this the closure check below can pass vacuously: if nothing is
-        // read, nothing is checked. node-pty is the one native root every
-        // platform ships, and node-addon-api is its transitive runtime
-        // dependency, so require them by name.
         for (const required of ["node-pty", "node-addon-api"]) {
           assert.ok(
             found.includes(required),
@@ -178,10 +142,6 @@ it.layer(NodeServices.layer)("external package dependency closure", (it) => {
       const installed = yield* readInstalledPackages;
       const violations: string[] = [];
       const seen = new Set<string>();
-      // Seeded from what is actually installed and matches a prefix, so scoped
-      // prefixes like "@yuuang/" and "@ff-labs/" are covered too. Seeding from
-      // the prefix strings themselves would skip every scoped entry, since a
-      // prefix is not a package name.
       const queue = [...installed.keys()].filter(isRuntimeExternal);
 
       for (const name of queue) {
@@ -213,8 +173,6 @@ it.layer(NodeServices.layer)("external package dependency closure", (it) => {
   );
 });
 
-// Configuring the bundler is not the same as checking what it emitted. These
-// exercise the scanner against the marker shape rolldown actually produces.
 describe("findInlinedExternalPackages", () => {
   const region = (path: string) => `//#region ${path}
 var x = 1;
@@ -250,11 +208,6 @@ var x = 1;
     assert.strictEqual(result.regionCount, 2);
   });
 
-  // regionCount is what separates "clean" from "this scan went blind because the
-  // marker format changed". A caller that ignores it gets a vacuous pass.
-  // The scan has to answer both directions. Checking only that externals are
-  // absent still passes on a bundle that externalized everything, which is the
-  // failure this whole change prevents.
   it("reports the packages that were inlined, not just the violations", () => {
     const source =
       region("../../node_modules/.pnpm/effect@4.0.0/node_modules/effect/dist/index.js") +
@@ -280,10 +233,6 @@ var x = 1;
   });
 });
 
-// The single-executable build can only `import` built-ins. A file-backed
-// import of an external package passes every bundler check and the regular
-// `node dist/bin.mjs` path, then fails inside the executable, so the scan
-// reads the emitted module graph instead.
 describe("findEsmImportsOfExternalPackages", () => {
   it("flags static and dynamic imports of file-backed packages", () => {
     const source = [

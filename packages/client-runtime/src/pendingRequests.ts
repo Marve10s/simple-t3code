@@ -22,7 +22,6 @@ export interface PendingUserInput {
   readonly requestId: ApprovalRequestId;
   readonly createdAt: string;
   readonly questions: ReadonlyArray<UserInputQuestion>;
-  /** Async questions can be dismissed without a reply; native callbacks cannot. */
   readonly dismissible: boolean;
 }
 
@@ -34,7 +33,6 @@ const QuestionOption = Schema.Struct({
   label: Schema.String,
 });
 const isQuestionOption = Schema.is(QuestionOption);
-// Native question IDs and option labels can be answer keys. Do not trim them.
 const decodeQuestion = Schema.decodeUnknownOption(
   Schema.Struct({
     ...UserInputQuestion.fields,
@@ -45,7 +43,6 @@ const decodeQuestion = Schema.decodeUnknownOption(
   }),
 );
 
-/** Older activities use native request types instead of a request kind. */
 export function requestKindFromRequestType(requestType: unknown): ProviderRequestKind | null {
   switch (requestType) {
     case "command_execution_approval":
@@ -95,8 +92,6 @@ const requestActivityKinds = new Set([
   "provider.user-input.respond.failed",
 ]);
 
-// The server reports a stale or unknown request through the failure text.
-// A failed reply with any other text stays open so the user can retry.
 const staleRequestFailureDetails = {
   "provider.approval.respond.failed": [
     "stale pending approval request",
@@ -120,15 +115,12 @@ function isStaleRequestFailure(
   return staleRequestFailureDetails[kind].some((fragment) => detail.includes(fragment));
 }
 
-/** Reduces request state once for web, desktop, and mobile. Layout stays with each client. */
 export function derivePendingRequests(activities: ReadonlyArray<OrchestrationThreadActivity>) {
   const approvals = new Map<ApprovalRequestId, PendingApproval>();
   const userInputs = new Map<ApprovalRequestId, PendingUserInput>();
   const closedApprovals = new Set<ApprovalRequestId>();
   const closedUserInputs = new Set<ApprovalRequestId>();
 
-  // Request IDs are unique. A terminal event stays final even when provider
-  // sequences and server-generated activities arrive in a different order.
   for (const activity of activities) {
     if (!requestActivityKinds.has(activity.kind)) continue;
     const payload = Predicate.isObject(activity.payload) ? activity.payload : undefined;
@@ -151,7 +143,6 @@ export function derivePendingRequests(activities: ReadonlyArray<OrchestrationThr
         : [];
       approvals.set(requestId, {
         requestId,
-        // Older OpenCode approvals do not always include a recognized kind.
         requestKind: requestKind ?? "command",
         createdAt: activity.createdAt,
         ...(typeof payload.detail === "string" && payload.detail ? { detail: payload.detail } : {}),

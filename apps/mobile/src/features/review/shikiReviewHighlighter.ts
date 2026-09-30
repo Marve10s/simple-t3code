@@ -570,7 +570,6 @@ export async function highlightCodeSnippet(input: {
   const languageHint = input.language?.trim() || "text";
   const language = await resolveLanguageFromPath(`snippet.${languageHint}`, languageHint);
   const theme = SHIKI_THEME_NAME_BY_SCHEME[input.theme];
-  // Bound retained text and preserve the existing plain-text/long-line fallback.
   if (
     !input.session ||
     language === "text" ||

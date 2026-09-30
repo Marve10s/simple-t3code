@@ -5,11 +5,6 @@ import { createJSONStorage, persist } from "zustand/middleware";
 import type { DraftId } from "../../composerDraftStore";
 import { resolveStorage } from "../../lib/storage";
 
-/**
- * Browser-style chat tabs for the "tabs" view. A new chat is a draft tab; when
- * the draft sends its first message it becomes a server thread with the same
- * thread id, and the tab keeps its place.
- */
 export type CodexTab =
   | {
       readonly kind: "thread";
@@ -24,7 +19,6 @@ export type CodexTab =
       readonly threadId: ThreadId;
     };
 
-/** Focus an open tab, adopt a promoted draft's tab, or open a new tab after the active one. */
 export function openCodexTab(
   tabs: ReadonlyArray<CodexTab>,
   tab: CodexTab,
@@ -43,7 +37,6 @@ export function openCodexTab(
   return [...tabs.slice(0, insertAt), tab, ...tabs.slice(insertAt)];
 }
 
-/** Remove a tab and pick the neighbor a browser would focus: right first, then left. */
 export function closeCodexTab(
   tabs: ReadonlyArray<CodexTab>,
   key: string,

@@ -4,7 +4,6 @@ export interface TurnDiffFileSummary {
   readonly deletions: number;
 }
 
-/** Reads Git's NUL-delimited numstat output without decoding display paths. */
 export function parseTurnDiffFilesFromNumstat(numstat: string): ReadonlyArray<TurnDiffFileSummary> {
   const records = numstat.split("\0");
   const files: TurnDiffFileSummary[] = [];
@@ -16,7 +15,6 @@ export function parseTurnDiffFilesFromNumstat(numstat: string): ReadonlyArray<Tu
 
     let path = record.slice(counts[0].length);
     if (path.length === 0) {
-      // Renames and copies use two more records: the source and destination.
       path = records[index + 2] ?? "";
       index += 2;
     }

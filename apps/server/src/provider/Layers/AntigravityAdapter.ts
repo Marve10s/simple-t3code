@@ -141,7 +141,6 @@ export interface AntigravityAdapterOptions {
     configOptions: ReadonlyArray<EffectAcpSchema.SessionConfigOption>,
   ) => Effect.Effect<void>;
   readonly onAuthRequired?: Effect.Effect<void>;
-  /** Model the provider default alias selects, when the account offers it. */
   readonly defaultModel?: Effect.Effect<string | undefined>;
   readonly nativeEventLogger?: EventNdjsonLogger;
 }
@@ -201,7 +200,6 @@ interface SessionContext {
   readonly approvals: Map<ApprovalRequestId, PendingApproval>;
   readonly questions: Map<ApprovalRequestId, PendingQuestion>;
   readonly commands: Map<string, OpenCommand>;
-  /** Keep only IDs after settlement or MCP exclusion so merged late updates cannot change identity. */
   readonly subagents: Map<string, OpenSubagent | "finished" | "mcp">;
   readonly turns: Array<{ id: TurnId; items: Array<unknown> }>;
   session: ProviderSession;
@@ -220,7 +218,6 @@ function isInsideRoot(path: Path.Path, root: string, candidate: string): boolean
   return relative === "" || (!relative.startsWith("..") && !path.isAbsolute(relative));
 }
 
-/** Resolves an agent-supplied path and rejects anything outside the session roots. */
 const resolveClientFilePath = Effect.fn("AntigravityAdapter.resolveClientFilePath")(
   function* (input: {
     readonly fileSystem: FileSystem.FileSystem;
@@ -230,7 +227,6 @@ const resolveClientFilePath = Effect.fn("AntigravityAdapter.resolveClientFilePat
   }) {
     const { path } = input;
     const resolved = path.resolve(input.requestPath);
-    // Follow symlinks on the parent so a link out of the workspace cannot escape it.
     const parent = yield* input.fileSystem
       .realPath(path.dirname(resolved))
       .pipe(Effect.orElseSucceed(() => path.dirname(resolved)));
@@ -278,7 +274,6 @@ const readClientTextFile = Effect.fn("AntigravityAdapter.readClientTextFile")(fu
   if (line === undefined && limit === undefined) {
     return { content: text };
   }
-  // ACP lines are 1-indexed. `limit` is a line count.
   const lines = text.split("\n");
   const start = Math.max(0, (line ?? 1) - 1);
   const end = limit === undefined ? lines.length : Math.min(lines.length, start + limit);
@@ -301,7 +296,6 @@ const writeClientTextFile = Effect.fn("AntigravityAdapter.writeClientTextFile")(
   return {};
 });
 
-/** Keeps one official ACP process per thread and drains a cancelled prompt before steering. */
 export const makeAntigravityAdapter = Effect.fn("makeAntigravityAdapter")(function* (
   settings: AntigravitySettings,
   options: AntigravityAdapterOptions,
@@ -628,7 +622,6 @@ export const makeAntigravityAdapter = Effect.fn("makeAntigravityAdapter")(functi
             if (!isMcp && (subagent || kind === "subagent")) {
               const turnId = subagent?.turnId ?? context.activeTurnId;
               const linkage = subagentLinkage(toolCall.toolCallId);
-              // Replay starts claim completion before the result says whether the call failed.
               if (
                 context.activeTurnId === undefined &&
                 isAntigravitySubagentReplayStart(event.rawPayload)
@@ -667,8 +660,6 @@ export const makeAntigravityAdapter = Effect.fn("makeAntigravityAdapter")(functi
                 });
                 context.subagents.set(toolCall.toolCallId, "finished");
               } else {
-                // start_subagent returns after launching a batch. Its output is
-                // the launch description, not a child result or completion.
                 const status = toolCall.status === "pending" ? "pending" : "running";
                 const description =
                   antigravitySubagentOutput(toolCall) ?? subagent?.description ?? linkage.title;
@@ -786,9 +777,6 @@ export const makeAntigravityAdapter = Effect.fn("makeAntigravityAdapter")(functi
             stopOwned,
             Effect.gen(function* () {
               const mcp = McpProviderSession.readMcpProviderSession(input.threadId);
-              // The attachments dir grant lets the agent read path-only uploads
-              // at the paths ProviderService injects into the turn text. It is
-              // a leaf directory holding only uploads.
               const runtime = yield* options.makeRuntime({
                 cwd,
                 clientInfo: { name: "t3-code", version: "0.0.0" },
@@ -814,10 +802,6 @@ export const makeAntigravityAdapter = Effect.fn("makeAntigravityAdapter")(functi
                   threadId: input.threadId,
                 }),
               });
-              // Workspace file access requested through the client fs
-              // capability. The agent gates each write behind
-              // `session/request_permission`, so only path containment is
-              // checked here.
               const allowedRoots = [cwd, serverConfig.attachmentsDir];
               yield* runtime.handleReadTextFile((request) =>
                 readClientTextFile({ fileSystem, path, allowedRoots, request }),
@@ -990,7 +974,6 @@ export const makeAntigravityAdapter = Effect.fn("makeAntigravityAdapter")(functi
       Effect.mapError((cause) => mapAntigravityError(input.threadId, "session/prompt", cause)),
     );
     let intent: TurnIntent | undefined;
-    // The caller holds promptLock while it changes or settles the active turn.
     const finishTurn = (turn: TurnIntent, payload: TurnCompletedPayload) =>
       Effect.gen(function* () {
         if (turn.settled || context.stopped || context.generation !== turn.generation) return;
@@ -1093,8 +1076,6 @@ export const makeAntigravityAdapter = Effect.fn("makeAntigravityAdapter")(functi
             )
             .pipe(Effect.forkIn(context.scope));
           context.promptFiber = fiber;
-          // Fiber.join can skip a scope-close waiter when the child is interrupted.
-          // Unwrap the Exit after Fiber.await returns.
           yield* Effect.raceFirst(
             Deferred.await(dispatched),
             Fiber.await(fiber).pipe(
@@ -1165,15 +1146,10 @@ export const makeAntigravityAdapter = Effect.fn("makeAntigravityAdapter")(functi
   const interruptTurn: Adapter["interruptTurn"] = (threadId) =>
     Effect.gen(function* () {
       const context = yield* requireSession(threadId);
-      // A command that outlived its turn keeps running in the agent, and
-      // session/cancel only stops a prompt. The agent kills its background
-      // commands when its session closes, so Stop with nothing else running
-      // ends the session, as Claude's does. The next turn resumes it.
       let idleWithCommands = false;
       yield* context.promptLock
         .withPermit(
           Effect.gen(function* () {
-            // Decided under the prompt lock so a turn cannot start in between.
             if (!context.promptFiber && [...context.commands.values()].some((c) => c.promoted)) {
               context.stopped = true;
               idleWithCommands = true;
@@ -1185,8 +1161,6 @@ export const makeAntigravityAdapter = Effect.fn("makeAntigravityAdapter")(functi
         )
         .pipe(
           Effect.mapError((cause) => mapAntigravityError(threadId, "session/cancel", cause)),
-          // Once marked stopped the session must close, even if this call is
-          // interrupted, or it is left unreachable with its commands running.
           Effect.ensuring(
             Effect.suspend(() =>
               idleWithCommands

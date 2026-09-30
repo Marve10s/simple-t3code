@@ -25,9 +25,6 @@ function latestTimestamp(values: ReadonlyArray<string | null | undefined>): stri
   return latest;
 }
 
-/** A recent user message stays queued until a turn adopts its timestamp.
- * Absolute age bounds client clock skew in both directions and stops stale
- * pre-adoption data from blocking the thread forever. */
 export function threadHasQueuedTurnStart(
   thread: Pick<OrchestrationThreadShell, "latestUserMessageAt" | "latestTurn" | "session">,
   now: string,
@@ -114,7 +111,6 @@ export function resolveAutoSettlementAt(input: {
     : null;
 }
 
-/** Cheap checks that run before any source control lookup. */
 export function isAutoSettlementCandidate(thread: OrchestrationThreadShell, now: string): boolean {
   if (thread.archivedAt !== null || thread.settledOverride !== null) return false;
   if (thread.autoSettleDisabledAt != null) return false;

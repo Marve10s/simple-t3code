@@ -20,19 +20,12 @@ const mergeProviderModels = (
   cachedModels: ReadonlyArray<ServerProvider["models"][number]>,
 ): ReadonlyArray<ServerProvider["models"][number]> => {
   const fallbackSlugs = new Set(fallbackModels.map((model) => model.slug));
-  // The fallback snapshot is built from current settings and already carries
-  // every custom model, so cached custom rows that are not in it were removed
-  // while the cache was stale and must not come back.
   return [
     ...fallbackModels,
     ...cachedModels.filter((model) => !model.isCustom && !fallbackSlugs.has(model.slug)),
   ];
 };
 
-/**
- * Built-in drivers in presentation order. Codex and Claude lead, the opt-in
- * providers follow, and unknown or fork drivers sort after every built-in.
- */
 const BUILT_IN_DRIVER_ORDER: ReadonlyArray<string> = [
   "codex",
   "claudeAgent",
@@ -98,20 +91,6 @@ export const hydrateCachedProvider = (input: {
     : hydratedProvider;
 };
 
-/**
- * Resolve the on-disk cache path for a provider instance snapshot.
- *
- * File naming: `<cacheDir>/<instanceId>.json`. For the default instance of
- * a built-in kind this equals the legacy `<kind>.json` path (because
- * `defaultInstanceIdForDriver(kind).toString() === kind`), so existing
- * cached snapshots remain readable without any rename step.
- *
- * Non-default instances (e.g. `codex_personal`) land in their own files and
- * never collide with other instances.
- *
- * Cache contents must still carry matching `instanceId` + `driver` identity
- * before hydration. The filename alone is not trusted as a routing key.
- */
 export const resolveProviderStatusCachePath = Effect.fn("resolveProviderStatusCachePath")(
   function* (input: {
     readonly cacheDir: string;

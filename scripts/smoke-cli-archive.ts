@@ -1,11 +1,4 @@
 #!/usr/bin/env node
-/**
- * Unpacks a CLI archive into a scratch directory and runs the executable the
- * way an installer would: no repo, no node_modules, no Node on PATH. Catches
- * the failures that only show inside the single-executable, such as an
- * external package reached through `import` or a native addon the hardened
- * runtime refuses to load.
- */
 import * as NodeRuntime from "@effect/platform-node/NodeRuntime";
 import * as NodeServices from "@effect/platform-node/NodeServices";
 import * as Duration from "effect/Duration";
@@ -52,8 +45,6 @@ const runExecutable = Effect.fn("runExecutable")(function* (
   const child = yield* spawner.spawn(
     ChildProcess.make(executable, args, {
       cwd,
-      // Empty PATH: the archive must not reach a system node, and the
-      // launcher context must not leak in from a developer shell.
       env: { PATH: "", HOME: cwd, USERPROFILE: cwd, TMPDIR: cwd, TEMP: cwd },
       extendEnv: false,
     }),
@@ -75,8 +66,6 @@ const smokeCliArchive = Effect.fn("smokeCliArchive")(function* (input: {
   const spawner = yield* ChildProcessSpawner.ChildProcessSpawner;
   const scratch = yield* fs.makeTempDirectoryScoped({ prefix: "t3-cli-smoke-" });
 
-  // On Windows the archive is a zip and the Git Bash `tar` on PATH is GNU
-  // tar; use the bsdtar Windows ships, which reads both formats.
   const tar = platform === "win32" ? windowsSystemTar() : "tar";
   const extract = yield* spawner
     .spawn(ChildProcess.make(tar, ["-xf", input.archive, "-C", scratch]))
@@ -113,10 +102,6 @@ const smokeCliArchive = Effect.fn("smokeCliArchive")(function* (input: {
     });
   }
 
-  // Starting the server is what actually opens sqlite, loads the terminal
-  // and search stacks (node-pty, fff, msgpackr-extract), and serves the
-  // client, so probe a real `serve` in a scratch home rather than a
-  // command that only reads package metadata.
   const net = yield* NetService.NetService;
   const port = yield* net.findAvailablePort(47700);
   const home = path.join(scratch, "home");
@@ -142,8 +127,6 @@ const smokeCliArchive = Effect.fn("smokeCliArchive")(function* (input: {
     Effect.all([collect(server.stdout), collect(server.stderr)]),
   );
   const httpClient = yield* HttpClient.HttpClient;
-  // A request that connects while the server is still initializing can hang,
-  // so each probe gets its own deadline, like the SSH readiness probe.
   const probe = httpClient.execute(HttpClientRequest.get(`http://127.0.0.1:${String(port)}/`)).pipe(
     Effect.map((response) => response.status === 200),
     Effect.timeout(Duration.seconds(2)),

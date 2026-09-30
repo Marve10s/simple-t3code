@@ -28,7 +28,6 @@ const UsageResponse = Schema.Struct({
   usage: Schema.Struct({ rolling: UsageWindow, weekly: UsageWindow, monthly: UsageWindow }),
 });
 
-/** External OpenCode servers own their credentials; never read the host's account for them. */
 export const readOpenCodeGoUsageLimits = Effect.fn("readOpenCodeGoUsageLimits")(function* (input: {
   readonly enabled: boolean;
   readonly serverUrl: string;
@@ -56,7 +55,6 @@ export const readOpenCodeGoUsageLimits = Effect.fn("readOpenCodeGoUsageLimits")(
       ));
     const auth = yield* decodeAuthFile(contents);
     const apiAuth = decodeApiAuth(auth["opencode-go"]);
-    // OpenCode overlays stored API credentials after environment credentials.
     const apiKey = (Option.isSome(apiAuth) ? apiAuth.value.key : env.OPENCODE_API_KEY)?.trim();
     if (!apiKey) return unsupported;
 
@@ -66,7 +64,6 @@ export const readOpenCodeGoUsageLimits = Effect.fn("readOpenCodeGoUsageLimits")(
         HttpClientRequest.bearerToken(apiKey),
       ),
     );
-    // A valid Zen key can exist without a Go subscription.
     if (response.status === 403) return unsupported;
     const body = yield* HttpClientResponse.filterStatusOk(response).pipe(
       Effect.flatMap(HttpClientResponse.schemaBodyJson(UsageResponse)),
@@ -98,9 +95,6 @@ export const readOpenCodeGoUsageLimits = Effect.fn("readOpenCodeGoUsageLimits")(
     ];
     return {
       ...makeUsageLimits({ checkedAt, windows }),
-      // Go's usage response has no account ID. An unkeyed hash matches across
-      // environments without a shared secret. It permits offline guesses, but
-      // Go keys are randomly generated.
       credentialFingerprint: NodeCrypto.createHash("sha256")
         .update("opencode-go\0")
         .update(apiKey)

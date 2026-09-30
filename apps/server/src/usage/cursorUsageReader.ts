@@ -1,4 +1,3 @@
-// Node fs reads CLI credentials, and crypto hashes account IDs for deduplication.
 // @effect-diagnostics nodeBuiltinImport:off
 import * as NodeFSP from "node:fs/promises";
 import * as NodeCrypto from "node:crypto";
@@ -20,11 +19,6 @@ function tokens(value: unknown): number {
   return typeof value === "number" && Number.isFinite(value) && value > 0 ? Math.trunc(value) : 0;
 }
 
-/**
- * Maps Cursor's tiered names (`cursor-grok-4.6-high-fast`,
- * `claude-fable-5-1-thinking-high`) to the base model's rate-table key.
- * Grok resolves through xAI's first-party entry, which has no bare alias.
- */
 export function cursorRateModel(model: string): string {
   const base = model
     .replace(/^cursor-/, "")
@@ -52,7 +46,6 @@ function canonicalJson(value: unknown): string {
   return JSON.stringify(value) ?? "null";
 }
 
-/** Find the longest exact suffix/prefix overlap in linear time. */
 function boundaryOverlap(previous: readonly string[], current: readonly string[]): number {
   const sequence = [...current, "", ...previous];
   const lengths = Array.from({ length: sequence.length }, () => 0);
@@ -65,7 +58,6 @@ function boundaryOverlap(previous: readonly string[], current: readonly string[]
   return lengths.at(-1) ?? 0;
 }
 
-/** Dashboard usage includes headless agents and reports fresh input separately from cache reads. */
 export async function readCursorAccountUsage(
   credentialSource: string | { readonly kind: "keychain" },
   sinceMs: number,
@@ -125,8 +117,6 @@ export async function readCursorAccountUsage(
     const pageSize = 1000;
     let total: number | undefined;
     for (let page = 1; ; page++) {
-      // A count can include overlapping page boundaries. Allow room to
-      // reconcile them without imposing a fixed account-size limit.
       if (page > (total === undefined ? 1000 : Math.ceil(total / pageSize) * 2 + 1)) {
         throw new Error("Account usage page limit exceeded");
       }
@@ -239,7 +229,6 @@ export async function readCursorAccountUsage(
         const reportedCostUsd =
           typeof usage.totalCents === "number" ? usage.totalCents / 100 : null;
         const sessionId = typeof event.conversationId === "string" ? event.conversationId : "";
-        // No event ID is provided. Preserve identical billed rows with an occurrence index.
         const key = accountHash(
           JSON.stringify([timestampMs, event.model, sessionId, totals, reportedCostUsd]),
         );

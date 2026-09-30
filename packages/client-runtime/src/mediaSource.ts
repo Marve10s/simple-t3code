@@ -20,7 +20,6 @@ import {
 
 export type MediaSourceResource = Extract<AssetResource, { readonly _tag: "media-file" }>;
 
-/** What a piece of authored media is and how its bytes can be reached. */
 export type ResolvedMediaSource = {
   readonly kind: "image" | "video";
   readonly mimeType: string;
@@ -45,7 +44,6 @@ export interface ResolveMediaSourceInput {
   readonly threadId: ThreadId | undefined;
   readonly workspaceRoot?: string | null | undefined;
   readonly resolvedFilePath?: string | undefined;
-  /** Image syntax can target an endpoint without a recognizable extension. */
   readonly imageEmbed?: boolean | undefined;
 }
 
@@ -66,7 +64,6 @@ export function resolveMediaSource(
     classified._tag === "Direct"
       ? splitMarkdownLinkSearchAndHash(classified.uri).path
       : splitFilePathPosition(classified.path).path;
-  // Local paths have already been decoded. Do not interpret literal #, ?, or % characters again.
   const basename = fileBasename(path);
   const extensionIndex = basename.lastIndexOf(".");
   const detectedMimeType =

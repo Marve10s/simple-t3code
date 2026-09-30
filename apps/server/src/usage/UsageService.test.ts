@@ -1,5 +1,4 @@
 // @effect-diagnostics nodeBuiltinImport:off - the suite seeds and grows real
-// transcript trees on disk, outside the service's Effect FileSystem.
 import * as NodeFSP from "node:fs/promises";
 import * as NodeOS from "node:os";
 import * as NodePath from "node:path";
@@ -81,7 +80,6 @@ const serviceLayers = (input: {
   readonly home: string;
   readonly settings: Parameters<typeof ServerSettings.layerTest>[0];
   readonly onRatesFetch?: () => void;
-  /** Defaults to an unparsable document so every scan retries the fetch. */
   readonly ratesDocument?: unknown;
   readonly environment?: NodeJS.ProcessEnv;
   readonly platform?: NodeJS.Platform;
@@ -96,8 +94,6 @@ const serviceLayers = (input: {
         HttpClient.make((request) =>
           Effect.sync(() => {
             input.onRatesFetch?.();
-            // Unparsable rates: every scan retries the fetch, which makes the
-            // fetch count a boundary-level observation of how many scans ran.
             return HttpClientResponse.fromWeb(request, Response.json(input.ratesDocument ?? {}));
           }),
         ),
@@ -451,7 +447,6 @@ describe("UsageService", () => {
           [
             { type: "session_meta", payload: { id: "codex-account-session" } },
             { type: "turn_context", payload: { model: "gpt-5.6-sol" } },
-            // A-B-A at one timestamp must preserve both equal A events.
             ...[11, 12, 11].map((outputTokens) => ({
               type: "event_msg",
               timestamp: "2026-08-01T10:00:00Z",
@@ -755,7 +750,6 @@ describe("UsageService", () => {
           );
           const warm = yield* service.readSummary(WINDOW);
           assert.deepStrictEqual(warm.buckets, first.buckets);
-          // The repeated content block has the same message/request identity.
           yield* Effect.promise(() => NodeFSP.appendFile(transcript, large + claudeLine(2, 100)));
           const appended = yield* service.readSummary(WINDOW);
           assert.strictEqual(totalOutputTokens(appended), 10000);
@@ -812,7 +806,6 @@ describe("UsageService", () => {
         assert.deepStrictEqual(restored.buckets, first.buckets);
         assert.deepStrictEqual(restored.sources, first.sources);
 
-        // A moved transcript must not count the saved usage twice.
         yield* Effect.promise(() => NodeFSP.writeFile(transcript + ".jsonl", content));
         const moved = yield* restarted.readSummary(WINDOW);
         assert.deepStrictEqual(moved.buckets, first.buckets);
@@ -965,7 +958,6 @@ describe("UsageService", () => {
       assert.deepStrictEqual(first, second);
       assert.strictEqual(ratesFetches, 1);
 
-      // A later request is fresh work again, not a stale cached answer.
       yield* service.readSummary(WINDOW);
       assert.strictEqual(ratesFetches, 2);
     }).pipe(Effect.scoped),
@@ -997,13 +989,10 @@ describe("UsageService", () => {
       assert.strictEqual(ratesFetches, 1);
       assert.strictEqual(first.pricing.status, "fresh");
 
-      // Inside the daily TTL a plain rescan keeps the cached table.
       yield* TestClock.adjust(Duration.minutes(2));
       yield* service.readSummary(WINDOW);
       assert.strictEqual(ratesFetches, 1);
 
-      // An explicit refresh fetches again so a newly listed model gets priced.
-      // A burst of refreshes shares that one fetch.
       const [refreshed] = yield* Effect.all([service.refreshRates, service.refreshRates], {
         concurrency: 2,
       });
@@ -1047,9 +1036,6 @@ describe("UsageService", () => {
           },
         };
 
-        // Each candidate needs a distinct key because the broken case leaves
-        // its entry in the service's private in-flight map. The invalid window
-        // keeps the real scan synchronous once its detached fiber starts.
         const input: UsageSummaryInput = {
           ...WINDOW,
           sinceDay: UsageDay.make("2026-09-01"),

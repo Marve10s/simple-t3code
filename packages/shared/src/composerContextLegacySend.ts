@@ -2,14 +2,6 @@ import type { ComposerContextRecord, ElementContextDetails } from "@t3tools/cont
 
 import { collectComposerContextReferences } from "./composerContextReferences.ts";
 
-/**
- * Serializes a canonical message (inline reference links plus records) into the pre-inline-context
- * wire shape, for servers that do not advertise `inlineMessageContext`. Those servers drop the
- * records and forward the links as literal text, so the payload has to travel inside the message.
- *
- * The output is the format `upgradeLegacyContextMessage` parses, so a newer client reading the
- * resulting message reconstructs the same records.
- */
 export function serializeLegacyContextMessage(input: {
   text: string;
   records: ReadonlyArray<ComposerContextRecord>;
@@ -17,8 +9,6 @@ export function serializeLegacyContextMessage(input: {
   const recordsById = new Map(input.records.map((record) => [record.contextId, record]));
   const used = new Set<string>();
 
-  // Inline references become the plain label the old composer wrote; the payload follows in a
-  // trailing block, which is where the legacy format carried it.
   let text = input.text;
   const occurrences = collectComposerContextReferences(text);
   for (const occurrence of [...occurrences].reverse()) {
@@ -47,8 +37,6 @@ export function serializeLegacyContextMessage(input: {
       .map(renderReviewComment),
   ].filter((block) => block.length > 0);
 
-  // Review comments already inlined their payload above; anything else unreferenced still ships
-  // its block so no context is silently dropped.
   return [text.trimEnd(), ...blocks].filter((part) => part.length > 0).join("\n\n");
 }
 
@@ -84,7 +72,6 @@ function renderTerminalEntry(record: ComposerContextRecord): string {
       : `lines ${record.lineStart}-${record.lineEnd}`;
   const body = record.text
     .split("\n")
-    // A trailing newline would otherwise number a line past the range the label declares.
     .slice(0, record.lineEnd - record.lineStart + 1)
     .map((line, index) => `${record.lineStart + index} | ${line}`)
     .join("\n");
@@ -148,7 +135,6 @@ function renderReviewComment(record: ComposerContextRecord): string {
     `startIndex="${record.startIndex}"`,
     `endIndex="${record.endIndex}"`,
   ].join(" ");
-  // The fence must be longer than any run of backticks inside the diff so the body stays intact.
   const longestRun = Math.max(
     0,
     ...[...record.diff.matchAll(/`+/g)].map((match) => match[0].length),

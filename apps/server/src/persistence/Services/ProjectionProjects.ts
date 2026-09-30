@@ -1,11 +1,3 @@
-/**
- * ProjectionProjectRepository - Projection repository interface for projects.
- *
- * Owns persistence operations for project rows in the orchestration projection
- * read model.
- *
- * @module ProjectionProjectRepository
- */
 import {
   IsoDateTime,
   ModelSelection,
@@ -42,28 +34,14 @@ export const GetProjectionProjectInput = Schema.Struct({
 });
 export type GetProjectionProjectInput = typeof GetProjectionProjectInput.Type;
 
-/**
- * ProjectionProjectRepositoryShape - Service API for projected project records.
- */
 export interface ProjectionProjectRepositoryShape {
-  /**
-   * Insert or replace a projected project row.
-   *
-   * Upserts by `projectId` and persists scripts through JSON encoding.
-   */
   readonly upsert: (row: ProjectionProject) => Effect.Effect<void, ProjectionRepositoryError>;
 
-  /**
-   * Read a projected project row by id.
-   */
   readonly getById: (
     input: GetProjectionProjectInput,
   ) => Effect.Effect<Option.Option<ProjectionProject>, ProjectionRepositoryError>;
 }
 
-/**
- * ProjectionProjectRepository - Service tag for project projection persistence.
- */
 export class ProjectionProjectRepository extends Context.Service<
   ProjectionProjectRepository,
   ProjectionProjectRepositoryShape

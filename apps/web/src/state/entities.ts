@@ -124,15 +124,9 @@ export function resolveThreadDetailRef(
   return ref !== null && (!options.waitForShell || options.shellExists) ? ref : null;
 }
 
-/** Detail collections composed with shell-authoritative thread/workspace metadata. */
 export function useThread(
   ref: ScopedThreadRef | null,
   options?: {
-    /**
-     * Client-reserved draft thread ids do not exist on the server until the
-     * first send. Waiting for the shell index avoids polling the detail
-     * endpoint for an intentionally missing thread during that window.
-     */
     waitForShell?: boolean;
   },
 ): EnvironmentThread | null {
@@ -154,7 +148,6 @@ export function readProjects(): ReadonlyArray<EnvironmentProject> {
   return appAtomRegistry.get(environmentProjects.projectsAtom);
 }
 
-/** Resolves when the project event reaches the live client store. */
 export function waitForProject(
   ref: ScopedProjectRef,
   timeoutMs = 10_000,
@@ -183,7 +176,6 @@ export function readThreadShell(ref: ScopedThreadRef): EnvironmentThreadShell | 
   return appAtomRegistry.get(environmentThreadShells.threadShellAtom(ref));
 }
 
-/** The thread as `useThread` returns it, read outside React. */
 export function readThread(ref: ScopedThreadRef): EnvironmentThread | null {
   return mergeEnvironmentThread(
     appAtomRegistry.get(environmentThreadDetails.detailAtom(ref)),
@@ -191,9 +183,6 @@ export function readThread(ref: ScopedThreadRef): EnvironmentThread | null {
   );
 }
 
-/** Whether the environment's server understands thread.settle/unsettle.
-    False for pre-settlement servers (capability defaults false on decode),
-    so clients under version skew fall back instead of erroring. */
 export function readEnvironmentSupportsSettlement(environmentId: EnvironmentId): boolean {
   return (
     appAtomRegistry.get(environmentServerConfigsAtom).get(environmentId)?.environment.capabilities
@@ -201,8 +190,6 @@ export function readEnvironmentSupportsSettlement(environmentId: EnvironmentId):
   );
 }
 
-/** Whether the environment's server understands thread.snooze/unsnooze.
-    Same version-skew contract as settlement. */
 export function readEnvironmentSupportsSnooze(environmentId: EnvironmentId): boolean {
   return (
     appAtomRegistry.get(environmentServerConfigsAtom).get(environmentId)?.environment.capabilities
@@ -210,8 +197,6 @@ export function readEnvironmentSupportsSnooze(environmentId: EnvironmentId): boo
   );
 }
 
-/** Whether the environment's server understands thread.pin/unpin.
-    Same version-skew contract as settlement. */
 export function readEnvironmentSupportsPinning(environmentId: EnvironmentId): boolean {
   return (
     appAtomRegistry.get(environmentServerConfigsAtom).get(environmentId)?.environment.capabilities
@@ -219,8 +204,6 @@ export function readEnvironmentSupportsPinning(environmentId: EnvironmentId): bo
   );
 }
 
-/** Whether the environment's server understands thread title regeneration.
-    Same version-skew contract as settlement. */
 export function readEnvironmentSupportsTitleRegeneration(environmentId: EnvironmentId): boolean {
   return (
     appAtomRegistry.get(environmentServerConfigsAtom).get(environmentId)?.environment.capabilities
@@ -228,8 +211,6 @@ export function readEnvironmentSupportsTitleRegeneration(environmentId: Environm
   );
 }
 
-/** Whether the environment's server understands thread.pin.reorder (and
-    orderKey on thread.pin). Same version-skew contract as settlement. */
 export function readEnvironmentSupportsPinReorder(environmentId: EnvironmentId): boolean {
   return (
     appAtomRegistry.get(environmentServerConfigsAtom).get(environmentId)?.environment.capabilities
@@ -237,8 +218,6 @@ export function readEnvironmentSupportsPinReorder(environmentId: EnvironmentId):
   );
 }
 
-/** Whether the environment's server understands thread.auto-settle.set.
-    Same version-skew contract as settlement. */
 export function readEnvironmentSupportsAutoSettleOptOut(environmentId: EnvironmentId): boolean {
   return (
     appAtomRegistry.get(environmentServerConfigsAtom).get(environmentId)?.environment.capabilities

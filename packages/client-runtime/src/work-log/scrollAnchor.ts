@@ -1,4 +1,3 @@
-/** Save the row at the current offset; a virtualizer's cached visible range can lag a fling. */
 export function resolveWorkGroupScrollAnchor(state: {
   readonly data: ReadonlyArray<{ readonly id: string }>;
   readonly scroll: number;

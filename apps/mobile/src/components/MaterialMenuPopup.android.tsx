@@ -45,7 +45,6 @@ function MenuIcon(props: {
   );
 }
 
-/** Native popup positioned at the original trigger, outside virtualized rows. */
 export function MaterialMenuPopup(props: MaterialMenuPopupProps) {
   const { appearance, themeAppearance, themeVariables: colors } = useAppearancePreferences();
   const { scale, menuItemHeight } = useAndroidControlSizing();
@@ -53,7 +52,6 @@ export function MaterialMenuPopup(props: MaterialMenuPopupProps) {
   const caption = resolveScaledTextRole("caption", appearance.baseFontSize);
   const foreground = colors["--color-foreground"];
   const muted = colors["--color-foreground-muted"];
-  // A fixed native item height clips wrapped labels; a minimum lets each row grow.
   const itemModifiers = [width(props.menuWidth), defaultMinSize({ minHeight: menuItemHeight })];
   const items = (
     <>

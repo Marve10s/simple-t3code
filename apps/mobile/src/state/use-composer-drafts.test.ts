@@ -385,7 +385,6 @@ describe("mobile composer drafts", () => {
 
   it("gives a folded paste a chip that survives the send", () => {
     const key = "environment-1:thread-1";
-    // What `createPastedTextComposerAttachment` produces for a long paste.
     const pasted = {
       type: "file" as const,
       id: "pasted-1",
@@ -397,12 +396,10 @@ describe("mobile composer drafts", () => {
     appendComposerDraftAttachments(key, [pasted], { appendReference: true });
 
     const draft = getComposerDraftSnapshot(key);
-    // Visible in the composer before sending, not only once the message lands.
     expect(draft.text).toContain("pasted-text.txt");
     expect(draft.context?.records).toMatchObject([
       { kind: "file", attachmentId: pasted.id, name: pasted.name },
     ]);
-    // The reference points at the record, so the chip stays a chip in the sent message.
     const [record] = draft.context?.records ?? [];
     expect(draft.text).toContain(String(record?.contextId));
   });
@@ -848,8 +845,6 @@ describe("mobile composer drafts", () => {
     expect(getComposerDraftSnapshot(draftKey).context).toBeUndefined();
   });
 
-  // Hydration is one-shot per module instance and the attachment sweep now
-  // triggers it too, so this test must observe it before any sweep test runs.
   it("hydrates generic file attachments from their saved local paths", () => {
     const file = {
       id: "file-1",
@@ -925,7 +920,6 @@ describe("mobile composer drafts", () => {
       makeAttachment("incoming-2").fileUri,
     );
 
-    // Restore paths bypass the cap so a failed send never drops its files.
     const overflowRejected = appendComposerDraftAttachments(
       draftKey,
       [makeAttachment("restored-1")],
@@ -984,7 +978,6 @@ describe("mobile composer drafts", () => {
     await releaseUnusedComposerAttachmentFiles([image]);
     expect(composerAttachmentCleanupMocks.remove).not.toHaveBeenCalled();
 
-    // A queued outbox message must keep the bytes alive after the draft clears.
     appAtomRegistry.set(composerDraftsAtom, {});
     appAtomRegistry.set(threadOutboxManager.queuedMessagesByThreadKeyAtom, {
       "environment-1:thread-1": [
@@ -1187,7 +1180,6 @@ describe("mobile composer drafts", () => {
       expect(appAtomRegistry.get(composerDraftsAtom)).toEqual({
         "direct-environment:thread-1": DRAFT,
       });
-      // The registry can remove the active outbox and drafts after the backup lands.
       appAtomRegistry.set(threadOutboxManager.queuedMessagesByThreadKeyAtom, {});
       await clearComposerDraftsEnvironment(environmentId);
       await releaseUnusedComposerAttachmentFiles([file]);
@@ -1687,7 +1679,6 @@ describe("mobile composer drafts", () => {
     );
     expect(hydrated).toHaveLength(1);
     const [key, draft] = hydrated[0]!;
-    // Legacy project keys are rewritten to id keys on load.
     expect(key).toMatch(/^new-task:[0-9a-z-]+$/);
     expect(draft).toEqual({
       text: "",
@@ -1742,9 +1733,6 @@ describe("mobile composer drafts", () => {
       attachments: [],
       importedShareIds: ["share-1"],
     };
-    // The stale-model strip must not touch receipt-bearing drafts, and the
-    // empty filter must keep them — or the same share would re-import after
-    // restart.
     const stripped = Object.values(
       decodePersistedComposerState({
         schemaVersion: 1,
@@ -1806,8 +1794,6 @@ describe("mobile composer drafts", () => {
       { text: "keep me", attachments: [] },
       now,
     );
-    // The new key has no colon after the prefix, so it can never be
-    // mistaken for the legacy shape on the next load.
     expect(key).toMatch(/^new-task:[0-9a-z-]+$/);
     expect(draft).toEqual({
       text: "keep me",
@@ -1819,7 +1805,6 @@ describe("mobile composer drafts", () => {
       },
     });
 
-    // Already-migrated, thread, and pending-task keys pass through untouched.
     const stamped: ComposerDraft = {
       text: "x",
       attachments: [],
@@ -1851,8 +1836,6 @@ describe("mobile composer drafts", () => {
     const first = createNewTaskDraft(project);
     const second = createNewTaskDraft(project);
     expect(first).not.toBe(second);
-    // Empty stamped drafts stay in memory so the composer has a key to write
-    // to, but the persisted document leaves them out.
     expect(appAtomRegistry.get(composerDraftsAtom)[first]?.project).toMatchObject(project);
 
     setComposerDraftText(first, "first idea");
@@ -1861,7 +1844,6 @@ describe("mobile composer drafts", () => {
       expect.arrayContaining([first, second]),
     );
 
-    // Clearing content on the way out drops the stamp with it.
     clearComposerDraftContent(first, { clearModelSelection: true, clearWorkspaceSelection: true });
     expect(appAtomRegistry.get(composerDraftsAtom)[first]).toBeUndefined();
     expect(getComposerDraftSnapshot(second).text).toBe("second idea");
@@ -1893,7 +1875,6 @@ describe("mobile composer drafts", () => {
     const moved = getComposerDraftSnapshot(key);
     expect(moved.text).toBe("moving house");
     expect(moved.runtimeMode).toBe("approval-required");
-    // Branch and worktree belong to the old repo.
     expect(moved.workspaceSelection).toBeUndefined();
     expect(moved.project).toEqual({ ...to, createdAt });
     expect(findNewTaskDraftKeys(appAtomRegistry.get(composerDraftsAtom), from)).toEqual([]);
@@ -1933,15 +1914,12 @@ describe("mobile composer drafts", () => {
 
     ensureComposerDraftsLoaded();
     await Promise.resolve();
-    // The read is blocked, hydration is pending.
     setComposerDraftText("new-task:environment-1:project-1", "New prompt");
     await vi.advanceTimersByTimeAsync(200);
 
-    // Write should still be deferred — hydration has not resolved.
     expect(composerDraftFileMocks.getWrites()).toHaveLength(0);
 
     composerDraftFileMocks.releaseRead();
-    // Let the loadPromise settle and chain into the deferred persist.
     await vi.runAllTimersAsync();
 
     expect(JSON.parse(composerDraftFileMocks.getWrites()[0]!)).toEqual({
@@ -1977,13 +1955,10 @@ describe("mobile composer drafts", () => {
 
     ensureComposerDraftsLoaded();
     await Promise.resolve();
-    // An edit lands before hydration finishes; its debounced write is gated
-    // behind the blocked read.
     setComposerDraftText("new-task:environment-1:project-1", "New prompt");
 
     const flush = flushComposerDrafts();
     await vi.advanceTimersByTimeAsync(200);
-    // The flush must not have written the pre-hydration snapshot over disk.
     expect(composerDraftFileMocks.getWrites()).toHaveLength(0);
 
     composerDraftFileMocks.releaseRead();
@@ -2085,7 +2060,6 @@ describe("mobile composer drafts", () => {
 
     const clear = clearComposerDraftsEnvironment(EnvironmentId.make("environment-1"));
     await Promise.resolve();
-    // Cleanup write is queued behind the still-blocked debounced write.
     expect(composerDraftFileMocks.getWrites()).toHaveLength(0);
 
     releaseFirstWrite();
@@ -2431,8 +2405,6 @@ describe("mobile composer drafts", () => {
       runtimeMode: "full-access",
       interactionMode: "default",
     };
-    // The user edited the text (forcing the partial undo) and also switched
-    // interaction mode, but never touched the merge-written runtime mode.
     const edited: ComposerDraft = {
       text: "typed EDITED before\n\nqueued text",
       attachments: [],
@@ -2476,7 +2448,6 @@ describe("mobile composer drafts", () => {
       text: "typed before\n\nqueued text",
       attachments: [keptAttachment, insertedAttachment],
     };
-    // The user rewrote the leading text and attached a file mid-recovery.
     const edited: ComposerDraft = {
       text: "typed EDITED before\n\nqueued text",
       attachments: [keptAttachment, insertedAttachment, userAttachment],
@@ -2491,8 +2462,6 @@ describe("mobile composer drafts", () => {
       },
     );
 
-    // Edits that broke the merged suffix keep their text untouched; only the
-    // inserted attachments still come out.
     const rewritten: ComposerDraft = {
       text: "totally rewritten",
       attachments: [insertedAttachment],
@@ -2541,8 +2510,6 @@ describe("mobile composer drafts", () => {
     });
     const first = fileFor("file-first");
     const reowned = fileFor("file-reowned");
-    // A restore re-owns the second file while the first deletion is in
-    // flight, after the sweep already decided both were unused.
     composerAttachmentCleanupMocks.remove.mockImplementationOnce(async () => {
       appAtomRegistry.set(composerDraftsAtom, {
         "environment-1:thread-1": { text: "restored", attachments: [reowned] },
@@ -2554,7 +2521,6 @@ describe("mobile composer drafts", () => {
     expect(composerAttachmentCleanupMocks.remove.mock.calls).toEqual([[first.fileUri]]);
   });
 
-  // These final tests use fresh module instances for independent hydration.
   it("keeps attachment files and uploads after a recovered message leaves an incomplete outbox", async () => {
     vi.resetModules();
     const drafts = await import("./use-composer-drafts");

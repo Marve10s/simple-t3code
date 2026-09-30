@@ -1327,7 +1327,6 @@ it.effect("evicts an unanswered host and lets later calls use a healthy runtime"
       const consumerExit = yield* Fiber.await(consumer);
       expect(Exit.isSuccess(consumerExit)).toBe(true);
 
-      // Late traffic from the evicted connection cannot restore its assignment.
       yield* broker.respond({
         clientId: "client-1",
         connectionId,
@@ -1412,7 +1411,6 @@ it.effect("rejects a routed action when its generation is evicted before deliver
         .pipe(Effect.flip, Effect.forkScoped);
       yield* Deferred.await(received);
 
-      // Suspend only this invocation in the gap between route selection and delivery.
       const tasks: Array<() => void> = [];
       let paused = false;
       const dispatcher: Scheduler.SchedulerDispatcher = {

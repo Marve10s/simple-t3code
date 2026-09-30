@@ -80,8 +80,6 @@ function parseGitHubAuth(input: SourceControlAuthProbeInput) {
     });
   }
 
-  // gh gained `auth status --json` in 2.81.0. Older versions reject the flag and exit
-  // non-zero, which reads exactly like a signed-out CLI. Name the real problem instead.
   if (input.exitCode !== 0 && output.includes("unknown flag: --json")) {
     return providerAuth({
       status: "unknown",
@@ -263,7 +261,6 @@ export const make = Effect.gen(function* () {
   return SourceControlProvider.SourceControlProvider.of({
     kind: "github",
     resolveLink: (input) => {
-      // Automatic enrichment must not send ambient CLI credentials to a host from message text.
       if (input.url.host !== "github.com") return undefined;
       const match = /^\/([\w.-]+)\/([\w.-]+)\/(?:pull|issues)\/([1-9]\d*)(?:\/.*)?$/.exec(
         input.url.pathname,

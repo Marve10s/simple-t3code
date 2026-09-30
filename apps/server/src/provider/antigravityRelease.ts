@@ -15,8 +15,6 @@ export interface AntigravityReleaseAsset {
   };
 }
 
-// URLs come from the official registry. Hashes and sizes were checked on 2026-09-03.
-// https://github.com/agentclientprotocol/registry/blob/81bf71b55e15f630c4fb8a86d20d3088071d2071/antigravity-acp/agent.json
 const releaseAssets = new Map<string, AntigravityReleaseAsset>([
   [
     "darwin-arm64",

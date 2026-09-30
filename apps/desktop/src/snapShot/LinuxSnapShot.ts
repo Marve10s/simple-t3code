@@ -97,7 +97,6 @@ function unavailable(error: unknown): boolean {
   );
 }
 
-/** One connection per operation: portal registration and request ownership stay together. */
 export class LinuxCaptureConnection {
   private readonly bus: MessageBus;
   private readonly disconnected: Promise<never>;
@@ -115,7 +114,6 @@ export class LinuxCaptureConnection {
     this.disconnected = new Promise((_, reject) => {
       bus.on("error", reject);
     });
-    // A disconnect between calls must not become an unhandled rejection.
     void this.disconnected.catch(() => undefined);
   }
 
@@ -172,7 +170,6 @@ export class LinuxCaptureConnection {
       });
       if (kde !== undefined && decodeKde(kde).Version.value >= 2) return "kde";
     }
-    // Sandboxed apps already have an identity. Host apps register before any portal calls.
     if (!process.env.FLATPAK_ID && !process.env.SNAP) {
       await this.call({
         destination: PORTAL,
@@ -226,7 +223,6 @@ export class LinuxCaptureConnection {
     const namespace = `${PORTAL_PATH}/request/${this.uniqueName.slice(1).replaceAll(".", "_")}/`;
     let handle = namespace + token;
     let completed = false;
-    // Subscribe before Screenshot: the response may precede its method reply.
     const responses = new Map<string, unknown>();
     let deliver: ((body: unknown) => void) | undefined;
     const listener = (message: Message) => {
@@ -297,7 +293,6 @@ export class LinuxCaptureConnection {
           }),
         );
       }
-      // Closing this dedicated connection also removes the signal match.
     }
   }
 
@@ -322,7 +317,6 @@ export class LinuxCaptureConnection {
     const png = resizeLinuxCapture(Buffer.from(bytes));
     if (!withFeedback) return { png, window };
     const animationStarted = decodeBoolean(reply.body[2]);
-    // Keep the same authenticated sender alive through activation and the compositor flight.
     this.feedbackTimer = setTimeout(() => this.close(), 15_000);
     let flight: Promise<void> | undefined;
     const feedback: LinuxCaptureFeedback = {
@@ -382,7 +376,6 @@ export async function getLinuxCaptureSupport(appId: string) {
   }
 }
 
-/** Undefined means capability missing, not denied: only that case may open the picker. */
 export async function captureLinuxWindow(
   appId: string,
   options?: FeedbackOptions,

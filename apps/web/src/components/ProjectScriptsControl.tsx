@@ -47,7 +47,6 @@ interface ProjectScriptsControlProps {
   presentation?: "toolbar" | "menu";
   onRequestMenuClose?: () => void;
   scripts: ReadonlyArray<ProjectScript>;
-  /** Scripts declared in the project's checked-in t3.json, offered for import. */
   fileScripts?: ReadonlyArray<T3ProjectFileScript>;
   keybindings: ResolvedKeybindingsConfig;
   preferredScriptId?: string | null;
@@ -131,8 +130,6 @@ export default function ProjectScriptsControl({
     };
     const result = await onAddScript(payload);
     if (result._tag === "Failure" && !isAtomCommandInterrupted(result)) {
-      // Surface the failure through the regular add dialog, prefilled so the
-      // user can adjust and retry.
       const error = squashAtomCommandFailure(result);
       setEditorRequest({
         scriptId: null,
@@ -187,7 +184,6 @@ export default function ProjectScriptsControl({
                 (presentation === "menu" ? (
                   <MenuShortcut className="ms-0 mr-7">{shortcutLabel}</MenuShortcut>
                 ) : (
-                  // The shortcut yields its slot to the edit button on hover.
                   <span className="transition-opacity group-hover:opacity-0 group-focus-visible:opacity-0">
                     <MenuShortcut className="ms-0">{shortcutLabel}</MenuShortcut>
                   </span>
@@ -275,8 +271,6 @@ export default function ProjectScriptsControl({
                   variant="outline"
                   className="w-7 sm:w-6 @3xl/header-actions:w-auto!"
                   aria-label={`Run ${primaryScript.name}`}
-                  // The tooltip wrapper replaces data-slot="button", so themed
-                  // toolbar styling needs its own hook.
                   data-toolbar-control=""
                   onClick={() => onRunScript(primaryScript)}
                 />
@@ -335,8 +329,6 @@ export default function ProjectScriptsControl({
                 variant="outline"
                 className="w-7 sm:w-6 @3xl/header-actions:w-auto!"
                 aria-label="Add action"
-                // The tooltip wrapper replaces data-slot="button", so themed
-                // toolbar styling needs its own hook.
                 data-toolbar-control=""
                 onClick={openAddDialog}
               />

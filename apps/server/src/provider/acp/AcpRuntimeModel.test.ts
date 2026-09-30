@@ -418,8 +418,6 @@ describe("AcpRuntimeModel", () => {
   });
 
   it("bounds an oversized cumulative tool_call_update content buffer to a tail window", () => {
-    // Mirrors Grok's ACP CLI resending the ENTIRE accumulated terminal output on every
-    // tool_call_update notification instead of a delta (see upstream #6556).
     const hugeText = Array.from({ length: 2_000 }, (_, i) => `line ${i}: ${"x".repeat(50)}`).join(
       "\n",
     );
@@ -428,8 +426,6 @@ describe("AcpRuntimeModel", () => {
     const result = parseSessionUpdateEvent({
       sessionId: "session-1",
       update: {
-        // Real ACP `tool_call_update` deltas typically omit `title` (already established by
-        // the initial `tool_call`); that is also the shape that surfaces raw content as detail.
         sessionUpdate: "tool_call_update",
         toolCallId: "tool-1",
         kind: "other",
@@ -446,13 +442,10 @@ describe("AcpRuntimeModel", () => {
 
     expect(event.toolCall.detail).toBeDefined();
     const detail = event.toolCall.detail!;
-    // 8000 chars of tail plus the truncation marker, regardless of input size.
     expect(detail.length).toBe(8_028);
     expect(detail.startsWith("[Earlier output truncated]")).toBe(true);
     expect(detail.endsWith(hugeText.slice(-100))).toBe(true);
 
-    // The raw payload threaded through for logging/persistence must not smuggle the full
-    // cumulative buffer back in either.
     const rawUpdate = (
       event.rawPayload as {
         readonly update: {
@@ -476,7 +469,6 @@ describe("AcpRuntimeModel", () => {
     let cumulativeBuffer = "";
 
     for (let i = 0; i < 1_000; i += 1) {
-      // Grok resends the FULL accumulated buffer, not a delta, on every redraw.
       cumulativeBuffer += `frame ${i}: ${"#".repeat(50)}\n`;
       const isLast = i === 999;
 
@@ -521,17 +513,11 @@ describe("AcpRuntimeModel", () => {
       }
     }
 
-    // The flood as the CLI sends it: 1000 cumulative redraws, ~31.6 MB of JSON.
     expect(notificationBytes).toBeGreaterThan(31_000_000);
 
-    // 1000 cumulative redraws collapse into a fixed, small number of runtime events...
     expect(emittedCount).toBe(114);
-    // ...each individually bounded, no matter how long the tool call runs...
     expect(largestEmittedEventBytes).toBeLessThan(25_000);
-    // ...so the whole flooding tool call costs ~2.5 MB of runtime events instead of ~31.6 MB.
     expect(emittedBytes).toBeLessThan(2_600_000);
-    // ...while the FINAL state (forced by the completed status) still reflects the real,
-    // latest output rather than a stale coalesced value.
     expect(finalDetail).toBeDefined();
     expect(finalDetail?.endsWith(`frame 999: ${"#".repeat(50)}`)).toBe(true);
   });
@@ -625,9 +611,6 @@ describe("AcpRuntimeModel", () => {
   });
 
   it("bounds oversized whitespace-only tool call content that has no trimmed text", () => {
-    // Whitespace-only entries are skipped when extracting display text (`chunks.length === 0`)
-    // and used to be returned unchanged, which let a redrawing terminal persist unbounded
-    // buffers on `toolCall.data.content` and `rawPayload`.
     const hugeWhitespace = " \n\t".repeat(30_000);
     expect(hugeWhitespace.length).toBeGreaterThan(60_000);
 
@@ -825,8 +808,6 @@ describe("AcpRuntimeModel", () => {
       let previous: AcpToolCallState | undefined;
 
       for (let i = 1; i <= 12; i += 1) {
-        // Grows by 1 char per update — well under the 256-char growth threshold, so this
-        // exercises the coalesce-count fallback rather than the growth-based trigger.
         const next = toolCall("x".repeat(i), "inProgress");
         const decision = decideToolCallUpdateEmission({
           previous,
@@ -842,8 +823,6 @@ describe("AcpRuntimeModel", () => {
         previous = next;
       }
 
-      // First update always emits (no previous state yet); after that, small per-update
-      // growth should be coalesced until the coalesce limit forces a periodic emission.
       const emittedIndices = emissions.flatMap((emitted, index) => (emitted ? [index + 1] : []));
       expect(emittedIndices).toEqual([1, 11]);
     });

@@ -710,7 +710,6 @@ it.layer(integrationLayer)("AgentSessionImporter integration", (it) => {
           createdAt: "2026-08-24T09:00:00.000Z",
         });
 
-        // This completed import predates persisted transcript source metadata.
         yield* directory.upsert({
           threadId: legacy.threadId,
           provider: ProviderDriverKind.make("codex"),
@@ -787,7 +786,6 @@ it.layer(integrationLayer)("AgentSessionImporter integration", (it) => {
                 if (transcriptPaths.has(filePath)) {
                   const count = (openCounts.get(filePath) ?? 0) + 1;
                   openCounts.set(filePath, count);
-                  // A fresh scanner first opens each file for project discovery.
                   if (count > 1) {
                     fullReads.push(filePath);
                     if (completedPaths.has(filePath)) {
@@ -910,7 +908,6 @@ it.layer(integrationLayer)("AgentSessionImporter integration", (it) => {
           Layer.provide(
             Layer.succeed(ProjectionSnapshotQuery.ProjectionSnapshotQuery, {
               ...snapshots,
-              // Acknowledge the imported settlement before draining the reactor.
               getThreadShellById: (requestedThreadId) =>
                 snapshots
                   .getThreadShellById(requestedThreadId)

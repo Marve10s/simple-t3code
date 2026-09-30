@@ -12,12 +12,10 @@ import type { FileBackedComposerAttachment } from "./composerImages";
 import { copyTextWithHaptic } from "./copyTextWithHaptic";
 import { loadLocalAttachmentPreview } from "./localAttachmentPreview";
 
-/** Authored source metadata is kept separate from temporary preview/download URLs. */
 export type MediaActionsSource = {
   readonly reference?: MediaReference;
   readonly name: string;
   readonly mimeType: string;
-  /** Anchors the iOS share sheet to the view that opened the menu. */
   readonly sourceIdentifier?: string;
 } & (
   | { readonly uri: string }

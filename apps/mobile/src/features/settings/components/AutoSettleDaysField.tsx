@@ -21,7 +21,6 @@ export function AutoSettleDaysField(props: AutoSettleDaysFieldProps) {
     }
     const text = (draft ?? "").trim();
     setDraft(null);
-    // Validate the whole input; decimals and trailing text must not become whole days.
     const parsed = /^\d+$/.test(text) ? Number(text) : Number.NaN;
     if (
       Number.isInteger(parsed) &&

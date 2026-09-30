@@ -1,17 +1,6 @@
-/**
- * Migration runner with an inline loader.
- *
- * Uses Migrator.make with fromRecord to define migrations inline.
- * All migrations are statically imported - no dynamic file system loading.
- *
- * `runMigrations` is called by the SQLite persistence layer at startup, so the
- * schema is always up to date before the application starts.
- */
-
 import * as Migrator from "effect/unstable/sql/Migrator";
 import * as Effect from "effect/Effect";
 
-// Import all migrations statically
 import Migration0001 from "./Migrations/001_OrchestrationEvents.ts";
 import Migration0002 from "./Migrations/002_OrchestrationCommandReceipts.ts";
 import Migration0003 from "./Migrations/003_CheckpointDiffBlobs.ts";
@@ -67,16 +56,6 @@ import Migration0052 from "./Migrations/052_ProjectionThreadTitleState.ts";
 import Migration0053 from "./Migrations/053_PullRequestFilesViewed.ts";
 import Migration0054 from "./Migrations/054_ProjectionThreadsAutoSettleDisabledAt.ts";
 
-/**
- * Migration loader with all migrations defined inline.
- *
- * Key format: "{id}_{name}" where:
- * - id: numeric migration ID (determines execution order)
- * - name: descriptive name for the migration
- *
- * Uses Migrator.fromRecord which parses the key format and
- * returns migrations sorted by ID.
- */
 const migrationEntries = [
   [1, "OrchestrationEvents", Migration0001],
   [2, "OrchestrationCommandReceipts", Migration0002],
@@ -145,26 +124,12 @@ const makeMigrationLoader = (throughId?: number) =>
     ),
   );
 
-/**
- * Migrator run function - no schema dumping needed
- * Uses the base Migrator.make without platform dependencies
- */
 const run = Migrator.make({});
 
 export interface RunMigrationsOptions {
   readonly toMigrationInclusive?: number | undefined;
 }
 
-/**
- * Run all pending migrations.
- *
- * Creates the migrations tracking table (effect_sql_migrations) if it doesn't exist,
- * then runs any migrations with ID greater than the latest recorded migration.
- *
- * Returns array of [id, name] tuples for migrations that were run.
- *
- * @returns Effect containing array of executed migrations
- */
 export const runMigrations = Effect.fn("runMigrations")(function* ({
   toMigrationInclusive,
 }: RunMigrationsOptions = {}) {

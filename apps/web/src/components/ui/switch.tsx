@@ -4,11 +4,6 @@ import { Switch as SwitchPrimitive } from "@base-ui/react/switch";
 
 import { cn } from "~/lib/utils";
 
-/**
- * `mixed` renders the thumb centred on a muted track for a selection whose
- * targets disagree (the macOS mixed-state convention). It is presentational:
- * the caller still decides what a click sets, usually on for everyone.
- */
 function Switch({
   className,
   size = "default",
@@ -27,9 +22,6 @@ function Switch({
       data-size={size}
       data-slot="switch"
       data-mixed={mixed ? "" : undefined}
-      // Base UI copies every key we pass, even `undefined`, over its own
-      // aria-checked. Only pass the attribute when mixed so the real state
-      // survives for screen readers.
       {...(mixed ? { "aria-checked": "mixed" as const } : {})}
       {...props}
     >

@@ -16,9 +16,6 @@ export type { HomeHeaderEnvironment } from "./HomeHeader.types";
 export function HomeHeader(props: HomeHeaderProps) {
   const searchBarRef = useRef<SearchBarCommands>(null);
   const iconColor = useUniwindTheme()["--color-icon"];
-  // The list uses a fixed creation order and ignores sort/group options, so
-  // the filter menu only carries the filters and the "customized" icon state
-  // keys off those alone.
   const hasCustomListOptions =
     props.selectedEnvironmentId !== null || props.selectedProjectKey !== null;
   const focusSearch = useCallback(() => {
@@ -33,8 +30,6 @@ export function HomeHeader(props: HomeHeaderProps) {
       <NativeStackScreenOptions
         optionsVersion={filterMenu.items}
         options={{
-          // Static header config (glass, title, fonts) lives in Stack.tsx
-          // (GLASS_HEADER_OPTIONS). Only dynamic values are set here.
           headerTintColor: iconColor,
           unstable_headerRightItems: () => [
             withNativeGlassHeaderItem({
@@ -46,8 +41,6 @@ export function HomeHeader(props: HomeHeaderProps) {
               type: "button",
             }),
           ],
-          // The keys below are set per-branch (not `undefined`) so a later
-          // reapply cannot clobber options owned by NativeHeaderToolbar.
           ...(NATIVE_MAIL_SEARCH_TOOLBAR_SUPPORTED
             ? {
                 unstable_headerToolbarItems: () => [
@@ -68,8 +61,6 @@ export function HomeHeader(props: HomeHeaderProps) {
                 ],
               }
             : {
-                // Pre-Liquid-Glass iOS: standard pull-down search in the nav
-                // bar; create + sort live in the plain bottom toolbar below.
                 headerSearchBarOptions: {
                   ref: searchBarRef,
                   autoCapitalize: "none" as const,

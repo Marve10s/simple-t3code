@@ -168,7 +168,6 @@ describe("Antigravity process environment", () => {
       auth: { type: "oauth-business" },
       gcp: { project: "proj", location: "us-central1" },
     });
-    // The agent's logout reads auth.type to clear only that method's token.
     expect(decodeJson(antigravityProfileSettings(ANTIGRAVITY_PERSONAL_AUTH))).toEqual({
       auth: { type: "oauth-personal" },
     });
@@ -259,7 +258,6 @@ describe("Antigravity process environment", () => {
         "/userdata",
         ProviderInstanceId.make("Antigravity"),
       );
-      // Existing sign-ins live at this path; it must not move.
       expect(first.profile).toBe(
         "/userdata/providers/antigravity/ac0a3dfd6dddb20962cecff6ee5fe65e19d3923be20e52c5ab52ff877f7e4c32",
       );
@@ -271,7 +269,6 @@ describe("Antigravity process environment", () => {
   it.effect("keeps the unpacked Windows runtime under MAX_PATH for long user names", () =>
     Effect.gen(function* () {
       const path = yield* Path.Path;
-      // Deepest member of the official agy_acp_server_1.1.1 windows-x86_64 bundle.
       const deepestMember =
         "google3\\cloud\\developer_experience\\antigravity_extensions\\acp_server\\_private__agy_acp_server_bin.lazy_imports_info.json";
       const directories = yield* resolveAntigravityInstanceDirectories(
@@ -280,7 +277,6 @@ describe("Antigravity process environment", () => {
       );
       const extracted = (tempDirectory: string) =>
         path.join(tempDirectory, "run-AbC123", "_MEI000012ab2", deepestMember);
-      // MAX_PATH is 260 including the terminating NUL.
       expect(extracted(directories.runtimeTemp).length).toBeLessThan(260);
       expect(
         extracted(path.join(directories.profile, "antigravity-acp", "tmp")).length,
@@ -646,12 +642,10 @@ it.layer(NodeServices.layer)("Antigravity profile preparation", (it) => {
         expect(yield* fs.readLink(configLink)).toBe(configSkills);
         expect(yield* fs.readLink(cliLink)).toBe(cliSkills);
         expect(yield* fs.exists(path.join(configLink, "review"))).toBe(true);
-        // Only the skill directories are shared; the rest of the profile stays private.
         expect(yield* fs.exists(path.join(profileDirectory, "config", "mcp_config.json"))).toBe(
           false,
         );
 
-        // A stale link is repointed; a real directory the user placed there is kept.
         yield* fs.remove(cliLink);
         yield* fs.symlink(path.join(temporaryDirectory, "elsewhere"), cliLink);
         yield* fs.remove(configLink);

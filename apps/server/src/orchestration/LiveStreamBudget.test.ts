@@ -29,12 +29,10 @@ describe("LiveStreamBudget", () => {
               ),
             );
             expect(yield* pull).toEqual([{ text: "first" }]);
-            // The other two items are in the source's pull state, not its queue.
             expect(yield* Queue.size(queue)).toBe(0);
             expect((yield* budget.usage).retainedItems).toBe(3);
             const overflow = yield* budget.retain({ text: "fourth" }).pipe(Effect.result);
             expect(overflow._tag).toBe("Failure");
-            // Do not resume the consumer. Its source scope must close now.
             yield* Deferred.await(sourceClosed);
             yield* budget.closed;
             expect((yield* budget.usage).retainedItems).toBe(1);

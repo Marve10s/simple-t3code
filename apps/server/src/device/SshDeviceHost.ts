@@ -305,7 +305,6 @@ export const make = Effect.fn("SshDeviceHost.make")(function* (
     if (next.agentDevice) yield* onReady({ ...next, agentDevice: next.agentDevice });
     ready = next;
     yield* onStatus("ready");
-    // Reconnect also repairs helpers that died while SSH itself stayed connected.
     const unhealthy = Effect.gen(function* () {
       while (true) {
         yield* Effect.sleep("10 seconds");
@@ -357,7 +356,6 @@ export const make = Effect.fn("SshDeviceHost.make")(function* (
       const failedScope = connectionScope;
       connectionScope = null;
       if (failedScope) yield* Scope.close(failedScope, Exit.void);
-      // SSH binds after the reservation is released, so a competing bind needs fresh ports.
       if (
         attempt >= 2 ||
         !["forwarding ports", "waiting for SSH forward"].includes(result.failure.step)

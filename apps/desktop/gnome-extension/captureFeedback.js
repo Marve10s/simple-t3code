@@ -6,7 +6,6 @@ import St from "gi://St";
 import * as Main from "resource:///org/gnome/shell/ui/main.js";
 import { captureDestinationFrame, findCaptureDestination } from "./feedbackGeometry.js";
 
-/** A single, bounded, sender-owned flight. No live window clone or per-frame JS work. */
 export class CaptureFeedback {
   begin(sender, pid, snapshot, options) {
     this.dispose();
@@ -54,7 +53,6 @@ export class CaptureFeedback {
         });
       }
     } catch (error) {
-      // Optional decoration must not prevent attaching a successfully captured image.
       this._clearActors();
       console.warn(`T3 capture effects unavailable: ${error.message}`);
     }
@@ -85,7 +83,6 @@ export class CaptureFeedback {
         session.pid,
         title,
       );
-    // A command-palette capture temporarily unmaps T3. Wait for its new surface, not a sleep.
     const target =
       find() ??
       (await new Promise((resolve) => {
@@ -143,7 +140,6 @@ export class CaptureFeedback {
       });
     });
     await this._flight;
-    // Keep the landed image until the renderer acknowledges the attachment (connection closes).
   }
 
   _clearActors() {

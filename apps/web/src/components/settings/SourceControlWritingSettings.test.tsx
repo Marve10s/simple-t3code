@@ -213,8 +213,6 @@ describe("mixed source control instructions", () => {
       "Shared instructions",
       "Shared instructions",
     ]);
-    // Template preferences still differ, but that is the templates row's
-    // concern: the instructions editor is no longer a bulk draft.
     expect(button("Write custom instructions for all")).toBeUndefined();
     expect(renderer!.root.findByType("textarea").props.defaultValue).toBe("Shared instructions");
   });

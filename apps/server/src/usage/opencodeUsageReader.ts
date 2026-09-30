@@ -1,4 +1,3 @@
-// node:sqlite reads live OpenCode databases; Node fs walks legacy JSON history.
 // @effect-diagnostics nodeBuiltinImport:off
 import * as NodeFSP from "node:fs/promises";
 import * as NodePath from "node:path";
@@ -21,7 +20,6 @@ function text(value: unknown): string {
   return typeof value === "string" ? value : "";
 }
 
-/** OpenCode stores uncached input and reasoning separately from input/output. */
 function parseOpenCodeMessage(
   source: string,
   fallback: {
@@ -61,8 +59,6 @@ function parseOpenCodeMessage(
     model,
     sessionId: fallback.sessionId || text(message.sessionID),
     totals,
-    // OpenCode writes zero for models without a known rate, including paid
-    // subscription models. Let the shared price table estimate those records.
     reportedCostUsd: typeof cost === "number" && Number.isFinite(cost) && cost > 0 ? cost : null,
     fast: false,
     dedupeKey: id ? `opencode:${id}` : null,
@@ -75,7 +71,6 @@ export interface OpenCodeUsageReadResult {
   readonly error: boolean;
 }
 
-/** Reads current SQLite and pre-migration JSON stores without modifying either. */
 export async function readOpenCodeUsage(
   root: string,
   sinceMs: number,
@@ -109,8 +104,6 @@ export async function readOpenCodeUsage(
     let database: NodeSqlite.DatabaseSync | undefined;
     try {
       database = new NodeSqlite.DatabaseSync(NodePath.join(root, name), { readOnly: true });
-      // A busy live provider should fail this source promptly rather than
-      // stalling the server while SQLite waits for its writer.
       database.exec("PRAGMA busy_timeout = 100");
       const tables = new Set(
         database
@@ -154,8 +147,6 @@ export async function readOpenCodeUsage(
     }
   }
 
-  // Do not follow symlinks, including cycles. Database records win over their
-  // old JSON copies when OpenCode has migrated a store in place.
   const directories = [NodePath.join(root, "storage", "message")];
   while (directories.length > 0) {
     const directory = directories.pop()!;

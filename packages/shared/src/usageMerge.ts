@@ -1,11 +1,3 @@
-/**
- * Merges per-environment usage summaries into the single view the page renders.
- *
- * Pure, so the de-duplication and derivation rules can be tested without a
- * connected environment.
- *
- * @module usageMerge
- */
 import {
   USAGE_MERGE_COMPATIBLE_SINCE,
   type EnvironmentId,
@@ -38,18 +30,10 @@ export interface ModelTotals {
   readonly costUsd: number;
   readonly totalTokens: number;
   readonly records: number;
-  /**
-   * Records whose tokens are counted here but which contributed nothing to
-   * `costUsd`. When it equals `records` the cost is unknown, not zero.
-   */
   readonly unpricedRecords: number;
   readonly costShare: number;
 }
 
-/**
- * A model whose every record lacked rates has an unknown cost, not a zero one.
- * Clients must not present its `costUsd` as a real dollar figure.
- */
 export function isModelCostUnknown(model: ModelTotals): boolean {
   return model.records > 0 && model.unpricedRecords >= model.records;
 }
@@ -97,20 +81,11 @@ export interface MergedUsage {
   readonly daily: readonly DailyTotals[];
   readonly hourly: readonly HourlyTotals[];
   readonly costQuality: CostQuality;
-  /** Environments whose data was dropped as a duplicate of another's. */
   readonly duplicateSources: readonly string[];
   readonly contributingEnvironments: readonly EnvironmentId[];
   readonly contractMismatches: readonly UsageContractMismatch[];
 }
 
-/**
- * Two sources are the same physical transcript directory only when host,
- * provider, path and filesystem identity all agree.
- *
- * `volumeId` is what stops two machines that happen to share a hostname and a
- * home path, which is every Mac in a fleet, from collapsing into one source and
- * having one of them silently dropped.
- */
 function fingerprintKey(fingerprint: UsageSourceFingerprint): string {
   return [
     fingerprint.hostId,
@@ -136,16 +111,6 @@ function bucketKey(bucket: UsageBucket): string {
   return JSON.stringify([bucket.day, bucket.hourStart ?? null, bucket.provider, bucket.model]);
 }
 
-/**
- * Decides which environment owns each physical transcript directory.
- *
- * Several environments on one machine (worktree servers, for instance) resolve
- * the same provider home and would otherwise double count every token. The
- * Complete scans claim a fingerprint ahead of partial scans, then the most
- * recently read scan wins within each status. A newer partial scan can still
- * contribute cells absent from an older complete scan. Environment ids break
- * ties so the result is stable when summaries have the same read time.
- */
 function claimSources(environments: readonly EnvironmentUsage[]): {
   readonly ownerByFingerprint: ReadonlyMap<string, EnvironmentId>;
   readonly supplementalBucketsByEnvironment: ReadonlyMap<EnvironmentId, ReadonlySet<UsageBucket>>;
@@ -168,8 +133,6 @@ function claimSources(environments: readonly EnvironmentUsage[]): {
       a.environmentId.localeCompare(b.environmentId),
   );
 
-  // A complete scan takes precedence over a newer partial scan of the same
-  // directory. Partial history still contributes when no complete copy exists.
   for (const status of ["ok", "partial", "failed"] as const) {
     for (const environment of ordered) {
       for (const source of environment.summary.sources) {
@@ -186,9 +149,6 @@ function claimSources(environments: readonly EnvironmentUsage[]): {
     }
   }
 
-  // A newer partial scan may contain usage recorded after an older complete
-  // scan. Keep cells absent from the complete scan. Aggregated cells do not
-  // reveal enough to reconcile overlapping records without double counting.
   for (const environment of ordered) {
     for (const source of environment.summary.sources) {
       if (source.status !== "partial") continue;
@@ -232,7 +192,6 @@ function claimSources(environments: readonly EnvironmentUsage[]): {
   };
 }
 
-/** Sources this environment owns after fingerprint claims, plus their buckets. */
 function ownedContribution(
   environment: EnvironmentUsage,
   ownerByFingerprint: ReadonlyMap<string, EnvironmentId>,
@@ -252,8 +211,6 @@ function ownedContribution(
       const provider = source.fingerprint.provider;
       ownedProviders.add(provider);
       ownedSources.add(`${provider}\u0000${source.fingerprint.resolvedHomePath}`);
-      // Distinct within a directory. Summing per-bucket session counts instead
-      // would count a session once per day and model it spans.
       sessionsByProvider.set(
         provider,
         (sessionsByProvider.get(provider) ?? 0) +
@@ -274,7 +231,6 @@ function ownedContribution(
 }
 
 function bucketTokens(bucket: UsageBucket): number {
-  // reasoningTokens is a subset of outputTokens and must not be added again.
   return (
     bucket.totals.uncachedInputTokens +
     bucket.totals.cachedInputTokens +
@@ -312,15 +268,6 @@ const EMPTY_MERGED: MergedUsage = {
   contractMismatches: [],
 };
 
-/**
- * Merges every connected environment's summary.
- *
- * `expectedContractVersion` guards against incompatible server code: rather
- * than blocking the page, its data is excluded and the mismatch direction is
- * reported so the UI can identify which side needs updating. Versions in
- * [{@link USAGE_MERGE_COMPATIBLE_SINCE}, expected] still merge, so an additive
- * provider expansion does not drop Claude/Codex totals from older servers.
- */
 export function mergeUsage(
   environments: readonly EnvironmentUsage[],
   expectedContractVersion: number,

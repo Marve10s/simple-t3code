@@ -2,7 +2,6 @@ import { FolderIcon, LaptopIcon, ServerIcon } from "lucide-react";
 
 import type { EnvMode } from "../BranchToolbar.logic";
 
-// Codex-style row above the composer: project, machine, and a worktree toggle.
 export function CodexComposerTray(props: {
   projectTitle: string;
   environmentLabel: string | null;

@@ -59,11 +59,6 @@ export function rewriteMarkdownFileUriHref(href: string | undefined): string | n
   return target ? `${target.path}${target.hash}` : null;
 }
 
-/**
- * `baseDir` anchors relative links; it defaults to the workspace root and is the
- * file's own directory when rendering a markdown file. `cwd` stays the workspace
- * root so the result still knows whether the target is inside it.
- */
 export function resolveMarkdownFileLinkTarget(
   href: string | undefined,
   cwd?: string,
@@ -79,12 +74,6 @@ export function resolveMarkdownFileLinkTarget(
   return resolvePathLinkTarget(pathWithPosition, baseDir);
 }
 
-/**
- * Inline code spans mostly hold identifiers, commands, and refs (`node.meta`,
- * `origin/main`) rather than deliberate link destinations, so auto-linking
- * them demands stronger path evidence than an explicit markdown link does:
- * an unambiguous path prefix, a file extension, or a :line suffix.
- */
 export function resolveInlineCodeFileLinkMeta(
   codeText: string,
   cwd?: string,

@@ -130,7 +130,6 @@ function PaletteRow(props: {
   );
 }
 
-/** Mounted only while open, so the app root does not subscribe to the full thread catalog. */
 export function CommandPalette(props: {
   readonly pathname: string;
   readonly onClose: () => void;
@@ -351,7 +350,6 @@ export function CommandPalette(props: {
   const selectedKey = results[selectedIndex]?.key;
   useEffect(() => {
     if (selectedIndex === 0) {
-      // Centering before the list measures its height scrolls half the first row out of view.
       listRef.current?.scrollToOffset({ offset: 0, animated: false });
     } else if (selectedKey !== undefined) {
       listRef.current?.scrollToIndex({ index: selectedIndex, animated: false, viewPosition: 0.5 });
@@ -362,14 +360,10 @@ export function CommandPalette(props: {
   const handleDismissed = useCallback(() => {
     if (dismissed.current) return;
     dismissed.current = true;
-    // Present navigation sheets only after UIKit has dismissed this modal.
     props.onClose();
     pendingAction.current?.();
   }, [props]);
 
-  // iOS drops Modal onDismiss when the VC is dismissed mid-presentation (e.g.
-  // ⌘K during the fade-in) or raced by another sheet — without a fallback the
-  // palette stays mounted-but-invisible and ⌘K dead-ends on a stale open state.
   useEffect(() => {
     if (visible) return;
     const fallback = setTimeout(handleDismissed, 400);

@@ -45,9 +45,7 @@ export interface PreviewAutomationInvokeInput {
   readonly input: unknown;
   readonly tabId?: PreviewTabId;
   readonly timeoutMs?: number;
-  /** Background metadata reads must not change the agent's current tab. */
   readonly updateCurrentTab?: boolean;
-  /** Capture the routed tab before another request changes the current assignment. */
   readonly onTargetTab?: (tabId: PreviewTabId | undefined) => void;
 }
 
@@ -84,14 +82,6 @@ interface PendingRequest {
   readonly context: PreviewAutomationRequestErrorContext;
 }
 
-/**
- * A lease pinning one provider session to one desktop runtime. It lives exactly
- * as long as the connection it names: `connectionId`/`queue` identity is what
- * makes a lease valid, so a disconnected or replaced host is dropped on the next
- * lookup. The lease deliberately has no clock of its own — it used to inherit
- * the MCP credential's expiry, which coupled host stickiness to an unrelated
- * auth deadline and could migrate a live session to another runtime mid-flow.
- */
 interface HostAssignment {
   readonly clientId: ClientConnection["clientId"];
   readonly connectionId: ClientConnection["connectionId"];
@@ -331,12 +321,9 @@ export const make = Effect.gen(function* PreviewAutomationBrokerMake() {
     completeStream = false,
   ) {
     if (completeStream) {
-      // Discard this generation's commands and complete the RPC stream so a
-      // responsive desktop can re-register after a timeout eviction.
       yield* Queue.clear(queue);
       yield* Queue.end(queue);
     } else {
-      // Replaced registrations must not reconnect and displace their successor.
       yield* Queue.shutdown(queue);
     }
     yield* Effect.forEach(
@@ -353,7 +340,6 @@ export const make = Effect.gen(function* PreviewAutomationBrokerMake() {
     completeStream = false,
   ) {
     yield* SynchronizedRef.modifyEffect(state, (current) => {
-      // Retired generations were already closed by their replacement or eviction.
       if (current.clients.get(clientId)?.queue !== queue) {
         return Effect.succeed([undefined, current] as const);
       }
@@ -489,12 +475,6 @@ export const make = Effect.gen(function* PreviewAutomationBrokerMake() {
       const assigned = assignments.get(assignmentKey);
       const assignedConnection = assigned ? current.clients.get(assigned.clientId) : undefined;
       const hasLiveAssignment = assignedConnection?.environmentId === input.scope.environmentId;
-      // Keep one provider session on one physical desktop runtime so a
-      // multi-step browser interaction cannot jump between independent
-      // Electron cookie/DOM state. A live assignment that predates an
-      // operation is not silently moved to a newer client: the caller gets a
-      // capability failure and can deliberately start a fresh provider
-      // session. A dead lease is pruned above and may fail over.
       const ownsTargetTab = (host: ClientConnection, visibleOnly = false) =>
         host.liveTabs.some(
           (tab) =>
@@ -581,8 +561,6 @@ export const make = Effect.gen(function* PreviewAutomationBrokerMake() {
     });
     const awaitResponse = Effect.fn("PreviewAutomationBroker.awaitResponse")(function* () {
       const offered = yield* SynchronizedRef.modifyEffect(state, (current) => {
-        // A route can outlive its generation while another request evicts it.
-        // Serialize the live-generation check and offer with queue closure.
         if (
           current.clients.get(connection.clientId)?.queue !== connection.queue ||
           !current.pending.has(requestId)
@@ -614,8 +592,6 @@ export const make = Effect.gen(function* PreviewAutomationBrokerMake() {
       return yield* Option.match(result, {
         onNone: () =>
           Effect.gen(function* () {
-            // An unanswered request invalidates this connection. Do not replay
-            // actions: the client may have applied them before becoming unreachable.
             yield* disconnect(connection.clientId, connection.queue, true);
             return yield* new PreviewAutomationTimeoutError(requestContext);
           }),

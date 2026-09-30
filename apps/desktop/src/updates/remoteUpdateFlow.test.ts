@@ -57,8 +57,6 @@ describe("nextRemoteDesktopUpdateStep", () => {
       ),
       { action: "install" },
     );
-    // A previous install failure keeps status "downloaded", so a remote run
-    // retries the install.
     assert.deepEqual(
       nextRemoteDesktopUpdateStep(
         makeState({
@@ -72,8 +70,6 @@ describe("nextRemoteDesktopUpdateStep", () => {
       ),
       { action: "install" },
     );
-    // A download survives an unrelated background updater error, so a run
-    // installs it instead of replaying that error.
     assert.deepEqual(
       nextRemoteDesktopUpdateStep(
         makeState({
@@ -87,8 +83,6 @@ describe("nextRemoteDesktopUpdateStep", () => {
       ),
       { action: "install" },
     );
-    // A leftover download behind a check error is not installable: fresh
-    // runs re-check, and post-check the error is terminal.
     const staleError = makeState({
       status: "error",
       downloadedVersion: "1.2.4",
@@ -154,8 +148,6 @@ describe("nextRemoteDesktopUpdateStep", () => {
   });
 
   it("re-checks stale up-to-date and error states before trusting them", () => {
-    // These states are retained from earlier/background checks; a remote
-    // request must look again instead of replaying them.
     assert.deepEqual(
       nextRemoteDesktopUpdateStep(makeState({ status: "up-to-date" }), NO_ATTEMPTS, null),
       { action: "check" },

@@ -13,7 +13,6 @@ interface PanelLayoutControlsProps {
   rightPanelOpen: boolean;
   rightPanelShortcutLabel: string | null;
   rightPanelUnavailableLabel?: string;
-  /** Running + waiting subagents in this thread; badges the right panel toggle. */
   liveAgentCount: number;
   onToggleTerminal: () => void;
   onToggleRightPanel: () => void;

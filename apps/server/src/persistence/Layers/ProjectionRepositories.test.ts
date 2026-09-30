@@ -257,7 +257,6 @@ projectionRepositoriesLayer("Projection repositories", (it) => {
         createdAt: "2026-03-01T00:00:00.000Z",
         updatedAt: "2026-03-01T00:01:00.000Z",
       });
-      // An unrelated old row must not be loaded or decoded by the exact lookup.
       yield* sql`
         INSERT INTO projection_thread_proposed_plans (
           plan_id, thread_id, turn_id, plan_markdown, implemented_at,
@@ -444,8 +443,6 @@ projectionRepositoriesLayer("Projection repositories", (it) => {
       assert.strictEqual(row.snoozedAt, "2026-03-25T00:00:00.000Z");
       assert.strictEqual(row.pinnedAt, "2026-03-25T00:00:00.000Z");
 
-      // Un-settle to the keep-active pin and wake the snooze; confirm the
-      // flips persist.
       yield* threads.upsert({
         ...row,
         settledOverride: "active",
@@ -656,10 +653,8 @@ projectionRepositoriesLayer("Projection repositories", (it) => {
       assert.strictEqual(rawRows[1]?.snapshotJson, null);
       assert.strictEqual(rawRows[1]?.stackJson, null);
 
-      // Ordered by linked_at, then number.
       assert.deepStrictEqual(yield* pullRequests.listByThreadId({ threadId }), [synced, unsynced]);
 
-      // One pull request across threads, ordered by linked_at.
       assert.deepStrictEqual(
         yield* pullRequests.listByPullRequest({
           host: "github.com",
@@ -669,7 +664,6 @@ projectionRepositoriesLayer("Projection repositories", (it) => {
         [unsynced, sharedOnOtherThread],
       );
 
-      // Upsert on the composite key replaces snapshot and stack in place.
       const resynced = { ...unsynced, snapshot: synced.snapshot, stack: null } as const;
       yield* pullRequests.upsert(resynced);
       assert.deepStrictEqual(yield* pullRequests.listByThreadId({ threadId }), [synced, resynced]);

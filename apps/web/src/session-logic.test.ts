@@ -36,8 +36,6 @@ function makeActivity(overrides: {
   turnId?: string;
   sequence?: number;
 }): OrchestrationThreadActivity {
-  // Fixtures model post-ingestion rows: ingestion stamps agentKind on every
-  // task.* payload. Pass an explicit agentKind to model legacy rows.
   const rawPayload = overrides.payload ?? {};
   const payload =
     overrides.kind?.startsWith("task.") && !("agentKind" in rawPayload)
@@ -140,7 +138,6 @@ describe("deriveActivePlanState", () => {
       }),
     ];
 
-    // Current turn is turn-2, which has no plan activity — should fall back to turn-1's plan
     const result = deriveActivePlanState(activities, TurnId.make("turn-2"));
     expect(result).toEqual({
       createdAt: "2026-02-23T00:00:01.000Z",
@@ -2162,7 +2159,6 @@ describe("deriveWorkLogEntries quiet-timeline guarantee", () => {
       expect(runningEntries).toHaveLength(1);
       expect(runningEntries[0]!.id).toBe("started-0");
       expect(runningEntries[0]!.agentSpawn?.agentTaskIds).toHaveLength(agent + 1);
-      // Progress ticks (several per agent) + attributed tool rows.
       for (let tick = 0; tick < 4; tick += 1) {
         activities.push(
           makeActivity({
@@ -2209,13 +2205,10 @@ describe("deriveWorkLogEntries quiet-timeline guarantee", () => {
     }
 
     const entries = deriveWorkLogEntries(activities);
-    // A1 CTA design: all direct spawns in one turn collapse into ONE
-    // call-to-action row carrying the batch's agent ids.
     const spawnRows = entries.filter((entry) => entry.agentSpawn !== undefined);
     expect(spawnRows).toHaveLength(1);
     expect(spawnRows[0]!.agentSpawn!.agentTaskIds).toHaveLength(5);
     expect(spawnRows[0]!.agentSpawn!.workflowId).toBeNull();
-    // No agent-attributed tool rows leak into the main log.
     expect(entries.some((entry) => entry.sourceActivityKind?.startsWith("tool."))).toBe(false);
   });
 
@@ -2317,8 +2310,6 @@ describe("deriveWorkLogEntries quiet-timeline guarantee", () => {
   });
 
   it("folds timelineBypass agent rows into one CTA (Codex children, workflow members)", () => {
-    // Codex children carry their parent's spawn turn (spawnTurnId stamping),
-    // which is what batches a fleet into one CTA.
     const entries = deriveWorkLogEntries([
       makeActivity({
         kind: "task.progress",
@@ -2335,8 +2326,6 @@ describe("deriveWorkLogEntries quiet-timeline guarantee", () => {
         turnId: "turn-spawn",
       }),
     ]);
-    // Not suppressed outright (a Codex fleet's rows are ALL bypassed and
-    // still need a CTA anchor) — but never more than the batch's single row.
     expect(entries).toHaveLength(1);
     expect(entries[0]!.agentSpawn?.agentTaskIds).toEqual(["child-1", "child-2"]);
   });
@@ -2374,8 +2363,6 @@ describe("deriveWorkLogEntries quiet-timeline guarantee", () => {
 
 describe("rerun workflows", () => {
   it("turn-less direct spawns do not collapse into one global batch", () => {
-    // Rows that lost their turn id (defensive path) group per task, so two
-    // unrelated turn-less spawns never merge into one immortal CTA.
     const entries = deriveWorkLogEntries([
       makeActivity({
         kind: "task.started",

@@ -50,11 +50,6 @@ export interface ExecuteGitInput {
   readonly timeoutMs?: number | null;
   readonly maxOutputBytes?: number;
   readonly appendTruncationMarker?: boolean;
-  /**
-   * With `appendTruncationMarker`, keep invoking the line callbacks after the
-   * buffered copy is full. For long-running commands whose output is only
-   * consumed through `progress`.
-   */
   readonly keepLineCallbacksAfterTruncation?: boolean;
   readonly progress?: ExecuteGitProgress;
 }
@@ -110,18 +105,7 @@ export interface ExecuteGitProgress {
   }) => Effect.Effect<void, never>;
 }
 
-/**
- * Progress callbacks for `createWorktree`. Git prints `Updating files: 78% (2104/2700)`
- * to stderr during checkout, and `Submodule path 'x': checked out` during
- * submodule init. The tracker uses these to drive the worktree setup card.
- */
 export interface CreateWorktreeProgress {
-  /**
-   * Fires once `git worktree add` has created and registered the directory,
-   * before the (possibly long) submodule step. Git refuses an existing path,
-   * so a path reported here belongs to this call and is safe to remove on
-   * cancel.
-   */
   readonly onWorktreeClaimed?: (path: string) => Effect.Effect<void, never>;
   readonly onCheckoutProgress?: (input: {
     percent: number;
@@ -129,7 +113,6 @@ export interface CreateWorktreeProgress {
     total: number;
   }) => Effect.Effect<void, never>;
   readonly onSubmodulesStarted?: () => Effect.Effect<void, never>;
-  /** Fires when `.gitmodules` exists but the resolved submodule mode is `"none"`. */
   readonly onSubmodulesDisabled?: (input: {
     source: "settings" | "t3.json";
   }) => Effect.Effect<void, never>;
@@ -142,11 +125,6 @@ export interface CreateWorktreeProgress {
 
 export interface CreateWorktreeOptions {
   readonly progress?: CreateWorktreeProgress;
-  /**
-   * The project-over-environment `worktreeSubmodules` setting. Null (or
-   * omitted, for callers without settings access) defers to the checkout's
-   * own t3.json.
-   */
   readonly submodules?: WorktreeSubmodules | null;
 }
 
@@ -214,10 +192,6 @@ export interface GitResolveCommitResult {
 export interface GitRefreshCheckedOutBranchInput {
   cwd: string;
   targetCommit: string;
-  /**
-   * Commit the checkout is allowed to be hard-reset away from: the upstream commit read before
-   * the fetch. HEAD sitting there means the checkout holds no work of its own.
-   */
   resetWhenHeadCommit?: string | null | undefined;
 }
 
@@ -334,14 +308,12 @@ export class GitVcsDriver extends Context.Service<
     readonly fetchPullRequestBranch: (
       input: GitFetchPullRequestBranchInput,
     ) => Effect.Effect<void, GitCommandError>;
-    /** Fetches `refs/pull/<n>/head` without writing a branch, for heads that exist nowhere else. */
     readonly fetchPullRequestHeadCommit: (
       input: GitFetchPullRequestHeadCommitInput,
     ) => Effect.Effect<GitResolveCommitResult, GitCommandError>;
     readonly resolveCommit: (
       input: GitResolveCommitInput,
     ) => Effect.Effect<GitResolveCommitResult, GitCommandError>;
-    /** Moves the branch checked out in `cwd` onto `targetCommit`, from inside that worktree. */
     readonly refreshCheckedOutBranch: (
       input: GitRefreshCheckedOutBranchInput,
     ) => Effect.Effect<GitRefreshCheckedOutBranchResult, GitCommandError>;
@@ -371,7 +343,6 @@ export class GitVcsDriver extends Context.Service<
     readonly removeWorktree: (
       input: VcsRemoveWorktreeInput,
     ) => Effect.Effect<void, GitCommandError>;
-    /** Drops worktree admin entries whose directory is already gone (`git worktree prune`). */
     readonly pruneWorktrees: (input: {
       readonly cwd: string;
     }) => Effect.Effect<void, GitCommandError>;
@@ -764,10 +735,6 @@ export const makeVcsDriverShape = Effect.fn("makeGitVcsDriverShape")(function* (
       return path.isAbsolute(gitCommonDir) ? gitCommonDir : path.resolve(cwd, gitCommonDir);
     });
 
-  // Git renames loose objects and refs into place without fsync by default, so
-  // an unclean restart can leave 0-byte files under refs/t3/** that break every
-  // later fetch and push. Checkpoint writes flush before they are published;
-  // macOS defaults to writeout-only, which does not reach the disk either.
   const durableWrite = [
     "-c",
     "core.fsync=objects,reference",
@@ -798,7 +765,6 @@ export const makeVcsDriverShape = Effect.fn("makeGitVcsDriverShape")(function* (
         GIT_COMMITTER_EMAIL: "t3code@users.noreply.github.com",
       };
 
-      // Forced process termination can leave Git's private index lock behind.
       const cleanupTempIndex = Effect.forEach(
         [tempIndexPath, `${tempIndexPath}.lock`],
         (indexFile) => fileSystem.remove(indexFile, { force: true }).pipe(Effect.ignore),
@@ -832,18 +798,15 @@ export const makeVcsDriverShape = Effect.fn("makeGitVcsDriverShape")(function* (
             });
             const { mtime } = yield* fileSystem.stat(indexPath.stdout.trim());
             if (Option.isNone(mtime)) return false;
-            // Stay below the source timestamp even if Date rounded up, preserving Git's racy check.
             const indexTime = Math.floor((mtime.value.getTime() - 1) / 1000);
             if (indexTime <= 0) return false;
             yield* fileSystem.copyFile(indexPath.stdout.trim(), tempIndexPath);
-            // Retain stat data only where the copied index already matches HEAD.
             yield* execute({
               operation,
               cwd: input.cwd,
               args: [...indexConfig, "read-tree", "--reset", "HEAD"],
               env: commitEnv,
             });
-            // read-tree can rewrite the index, so restore its racy timestamp afterward.
             yield* fileSystem.utimes(tempIndexPath, indexTime, indexTime);
             let specialFlags = false;
             let recordStart = true;
@@ -858,7 +821,6 @@ export const makeVcsDriverShape = Effect.fn("makeGitVcsDriverShape")(function* (
               env: commitEnv,
               maxOutputBytes: 4_096,
               outputMode: "truncate",
-              // Inspect every tag; retain only skipped file paths for checking sparse rules.
               onStdoutChunk: (chunk) => {
                 for (const byte of chunk) {
                   if (recordStart) skipped = byte === 83;
@@ -893,10 +855,8 @@ export const makeVcsDriverShape = Effect.fn("makeGitVcsDriverShape")(function* (
                 maxOutputBytes: 1,
                 outputMode: "truncate",
               });
-              // Any selected skipped file has a manual flag, not a sparse exclusion.
               specialFlags = selected.stdout.length > 0 || selected.stdoutTruncated;
             }
-            // Sparse Git clears skip-worktree for present files. Manual flags still need a reset.
             return !specialFlags;
           }).pipe(Effect.orElseSucceed(() => false));
           if (!reusedIndex) {
@@ -907,7 +867,6 @@ export const makeVcsDriverShape = Effect.fn("makeGitVcsDriverShape")(function* (
                 args: ["config", "--bool", "core.sparseCheckoutCone"],
                 allowNonZeroExit: true,
               });
-              // Rebuilding a non-cone index loses exclusions; do not publish false deletions.
               if (cone.stdout.trim() !== "true") {
                 return yield* new VcsProcessExitError({
                   operation,
@@ -922,7 +881,6 @@ export const makeVcsDriverShape = Effect.fn("makeGitVcsDriverShape")(function* (
             yield* execute({
               operation,
               cwd: input.cwd,
-              // A fresh sparse index represents excluded directories without marking them deleted.
               args: sparseCheckout
                 ? [...indexConfig, "-c", "index.sparse=true", "read-tree", "--reset", "HEAD"]
                 : ["read-tree", "HEAD"],
@@ -935,7 +893,6 @@ export const makeVcsDriverShape = Effect.fn("makeGitVcsDriverShape")(function* (
           execute({
             operation,
             cwd: input.cwd,
-            // Preserve absent skipped entries, but capture present nonignored files outside the cone.
             args: [
               ...indexConfig,
               ...durableWrite,
@@ -952,8 +909,6 @@ export const makeVcsDriverShape = Effect.fn("makeGitVcsDriverShape")(function* (
           Effect.catchTags({
             VcsProcessExitError: (error) =>
               Effect.gen(function* () {
-                // Git cannot stage an embedded repository until it has a commit. Discover these
-                // only after staging fails so ordinary checkpoints do not need another file scan.
                 const untracked = yield* execute({
                   operation,
                   cwd: input.cwd,
@@ -965,9 +920,7 @@ export const makeVcsDriverShape = Effect.fn("makeGitVcsDriverShape")(function* (
                 const candidates = splitNullSeparatedGitStdoutPaths(untracked).filter((entry) =>
                   entry.endsWith("/"),
                 );
-                // Refuse excessive recovery work before probing any nested repositories.
                 if (candidates.length > CHECKPOINT_RECOVERY_MAX_CANDIDATES) return yield* error;
-                // Discover each child's repository instead of inheriting the server's Git bindings.
                 const nestedRepoEnv: NodeJS.ProcessEnv = {
                   ...process.env,
                   GIT_DIR: undefined,
@@ -992,7 +945,6 @@ export const makeVcsDriverShape = Effect.fn("makeGitVcsDriverShape")(function* (
                 if (exclusions.length === 0) return yield* error;
                 return yield* stageFiles(exclusions);
               }).pipe(
-                // One budget covers discovery, queued Git admission, probes, and the staging retry.
                 Effect.timeoutOrElse({
                   duration: CHECKPOINT_RECOVERY_TIMEOUT,
                   orElse: () => Effect.fail(error),
@@ -1067,7 +1019,6 @@ export const makeVcsDriverShape = Effect.fn("makeGitVcsDriverShape")(function* (
         cwd: input.cwd,
         args: ["ls-files", "--cached", `--with-tree=${commitOid}`, "-z", "--", "."],
       });
-      // An empty index and checkpoint have nothing for git restore's pathspec to match.
       if (tracked.stdout.length > 0) {
         yield* execute({
           operation,
@@ -1075,7 +1026,6 @@ export const makeVcsDriverShape = Effect.fn("makeGitVcsDriverShape")(function* (
           args: ["restore", "--source", commitOid, "--worktree", "--staged", "--", "."],
         });
       }
-      // Restoring away the last tracked file can remove a nested workspace directory.
       yield* fileSystem.makeDirectory(input.cwd, { recursive: true }).pipe(
         Effect.mapError(
           (cause) =>
@@ -1095,7 +1045,6 @@ export const makeVcsDriverShape = Effect.fn("makeGitVcsDriverShape")(function* (
         allowNonZeroExit: true,
       });
       if (cleaned.exitCode !== 0) {
-        // Git can remove every child, then fail trying to remove './' itself.
         const emptiedWorkspace =
           cleaned.exitCode === 1 &&
           /^warning: failed to remove \.\/: [^\n]+$/.test(cleaned.stderr.trim()) &&

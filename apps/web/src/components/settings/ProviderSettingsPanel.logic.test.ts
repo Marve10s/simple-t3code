@@ -266,8 +266,6 @@ describe("remote operate access", () => {
   });
 
   it("stays optimistic when the session fetch fails or an older server omits scopes", () => {
-    // Transport failures and pre-scope-reporting servers are not permission
-    // decisions; the environment RPC layer still rejects unauthorized writes.
     expect(resolveRemoteOperateAccess({ session: null, isPending: false, hasError: true })).toBe(
       "granted",
     );

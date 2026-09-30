@@ -38,10 +38,6 @@ const CURSOR_INSTANCE_ID = ProviderInstanceId.make("cursor");
 const OPENCODE_INSTANCE_ID = ProviderInstanceId.make("opencode");
 const encoder = new TextEncoder();
 
-// Pin a non-win32 platform so `resolveSpawnCommand` is a no-op and the raw
-// `{ command, args }` assertions below hold deterministically on any host
-// (including Windows). Windows-specific resolution is covered by the dedicated
-// win32 case at the end of this suite.
 const NonWindowsPlatform = Layer.succeed(HostProcessPlatform, "linux");
 
 function lifecycleFor(provider: ProviderDriverKind): ProviderMaintenanceCapabilities {
@@ -211,8 +207,6 @@ function makeRegistry(
 
 const makeTestRunner = (
   registry: ProviderRegistryShape,
-  // Generic updater fixtures use synthetic versions. Keep their compatibility
-  // unknown so real harness minimums do not bypass the command under test.
   manifest: ModelManifest.ModelManifestData = {
     version: 1,
     currentModels: {},
@@ -235,7 +229,6 @@ const makeTestRunner = (
               forceRefresh: Effect.succeed(manifest),
               refreshInBackground: Effect.void,
             }),
-            // Fresh per runner so a version cached by one test cannot leak into another.
             Layer.sync(ProviderVersionCache, () => new Map()),
           ),
         ),
@@ -279,7 +272,6 @@ describe("providerMaintenanceRunner", () => {
   it.effect("reports unchanged when the updater exits 0 but the provider is gone", () => {
     return Effect.gen(function* () {
       const { registry, providersRef } = yield* makeRegistry(baseProvider);
-      // After the update, the refreshed snapshot no longer sees an install.
       const updater = yield* makeTestRunner({
         ...registry,
         refreshInstance: () =>
@@ -307,8 +299,6 @@ describe("providerMaintenanceRunner", () => {
     () => {
       return Effect.gen(function* () {
         const { registry, providersRef } = yield* makeRegistry(baseCursorProvider);
-        // Cursor's `agent about` probe can fail right after an update while the
-        // new binary is perfectly fine.
         const updater = yield* makeTestRunner({
           ...registry,
           refreshInstance: () =>
@@ -388,7 +378,6 @@ describe("providerMaintenanceRunner", () => {
       });
 
       yield* updater.updateProvider(CODEX_DRIVER);
-      // Cached read picks the lock; the two fresh reads bracket the command.
       assert.deepStrictEqual(fresh, [false, true, true]);
       assert.deepStrictEqual(calls, [
         { command: "/opt/homebrew/bin/brew", args: ["upgrade", "--cask", "codex"] },
@@ -881,18 +870,11 @@ describe("providerMaintenanceRunner", () => {
 
       const result = yield* runner.updateProvider(CODEX_DRIVER);
 
-      // On win32, resolveSpawnCommand resolves `npm` to the `.cmd` shim and
-      // routes the spawn through cmd.exe (shell: true), escaping every arg.
       assert.strictEqual(captured.length, 1);
       const call = captured[0];
       assert.ok(call, "expected the spawner to be invoked once");
-      // The resolved command is the escaped `.cmd` path. Asserting the precise
-      // escaped string is brittle, so verify it carries the resolved shim and
-      // that shell mode was used.
       assert.match(call.command, /npm\.cmd/i);
       assert.strictEqual(call.shell, true);
-      // Args are escaped for cmd.exe shell mode (each quoted) but still carry
-      // the original install command (`install -g @openai/codex@latest`) in order.
       assert.strictEqual(call.args.length, 3);
       assert.match(call.args[0] ?? "", /install/);
       assert.match(call.args[1] ?? "", /-g/);

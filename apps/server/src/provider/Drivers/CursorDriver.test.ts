@@ -36,7 +36,6 @@ const testLayer = ServerConfig.layerTest(process.cwd(), {
   ),
 );
 
-// The `#!/bin/sh` stub below cannot be resolved as an executable on Windows.
 const windowsHost = HostProcessPlatform.defaultValue() === "win32";
 
 it.layer(testLayer)("CursorDriver", (it) => {

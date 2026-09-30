@@ -3,7 +3,6 @@ import type { ComponentPropsWithoutRef } from "react";
 import { cn } from "../lib/utils";
 import { COLLAPSED_SIDEBAR_TITLEBAR_INSET_CLASS } from "../workspaceTitlebar";
 
-/** Shared workspace top-bar geometry. */
 export function WorkspacePageHeader({
   electron = false,
   reserveNativeControls = electron,

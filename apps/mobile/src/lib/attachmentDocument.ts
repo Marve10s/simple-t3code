@@ -15,14 +15,8 @@ import { attachmentDocumentPresentation } from "./attachmentDocumentPresentation
 
 const isLocalUri = (uri: string) => /^(file|content):/.test(uri);
 
-/** Signed asset URLs live for an hour; treat anything older than this as worth re-minting. */
 const STALE_URL_MS = 5 * 60_000;
 
-/**
- * Loads a captured attachment for viewing: a fresh signed URL for a sent or uploaded file,
- * a leased local file for a draft. Text kinds read a bounded prefix; documents hand their
- * URL to a native or web renderer. Captured bytes never resolve against the workspace.
- */
 export function useAttachmentDocument(input: {
   readonly name: string;
   readonly mimeType: string;
@@ -55,8 +49,6 @@ export function useAttachmentDocument(input: {
     [content, delimiter],
   );
   const [error, setError] = useState<string | null>(null);
-  // Reading source is a separate failure from loading the file: a rendered HTML page can be
-  // fine while its bytes are not UTF-8, and switching back to the page must not stay stuck.
   const [contentError, setContentError] = useState<string | null>(null);
   const textReadUrl = useRef<{ uri: string; authorizedAt: number } | null>(null);
   const [rendered, setRendered] = useState(true);
@@ -73,7 +65,6 @@ export function useAttachmentDocument(input: {
   useEffect(() => {
     if (attachment) return;
     let cancelled = false;
-    // Await a fresh signed URL: cached links can expire while the client is suspended.
     // oxlint-disable-next-line react/set-state-in-effect -- A new preview request clears its previous URL and error.
     setRemoteUri(null);
     setError(null);
@@ -96,8 +87,6 @@ export function useAttachmentDocument(input: {
   }, [attachment, refresh, revision]);
   useEffect(() => {
     if (!attachment) return;
-    // A new attachment must not keep the previous file behind it: `share()` would otherwise
-    // send the old bytes under the new name if this load fails.
     // oxlint-disable-next-line react/set-state-in-effect -- A new attachment invalidates the last one.
     setLocalUri(null);
     setContent(null);
@@ -133,8 +122,6 @@ export function useAttachmentDocument(input: {
     const response = isLocalUri(uri)
       ? Promise.resolve().then(() => ({ ok: true, body: new File(uri).readableStream() }))
       : (async () => {
-          // A signed URL minted when the file opened may have expired by the time the user
-          // switches to source; reauthorize before fetching instead of reading a stale link.
           const authorized = textReadUrl.current;
           let target = authorized?.uri ?? uri;
           if (!authorized || Date.now() - authorized.authorizedAt > STALE_URL_MS) {
@@ -142,7 +129,6 @@ export function useAttachmentDocument(input: {
             if (!refreshed) throw new Error("Reconnect to this environment and try again.");
             target = refreshed;
             if (!controller.signal.aborted) {
-              // Keep the source-read URL and its age together without restarting active media.
               textReadUrl.current = { uri: refreshed, authorizedAt: Date.now() };
             }
           }
@@ -192,7 +178,6 @@ export function useAttachmentDocument(input: {
     kind,
     ...presentation,
     uri,
-    /** Native viewers resolve their own fresh URL from this instead of reusing `uri`. */
     resource,
     content,
     table,

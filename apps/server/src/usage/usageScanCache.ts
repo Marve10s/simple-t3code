@@ -1,53 +1,21 @@
-/**
- * Durable per-file scan cache.
- *
- * Transcripts are append-only and a file that has not changed can never yield
- * different usage, so parsed records are keyed by `(size, mtime)` and reused.
- * Without this every server restart re-parses the whole window: roughly 3.5s
- * for a 30-day scan here, against ~11ms to reload this cache.
- *
- * Caching *per file* rather than per day is deliberate. It is timezone
- * independent, so changing the reporting zone does not invalidate anything, and
- * it keeps cross-file de-duplication exact: cached entries are de-duplicated
- * within their own file only, and the aggregator still applies the global
- * dedupe pass over the small surviving key set.
- *
- * @module usageScanCache
- */
 import type { UsageProviderKind } from "@t3tools/contracts";
 
 import { GUARD_LENGTH, type TranscriptParsePosition } from "./usageTranscriptReader.ts";
 import type { CodexScanState, UsageRecord } from "./usageTranscripts.ts";
 
-// v2: Codex fork-copy suppression changed what a file parses to, so v1
-// entries would keep serving double-counted records forever.
-// v3: entries carry the parse position and reducer state so a grown file
-// re-parses only its appended bytes instead of starting over.
-// v4: records carry Claude fast mode, which v3 rows never captured.
 const USAGE_SCAN_CACHE_VERSION = 4 as const;
 
 export interface CachedFile {
   readonly size: number;
   readonly mtimeMs: number;
   readonly provider: UsageProviderKind;
-  /** Records from newline-terminated lines, up to `position.resumeOffset`. */
   readonly records: readonly UsageRecord[];
-  /**
-   * Records from a trailing segment the writer had not newline-terminated at
-   * parse time. Kept apart from `records` because an incremental parse
-   * re-reads that segment and would otherwise double count it.
-   */
   readonly tailRecords: readonly UsageRecord[];
   readonly position: TranscriptParsePosition;
 }
 
 export type ScanCache = Map<string, CachedFile>;
 
-/**
- * Row layout for the serialised form. Positional and interned rather than
- * object-per-record: on a 30-day window that is the difference between a file
- * measured in tens of megabytes and one under six.
- */
 type SerializedRecord = readonly [
   timestampMs: number,
   modelIndex: number,
@@ -67,13 +35,10 @@ interface SerializedFile {
   readonly m: number;
   readonly p: UsageProviderKind;
   readonly r: readonly SerializedRecord[];
-  /** Tail records; see `CachedFile.tailRecords`. */
   readonly t: readonly SerializedRecord[];
-  /** Parse position: resume offset, guard length, guard hash. */
   readonly o: number;
   readonly gl: number;
   readonly gh: number;
-  /** Codex reducer state at `o`; `null` for stateless providers. */
   readonly cs: CodexScanState | null;
 }
 
@@ -84,7 +49,6 @@ interface SerializedCache {
   readonly files: Readonly<Record<string, SerializedFile>>;
 }
 
-/** Serialises the cache, interning the repeated model and session strings. */
 export function encodeScanCache(cache: ScanCache): SerializedCache {
   const models: string[] = [];
   const sessions: string[] = [];
@@ -136,12 +100,6 @@ function isRecordArray(value: unknown): value is readonly unknown[] {
   return Array.isArray(value);
 }
 
-/**
- * Rebuilds the cache from a parsed document.
- *
- * Anything malformed yields an empty cache rather than an error: a corrupt
- * cache should cost one cold scan, never a broken page.
- */
 export function decodeScanCache(document: unknown): ScanCache {
   const cache: ScanCache = new Map();
   if (typeof document !== "object" || document === null) return cache;
@@ -151,17 +109,11 @@ export function decodeScanCache(document: unknown): ScanCache {
   if (!isRecordArray(root.models) || !isRecordArray(root.sessions)) return cache;
   if (typeof root.files !== "object" || root.files === null) return cache;
 
-  // The intern tables must be all strings: a numeric entry would pass the
-  // undefined guard below, land in a record's model, and crash the aggregate
-  // at lookupRate. A corrupt table rejects the whole cache.
   if (!root.models.every((value) => typeof value === "string")) return cache;
   if (!root.sessions.every((value) => typeof value === "string")) return cache;
   const models = root.models as readonly string[];
   const sessions = root.sessions as readonly string[];
 
-  // Any corrupt row disqualifies the whole entry. Keeping the survivors
-  // under the original (size, mtime) would read as a valid warm hit and the
-  // file would never be re-parsed, silently losing the dropped rows' usage.
   const decodeRecords = (
     rows: readonly unknown[],
     provider: UsageProviderKind,
@@ -224,10 +176,6 @@ export function decodeScanCache(document: unknown): ScanCache {
     if (typeof entry.s !== "number" || typeof entry.m !== "number") continue;
     if (entry.p !== "claude" && entry.p !== "codex" && entry.p !== "grok") continue;
     if (!isRecordArray(entry.r) || !isRecordArray(entry.t)) continue;
-    // Position fields feed byte offsets and a Buffer allocation in the reader,
-    // so anything outside their real ranges must reject the entry: a bogus
-    // guard length would otherwise fail every parse of the file, silently
-    // dropping its usage instead of costing the documented cold re-parse.
     if (
       typeof entry.o !== "number" ||
       !Number.isSafeInteger(entry.o) ||
@@ -268,11 +216,6 @@ export function decodeScanCache(document: unknown): ScanCache {
   return cache;
 }
 
-/**
- * Validates a persisted Codex reducer state. Returns `undefined` for a corrupt
- * value, which disqualifies the entry: resuming with a bad state would attach
- * appended usage to the wrong model or replay fork-copied history.
- */
 function decodeCodexState(value: unknown): CodexScanState | null | undefined {
   if (value === null) return null;
   if (typeof value !== "object") return undefined;
@@ -298,7 +241,6 @@ function decodeCodexState(value: unknown): CodexScanState | null | undefined {
   };
 }
 
-/** Keeps saved usage after transcript cleanup, until the reporting retention expires. */
 export function pruneScanCache(cache: ScanCache, retentionCutoffMs: number): number {
   let removed = 0;
   for (const [path, entry] of cache) {
@@ -310,13 +252,6 @@ export function pruneScanCache(cache: ScanCache, retentionCutoffMs: number): num
   return removed;
 }
 
-/**
- * Within-file de-duplication, applied before an entry is cached.
- *
- * Callers stitching an incremental parse together pass one `seen` set across
- * the line and tail record batches so the whole file stays deduplicated as a
- * unit; the set is mutated in place.
- */
 export function dedupeWithinFile(
   records: readonly UsageRecord[],
   seen: Set<string> = new Set(),

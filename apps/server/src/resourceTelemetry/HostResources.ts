@@ -32,8 +32,6 @@ function darwinAvailableMemory(output: string): number | null {
   const inactive = /^Pages inactive:\s+(\d+)\./m.exec(output)?.[1];
   const speculative = /^Pages speculative:\s+(\d+)\./m.exec(output)?.[1];
   if (!pageSize || !free || !inactive || !speculative) return null;
-  // vm_stat subtracts speculative pages from its printed "Pages free" count.
-  // Adding them here counts each reclaimable page once; purgeable pages overlap.
   const available = (Number(free) + Number(inactive) + Number(speculative)) * Number(pageSize);
   return Number.isSafeInteger(available) && Number(pageSize) > 0 ? available : null;
 }
@@ -45,7 +43,6 @@ export const make = Effect.fn("makeHostResources")(function* () {
 
   const sample = Effect.fn("HostResources.sample")(function* () {
     const previousCpu = readCpu();
-    // CPU counters need two readings; idle servers do no polling or process scans.
     yield* Effect.sleep("200 millis");
     const cpu = readCpu();
     const totalDelta = cpu.total - previousCpu.total;
@@ -55,7 +52,6 @@ export const make = Effect.fn("makeHostResources")(function* () {
         ? Math.min(1, Math.max(0, 1 - idleDelta / totalDelta))
         : null;
     const totalMemoryBytes = NodeOS.totalmem();
-    // On Windows libuv returns GlobalMemoryStatusEx.ullAvailPhys, including standby memory.
     let availableMemoryBytes = NodeOS.freemem();
     if (platform === "linux") {
       const meminfo = yield* fs
@@ -81,7 +77,6 @@ export const make = Effect.fn("makeHostResources")(function* () {
     };
   });
 
-  // One server-lifetime cache deduplicates simultaneous requests from all sockets.
   const cache = yield* Cache.make({
     capacity: 1,
     lookup: (_key: "host") => sample(),

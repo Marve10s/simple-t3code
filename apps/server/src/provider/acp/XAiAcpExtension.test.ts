@@ -427,7 +427,6 @@ describe("XAiAcpExtension", () => {
     expect(isGrokPlanMarkdownPath("/OPT/GROK-DATA/sessions/sess/plan.md", grokHomeHost)).toBe(
       false,
     );
-    // Workspace plan.md must not be treated as the session plan file.
     expect(isGrokPlanMarkdownPath("plan.md", linuxHost)).toBe(false);
     expect(isGrokPlanMarkdownPath("/repo/docs/plan.md", linuxHost)).toBe(false);
     expect(isGrokPlanMarkdownPath("/tmp/other.md", linuxHost)).toBe(false);

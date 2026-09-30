@@ -1,6 +1,5 @@
 import { flattenThemeColor, type MobileThemeVariables } from "./mobileTheme";
 
-/** Native chip parsers need opaque hex instead of CSS rgba or platform-specific alpha order. */
 export function createNativeComposerTheme(theme: MobileThemeVariables) {
   const surface = flattenThemeColor(theme["--color-composer-surface"], theme["--color-screen"]);
   const chipBackground = flattenThemeColor(theme["--color-subtle"], surface);

@@ -90,7 +90,6 @@ const REASONING_EFFORT_LABELS: Readonly<Record<string, string>> = {
 
 const DEFAULT_SERVICE_TIER_ID = "default";
 
-/** Shorter copy for tiers whose catalog description wraps in the traits menu. */
 const SERVICE_TIER_DESCRIPTIONS: Readonly<Record<string, string>> = {
   ultrafast: "Even faster, more expensive",
 };
@@ -107,7 +106,6 @@ function codexAccountAuthLabel(account: CodexSchema.V2GetAccountResponse["accoun
   return codexPlanLabel(account.planType);
 }
 
-/** Shared with usage-limit sources, which report the same `planType` slugs. */
 export function codexPlanLabel(planType: string | null | undefined): string | undefined {
   switch (planType) {
     case "free":
@@ -222,9 +220,8 @@ export function mapCodexModelCapabilities(
 }
 
 const toDisplayName = (model: CodexSchema.V2ModelListResponse__Model): string => {
-  // Capitalize 'gpt' to 'GPT-' and capitalize any letter following a dash
   return model.displayName
-    .replace(/^gpt/i, "GPT") // Handle start with 'gpt' or 'GPT'
+    .replace(/^gpt/i, "GPT")
     .replace(/-([a-z])/g, (_, c) => "-" + c.toUpperCase());
 };
 
@@ -240,10 +237,6 @@ function parseCodexModelListResponse(
   }));
 }
 
-/**
- * Prefer our own default-model ranking when one of the preferred slugs is in
- * the live catalog; otherwise keep whatever Codex itself flagged as default.
- */
 export function applyPreferredCodexDefaultModel(
   models: ReadonlyArray<ServerProviderModel>,
 ): ReadonlyArray<ServerProviderModel> {
@@ -265,11 +258,6 @@ export function applyPreferredCodexDefaultModel(
   });
 }
 
-/**
- * Codex has no static default capability set, so a bare custom slug borrows
- * the first built-in's descriptors; an entry with its own capabilities keeps
- * them.
- */
 function appendCustomCodexModels(
   models: ReadonlyArray<ServerProviderModel>,
   customModels: ReadonlyArray<CustomModelSetting>,
@@ -363,12 +351,6 @@ export function buildCodexInitializeParams(): CodexSchema.V1InitializeParams {
   };
 }
 
-/**
- * Spawns a short-lived `codex app-server`, runs the initialize handshake, and
- * hands the caller a connected client. Scoped: the process is killed when
- * the caller's scope closes. Shared by the status probe, the skills probe,
- * and account-level requests such as reset-credit redemption.
- */
 export const withCodexAppServerClient = Effect.fn("withCodexAppServerClient")(function* (input: {
   readonly binaryPath: string;
   readonly homePath?: string | undefined;
@@ -376,10 +358,6 @@ export const withCodexAppServerClient = Effect.fn("withCodexAppServerClient")(fu
   readonly cwd: string;
   readonly environment?: NodeJS.ProcessEnv | undefined;
 }) {
-  // `~` is not shell-expanded when env vars are set via `child_process.spawn`,
-  // so `CODEX_HOME=~/.codex_work` would reach codex verbatim and trip
-  // "CODEX_HOME points to '~/.codex_work', but that path does not exist".
-  // Expand here for parity with `CodexTextGeneration`/`CodexSessionRuntime`.
   const resolvedHomePath = input.homePath ? expandHomePath(input.homePath) : undefined;
   const spawner = yield* ChildProcessSpawner.ChildProcessSpawner;
   const environment = {
@@ -430,7 +408,6 @@ const probeCodexAppServerProvider = Effect.fn("probeCodexAppServerProvider")(fun
 }) {
   const { client, initialize } = yield* withCodexAppServerClient(input);
 
-  // Extract the version string after the first '/' in userAgent, up to the next space or the end
   const versionMatch = initialize.userAgent.match(/\/([^\s]+)/);
   const version = versionMatch ? versionMatch[1] : undefined;
 
@@ -450,8 +427,6 @@ const probeCodexAppServerProvider = Effect.fn("probeCodexAppServerProvider")(fun
         cwds: [input.cwd],
       }),
       requestAllCodexModels(client),
-      // Usage is an enrichment: a failure or a slow answer degrades to "no
-      // usage this probe" rather than costing the account and models.
       input.skipNativeUsage
         ? Effect.succeed(undefined)
         : client.request("account/rateLimits/read", null).pipe(
@@ -714,11 +689,4 @@ export const checkCodexProviderStatus = Effect.fn("checkCodexProviderStatus")(fu
   });
 });
 
-// NOTE: the singleton `CodexProviderLive` Layer has been removed as part of
-// the per-instance-driver refactor. `CodexDriver.create()` builds a managed
-// snapshot per instance (each with its own `CodexSettings`) and hands the
-// resulting `ServerProviderShape` back as `ProviderInstance.snapshot`.
-//
-// The `makePendingCodexProvider` and `checkCodexProviderStatus` helpers are
-// re-exported for use by `CodexDriver`.
 export { makePendingCodexProvider };

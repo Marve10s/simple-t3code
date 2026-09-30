@@ -76,7 +76,6 @@ function configuredMcpToolAvailability(
   mcpCapabilities: ReadonlySet<string> | undefined,
 ): T3CodeToolAvailability {
   if (!hasConfiguredMcpServer(appServerArgs)) return { browser: false, device: false };
-  // Callers predating the capability set attached the browser toolkit only.
   if (mcpCapabilities === undefined) return { browser: true, device: false };
   return { browser: mcpCapabilities.has("preview"), device: mcpCapabilities.has("device") };
 }
@@ -142,8 +141,6 @@ const McpElicitationForm = Schema.Struct({
 const isMcpElicitationMetadata = Schema.is(McpElicitationMetadata);
 const isMcpElicitationForm = Schema.is(McpElicitationForm);
 
-// TODO: Verify `packages/effect-codex-app-server/scripts/generate.ts` so the generated
-// `V2TurnStartParams` schema includes its experimental fields directly.
 const CodexTurnStartParamsWithCollaborationMode = EffectCodexSchema.V2TurnStartParams.pipe(
   Schema.fieldsAssign({
     collaborationMode: Schema.optionalKey(EffectCodexSchema.V2TurnStartParams__CollaborationMode),
@@ -183,9 +180,7 @@ export interface CodexSessionRuntimeOptions {
   readonly serviceTier?: CodexServiceTier | undefined;
   readonly resumeCursor?: CodexResumeCursor;
   readonly appServerArgs?: ReadonlyArray<string>;
-  /** The provider's model list; supplies the display name for runtime info. */
   readonly models?: Effect.Effect<ReadonlyArray<ServerProviderModel>>;
-  /** Capabilities the session's `t3-code` MCP credential grants; drives the prompt blocks. */
   readonly mcpCapabilities?: ReadonlySet<string>;
 }
 
@@ -362,7 +357,6 @@ function isMcpElicitationPersistenceField(
   );
 }
 
-/** Returns the app and approval choices advertised by an MCP elicitation. */
 export function describeMcpElicitation(
   payload: EffectCodexSchema.McpServerElicitationRequestParams,
 ): { readonly appName: string; readonly options: ReadonlyArray<ProviderApprovalOption> } {
@@ -428,7 +422,6 @@ export function describeMcpElicitation(
   };
 }
 
-/** Converts a T3 approval decision into the MCP elicitation wire response. */
 export function toMcpElicitationResponse(
   payload: EffectCodexSchema.McpServerElicitationRequestParams,
   decision: ProviderApprovalDecision,
@@ -515,8 +508,6 @@ function readResumeCursorThreadId(
 function runtimeModeToThreadConfig(input: RuntimeMode): {
   readonly approvalPolicy: EffectCodexSchema.V2ThreadStartParams__AskForApproval;
   readonly sandbox: EffectCodexSchema.V2ThreadStartParams__SandboxMode;
-  // Always explicit: omitting the field on resume keeps the thread's previous
-  // reviewer, which would leave auto_review sticky after switching modes.
   readonly approvalsReviewer: EffectCodexSchema.V2ThreadStartParams__ApprovalsReviewer;
 } {
   switch (input) {
@@ -614,7 +605,6 @@ function buildCodexTurnInstructions(input: {
   };
 }
 
-// Match the skill grammar used by Claude/Cursor, leaving currency amounts as prose.
 const SKILL_MENTION_PATTERN =
   /(^|\s)\p{Sc}(?![0-9][0-9_]*(?:[kKmMbBtT]|[eE][0-9]+)?(?:\s|$))(?=[a-zA-Z0-9:_-]*[a-zA-Z])([a-zA-Z0-9][a-zA-Z0-9:_-]*)(?=\s|$)/gu;
 
@@ -627,12 +617,10 @@ export function buildTurnStartParams(input: {
     readonly path: string;
   }>;
   readonly model?: string;
-  /** Display name of `model`, for runtime info. */
   readonly modelName?: string;
   readonly serviceTier?: CodexServiceTier;
   readonly effort?: EffectCodexSchema.V2TurnStartParams__ReasoningEffort;
   readonly interactionMode?: ProviderInteractionMode;
-  /** Defaults to true so callers that predate the agent-access gate are unchanged. */
   readonly browserToolsAvailable?: boolean | T3CodeToolAvailability;
 }): Effect.Effect<
   CodexTurnStartParamsWithCollaborationMode,
@@ -753,9 +741,6 @@ export const openCodexThread = (input: {
     return input.client.request("thread/start", startParams);
   }
 
-  // Older providers may still return history despite excludeTurns. Only the
-  // session metadata is needed here, so unrelated historical items cannot
-  // prevent resuming a valid provider thread.
   return input.client.raw
     .request("thread/resume", {
       threadId: resumeThreadId,
@@ -938,23 +923,6 @@ function readRouteFields(notification: CodexServerNotification): {
   }
 }
 
-/**
- * Native collab child-agent tracking (multi-agent v2). Under v2 subagents are
- * full app-server threads: identity arrives on `thread/started` with
- * source.subAgent.thread_spawn, lifecycle on `subAgentActivity` items and the
- * child thread's own turn/status/tokenUsage notifications. The runtime
- * registers children from those explicit signals, intercepts their
- * notifications before parent-timeline mapping, and re-emits them as
- * synthetic `collabAgent/*` provider events the adapter turns into task.*
- * runtime events (timelineBypass keeps them out of the parent chat).
- *
- * WIP, probe-gated: registration is deliberately explicit-signals-only. The
- * spec's "provisionally treat unknown foreign thread ids as v2 children" rule
- * needs a live wire capture of the packaged binary before it lands — blind
- * capture risks eating unrelated traffic. Until then a child whose first
- * notification precedes registration passes through as today (no regression
- * vs main, which passes everything through).
- */
 interface CollabChildAgentState {
   readonly agentThreadId: string;
   readonly nickname: string | undefined;
@@ -962,12 +930,6 @@ interface CollabChildAgentState {
   readonly agentPath: string | undefined;
   readonly depth: number | undefined;
   readonly parentThreadId: string | undefined;
-  /**
-   * Parent canonical turn active when the child registered. Stamped on every
-   * synthetic collabAgent/* event so clients can batch a fleet by its spawn
-   * turn — without it, separate fleets in one thread collapsed into a single
-   * "direct:no-turn" CTA (review finding).
-   */
   readonly spawnTurnId: TurnId | undefined;
 }
 
@@ -1075,22 +1037,6 @@ function shouldSuppressChildConversationNotification(
   );
 }
 
-/**
- * How a notification addressed to a REGISTERED child thread is handled.
- *
- * Exported and pure so the routing table can be asserted against captured
- * wire traces (see codexMultiAgentWire.json) rather than only read.
- *
- * - "agent-event": map to a synthetic collabAgent/* event (Agents surface).
- * - "parent": pass through to the parent path — it carries state the parent
- *   still owns (approval correlation cleanup).
- * - "drop": genuine child chatter with no parent meaning (deltas, name and
- *   plan updates).
- *
- * Default is "drop" ONLY for the enumerated chatter; anything unrecognized
- * routes to "parent" so new wire methods surface instead of vanishing
- * (two shipped bugs came from a catch-all that swallowed everything).
- */
 export type CodexChildNotificationRoute = "agent-event" | "parent" | "drop";
 
 const CHILD_AGENT_EVENT_METHODS: ReadonlySet<string> = new Set([
@@ -1119,15 +1065,9 @@ const CHILD_CHATTER_METHODS: ReadonlySet<string> = new Set([
   "turn/diff/updated",
   "thread/name/updated",
   "rawResponseItem/completed",
-  // Child-owned thread lifecycle: the parent adapter maps these onto the
-  // PARENT thread (archived/compacted state), so a child compacting would
-  // rewrite the parent. Mirrors the v1 suppressor list — dropping them is
-  // the pre-existing behavior for collab children (review finding).
   "thread/archived",
   "thread/unarchived",
   "thread/compacted",
-  // Registration path 1 handles a child's first thread/started; a repeat
-  // must not reach the parent (it would restart the parent's thread state).
   "thread/started",
 ]);
 
@@ -1138,7 +1078,6 @@ export function routeCodexChildNotification(method: string): CodexChildNotificat
   if (CHILD_CHATTER_METHODS.has(method)) {
     return "drop";
   }
-  // Unknown or parent-owned (serverRequest/resolved, approvals, …).
   return "parent";
 }
 
@@ -1285,8 +1224,6 @@ export const rollbackCodexThread = Effect.fn("rollbackCodexThread")(function* (
   threadId: string,
   numTurns: number,
 ): Effect.fn.Return<CodexThreadSnapshot, CodexErrors.CodexAppServerError> {
-  // Codex replaces history at a turn boundary. It rejects threads that still
-  // use legacy history, which have no rollback API since Codex 0.156.
   const snapshot = yield* readCodexThread(client, threadId);
   const retainedCount = Math.max(0, snapshot.turns.length - numTurns);
   const firstRemoved = snapshot.turns[retainedCount];
@@ -1314,17 +1251,12 @@ export const makeCodexSessionRuntime = (
     const collabReceiverTurnsRef = yield* Ref.make(new Map<string, TurnId>());
     const collabChildAgentsRef = yield* Ref.make(new Map<string, CollabChildAgentState>());
     const collabChildMetadataRef = yield* Ref.make(new Map<string, CollabChildMetadataState>());
-    /** Child provider-thread id → its currently running provider turn id. */
     const collabChildLiveTurnsRef = yield* Ref.make(new Map<string, string>());
     const suppressMemoryConsolidationNotification = makeMemoryConsolidationNotificationFilter();
     const closedRef = yield* Ref.make(false);
-    /** The `additionalContext` of the latest `turn/start`, restored after compaction. */
     const lastAdditionalContextRef =
       yield* Ref.make<CodexTurnStartParamsWithCollaborationMode["additionalContext"]>(undefined);
 
-    // `~` is not shell-expanded when env vars are set via
-    // `child_process.spawn`; `expandHomePath` lets a configured
-    // `CODEX_HOME=~/.codex_work` reach codex as an absolute path.
     const resolvedHomePath = options.homePath ? expandHomePath(options.homePath) : undefined;
     const env = {
       ...options.environment,
@@ -1502,8 +1434,6 @@ export const makeCodexSessionRuntime = (
         return;
       }
 
-      // The child is already loaded. This rejoins it without starting a turn,
-      // and excludeTurns avoids loading or replaying its history.
       yield* client.raw
         .request("thread/resume", { threadId: agentThreadId, excludeTurns: true })
         .pipe(
@@ -1563,16 +1493,8 @@ export const makeCodexSessionRuntime = (
         ),
       );
 
-    /**
-     * Registers v2 collab children and re-emits their notifications as
-     * synthetic `collabAgent/*` events for the adapter's task.* synthesis.
-     * Returns true when the notification was fully handled (must not reach
-     * parent-timeline mapping).
-     */
     const interceptCollabChildNotification = (notification: CodexServerNotification) =>
       Effect.gen(function* () {
-        // Registration path 1: child thread announces itself with a
-        // subAgent thread_spawn source.
         if (notification.method === "thread/started") {
           const thread = notification.params.thread;
           const spawn = readThreadSpawnSource(thread);
@@ -1583,13 +1505,6 @@ export const makeCodexSessionRuntime = (
           if (thread.id === rootProviderThreadId) {
             return false;
           }
-          // Merge with any subAgentActivity registration that got here
-          // first. spawnTurnId is REGISTRATION-time-only on both paths: for
-          // an already-known child we keep its value (set or unset) — a
-          // later thread/started during an unrelated parent turn must not
-          // backfill that turn as the spawn batch, which would stamp an old
-          // child onto a new fleet's CTA (review finding). Only a genuinely
-          // new registration captures the current turn.
           const existingChild = (yield* Ref.get(collabChildAgentsRef)).get(thread.id);
           const spawnTurnId = existingChild
             ? existingChild.spawnTurnId
@@ -1625,19 +1540,11 @@ export const makeCodexSessionRuntime = (
           return true;
         }
 
-        // Registration path 2: parent-side subAgentActivity item names the
-        // child thread (may arrive before or after thread/started).
         if (
           (notification.method === "item/started" || notification.method === "item/completed") &&
           notification.params.item.type === "subAgentActivity"
         ) {
           const item = notification.params.item;
-          // Never register the session's ROOT thread as its own child. The
-          // wire emits subAgentActivity {agentPath: "/root", interacted}
-          // about the root during collab runs; registering it intercepted
-          // every subsequent root notification — including the final
-          // assistant message and turn/completed — so the thread hung
-          // "working" after all subagents finished (live-probe finding).
           const rootProviderThreadId = currentProviderThreadId(yield* Ref.get(sessionRef));
           if (
             item.agentThreadId === rootProviderThreadId ||
@@ -1650,13 +1557,6 @@ export const makeCodexSessionRuntime = (
           yield* Ref.update(collabChildAgentsRef, (current) => {
             const existing = current.get(item.agentThreadId);
             const next = new Map(current);
-            // Merge-late semantics: when thread/started registered first, a
-            // later subAgentActivity still carries the real agentPath (and a
-            // derived nickname) — fill missing fields, never clobber known
-            // ones. spawnTurnId is registration-time-only: for an already
-            // registered child, a later activity during an UNRELATED turn
-            // must not backfill that turn as the spawn batch (review
-            // finding); an unset spawn turn stays unset.
             next.set(item.agentThreadId, {
               agentThreadId: item.agentThreadId,
               nickname:
@@ -1690,14 +1590,10 @@ export const makeCodexSessionRuntime = (
           return true;
         }
 
-        // Interception: notifications addressed to a registered child thread
-        // become agent-scoped synthetic events instead of parent chatter.
         const providerConversationId = readNotificationThreadId(notification);
         if (!providerConversationId) {
           return false;
         }
-        // Belt-and-braces: the root thread's traffic must never be
-        // intercepted, whatever the registry says.
         const interceptRootId = currentProviderThreadId(yield* Ref.get(sessionRef));
         if (providerConversationId === interceptRootId) {
           return false;
@@ -1816,9 +1712,6 @@ export const makeCodexSessionRuntime = (
             });
             return true;
           case "thread/closed":
-            // The child is gone: drop its live-turn entry so a later Stop
-            // doesn't waste a turn/interrupt RPC on a closed thread before
-            // reaching the parent (review finding).
             yield* Ref.update(collabChildLiveTurnsRef, (current) => {
               const next = new Map(current);
               next.delete(child.agentThreadId);
@@ -1834,14 +1727,6 @@ export const makeCodexSessionRuntime = (
             });
             return true;
           case "error": {
-            // A child error must surface as a failed agent, not vanish into
-            // the default swallow (review finding: the child stayed
-            // "running" forever). Retryable errors (willRetry) keep the
-            // child RUNNING and interruptible — mirroring the root error
-            // handler; settling it would orphan a still-live child from
-            // Stop (review finding). Terminal errors clean up the live turn
-            // like thread/closed and reuse the statusChanged systemError
-            // path.
             const willRetry = (notification.params as { willRetry?: boolean }).willRetry === true;
             if (willRetry) {
               return true;
@@ -1864,22 +1749,10 @@ export const makeCodexSessionRuntime = (
             return true;
           }
           default:
-            // Routing table decides (single source of truth, asserted
-            // against captured wire traces): enumerated chatter is dropped,
-            // everything else — including methods this build has never seen
-            // — falls through to the parent path rather than vanishing.
             return routeCodexChildNotification(notification.method) === "drop";
         }
       });
 
-    /**
-     * Compaction rebuilds history from user messages and Codex's own context,
-     * which drops our `additionalContext` messages. Codex only resends an
-     * entry when its value changes, so without this the T3 context would stay
-     * lost until the model or effort changed. Awaited so the context is back
-     * before later notifications from the same turn are handled. Drop this if
-     * Codex enables its `retain_client_developer_messages` feature by default.
-     */
     const restoreAdditionalContext = (threadId: string) =>
       Effect.gen(function* () {
         const context = yield* Ref.get(lastAdditionalContextRef);
@@ -1917,23 +1790,11 @@ export const makeCodexSessionRuntime = (
         })();
 
         rememberCollabReceiverTurns(collabReceiverTurns, notification, route.turnId);
-        // Interception FIRST: a registered v2 child is usually also in the
-        // receiver-turn map (collabAgentToolCall.receiverThreadIds), and the
-        // legacy suppressor below would drop its lifecycle before it could
-        // become synthetic collabAgent events (review finding). The
-        // suppressor still covers UNREGISTERED children.
         if (yield* interceptCollabChildNotification(notification)) {
           yield* Ref.set(collabReceiverTurnsRef, collabReceiverTurns);
           return;
         }
 
-        // Suppression applies to receiver-map children (v1) AND to any
-        // conversation that is not the root thread. The live capture
-        // (codexMultiAgentWire.json) shows a child's thread/status/changed
-        // arriving BEFORE anything registers the child — pre-registration
-        // lifecycle must not reach the parent path, where the adapter maps
-        // thread/* onto parent session state. Root-id-known guard keeps the
-        // root's own early notifications flowing during session open.
         const suppressRootId = currentProviderThreadId(yield* Ref.get(sessionRef));
         const foreignConversation = (() => {
           const providerConversationId = readNotificationThreadId(notification);
@@ -1947,13 +1808,6 @@ export const makeCodexSessionRuntime = (
           (childParentTurnId !== undefined || foreignConversation) &&
           shouldSuppressChildConversationNotification(notification.method)
         ) {
-          // Stop-everything must not depend on registration timing: a
-          // child's turn/started can arrive before the subAgentActivity that
-          // registers it (captured ordering), and suppressing it without
-          // remembering the live turn would leave that child running after
-          // Stop (review finding). Track live turns for ANY foreign
-          // conversation; interrupts are best-effort per child, so a
-          // false-positive entry costs one ignored RPC at worst.
           const foreignThreadId = readNotificationThreadId(notification);
           if (foreignThreadId !== undefined) {
             if (notification.method === "turn/started") {
@@ -2333,8 +2187,6 @@ export const makeCodexSessionRuntime = (
             }),
           ),
         );
-        // Approving grants the requested profile; denying answers with an
-        // empty grant so the app-server treats the permission as withheld.
         const grantedPermissions =
           resolved === "accept" || resolved === "acceptForSession" ? payload.permissions : {};
         return {
@@ -2574,9 +2426,6 @@ export const makeCodexSessionRuntime = (
             ...(input.serviceTier ? { serviceTier: input.serviceTier } : {}),
             ...(input.effort ? { effort: input.effort } : {}),
             ...(input.interactionMode ? { interactionMode: input.interactionMode } : {}),
-            // Derived from the session's own credential rather than the
-            // setting, so the prompt describes the tools this turn actually
-            // has even if the setting changed after the session started.
             browserToolsAvailable: configuredMcpToolAvailability(
               options.appServerArgs,
               options.mcpCapabilities,
@@ -2596,9 +2445,6 @@ export const makeCodexSessionRuntime = (
           const turnId = TurnId.make(response.turn.id);
           yield* updateSession(sessionRef, (session) => ({
             status: "running",
-            // Codex accepts follow-ups while the current turn is still
-            // running. The response contains the queued turn id, but
-            // turn/interrupt only accepts the id that is active now.
             activeTurnId: session.activeTurnId ?? turnId,
             ...(normalizedModel ? { model: normalizedModel } : {}),
           }));
@@ -2615,24 +2461,8 @@ export const makeCodexSessionRuntime = (
         Effect.gen(function* () {
           const providerThreadId = yield* readProviderThreadId;
           const session = yield* Ref.get(sessionRef);
-          // Settle parked approvals FIRST. The transport answers server
-          // requests inline on its stdin read loop, so a pending
-          // command/file/app-permission prompt blocks every incoming message,
-          // including the turn/interrupt response itself - cancelling after
-          // the RPC would deadlock Stop exactly when a card is open. Settling
-          // releases the handler, which answers the peer and unblocks the
-          // loop before the interrupts below are sent.
           yield* settlePendingApprovals("cancel");
-          // Pending user-input prompts block the same way; settle them too.
           yield* settlePendingUserInputs({});
-          // Stop-everything: children are full threads with their own turns;
-          // interrupting only the parent leaves the fleet running. Interrupt
-          // each live child turn first, best-effort per child, BOUNDED: the
-          // transport awaits an unbounded Deferred per request, so a wedged
-          // child would otherwise block the parent interrupt forever —
-          // exactly during the runaway fleet where Stop matters most
-          // (review finding). Per-child and overall deadlines guarantee the
-          // parent interrupt below always runs.
           const liveChildTurns = yield* Ref.get(collabChildLiveTurnsRef);
           yield* Effect.forEach(
             Array.from(liveChildTurns.entries()),

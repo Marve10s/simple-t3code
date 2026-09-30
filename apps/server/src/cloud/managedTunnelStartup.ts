@@ -34,8 +34,6 @@ export function managedTunnelStartupAction(input: {
   return { action: "none" };
 }
 
-// After this window the host can start its stored connector config while
-// registration keeps retrying to reconcile the origin when the relay returns.
 const MANAGED_TUNNEL_REGISTRATION_RETRY_WINDOW = Duration.minutes(10);
 
 export const retryManagedTunnelRegistration = <A, E, R>(
@@ -67,12 +65,6 @@ export const retryManagedTunnelRegistration = <A, E, R>(
   );
 };
 
-// A host asks the relay for a replacement tunnel at most this often. Every
-// managed host shares one relay, so a host stuck in a bad loop must not turn
-// into a fleet-wide request storm.
 export const MANAGED_TUNNEL_RECOVERY_COOLDOWN = Duration.minutes(2);
 
-// Existing hosts register on their first boot after an upgrade, and desktop
-// auto-update delivers that boot to many hosts at once. Spread the first
-// registration so the relay and Cloudflare see a ramp instead of a spike.
 export const MANAGED_TUNNEL_FIRST_REGISTRATION_JITTER = Duration.seconds(30);

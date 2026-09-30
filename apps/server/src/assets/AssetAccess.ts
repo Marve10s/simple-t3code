@@ -61,8 +61,6 @@ const ASSET_TOKEN_TTL_MS = 60 * 60 * 1000;
 const PROJECT_FAVICON_TOKEN_BUCKET_MS = 30 * 60 * 1000;
 const PROJECT_FAVICON_VERSION_PREFIX = "v";
 const INLINE_VIDEO_MIME_TYPE_PATTERN = /^video\/[\w!#$&^.+-]+$/i;
-// Extensions a document viewer or audio player may request inline. The extension comes from
-// the attachment id the server assigned, never from the client's mime type.
 const INLINE_PREVIEW_MIME_TYPES: Record<string, string> = {
   pdf: "application/pdf",
   html: "text/html",
@@ -109,11 +107,7 @@ const AssetClaimsSchema = Schema.Union([
     version: Schema.Literal(1),
     kind: Schema.Literal("attachment"),
     attachmentId: Schema.String,
-    /** Decided at mint time. Absent tokens (from before this field) serve
-        inline, which is only ever the image case. */
     download: Schema.optionalKey(Schema.Boolean),
-    /** Display name and mime the caller supplied at mint time; drive the
-        download filename and Content-Type. */
     fileName: Schema.optionalKey(Schema.String),
     mimeType: Schema.optionalKey(Schema.String),
     expiresAt: Schema.Number,
@@ -140,7 +134,6 @@ const AssetClaimsSchema = Schema.Union([
   Schema.Struct({
     version: Schema.Literal(1),
     kind: Schema.Literal("github-media"),
-    /** Already narrowed to a GitHub media host at mint time; the signature is what keeps it there. */
     url: Schema.String,
     cwd: Schema.String,
     expiresAt: Schema.Number,
@@ -165,8 +158,6 @@ export type ResolvedAsset =
       readonly kind: "github-media";
       readonly url: string;
       readonly cwd: string;
-      /** When the signed URL that granted this stops working, which bounds how long a client
-          may keep the bytes it fetched with it. */
       readonly expiresAt: number;
     };
 
@@ -250,25 +241,14 @@ const resolveCanonicalWorkspaceFileForRequest = (input: {
     Effect.orElseSucceed(() => null),
   );
 
-/**
- * Reads pixel dimensions from an image's header so clients can reserve the
- * exact box before the bytes arrive. Best effort: an unreadable or unsupported
- * file just leaves the field out, and the client measures after decode. Only
- * formats the parser understands are opened; SVG and the rest are skipped.
- */
 const HEADER_IMAGE_EXTENSIONS = new Set([".png", ".jpg", ".jpeg", ".gif", ".webp"]);
 
-/** From the identity-checked, non-blocking handle the caller already holds. */
 const readImageDimensionsFromOpenFile = (filePath: string, file: OpenMediaFile) =>
   readMediaFileHeader(filePath, file, IMAGE_DIMENSIONS_HEADER_BYTES).pipe(
     Effect.map(readImageDimensions),
     Effect.orElseSucceed((): ImageDimensions | null => null),
   );
 
-/**
- * Opens through `openMediaFile` so a path swapped for a FIFO cannot block the
- * request; a regular open would wait for a writer that never comes.
- */
 const readImageDimensionsFromHeader = (filePath: string) =>
   openMediaFile(filePath).pipe(
     Effect.flatMap((file) =>
@@ -483,11 +463,8 @@ export const issueAssetUrl = Effect.fn("AssetAccess.issueAssetUrl")(function* (i
       break;
     }
     case "draft-workspace-file": {
-      // The draft names its workspace root in the resource itself; an explicit
-      // root only overrides it.
       const draftWorkspaceRoot = input.workspaceRoot ?? input.resource.cwd;
       if (path.isAbsolute(input.resource.path)) {
-        // An absolute draft path serves exactly like an absolute media path.
         const finalized = yield* finalizeAbsoluteMediaFileAsset({
           requestedPath: input.resource.path,
           resource: input.resource,
@@ -529,10 +506,6 @@ export const issueAssetUrl = Effect.fn("AssetAccess.issueAssetUrl")(function* (i
           resource: input.resource,
         });
       }
-      // Generic files carry their extension inside the attachment id (that
-      // shape resolves the on-disk path); images do not. Videos and images
-      // render inline. Other generic files download unless a viewer requests
-      // a supported document or audio format inline.
       const extension = parseAttachmentFileExtension(input.resource.attachmentId);
       const isGenericFile = extension !== null;
       const videoMimeType = input.resource.mimeType?.split(";", 1)[0]?.trim() ?? "";

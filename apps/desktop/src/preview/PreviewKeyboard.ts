@@ -80,11 +80,6 @@ const PRINTABLE_KEYS: ReadonlyArray<KeyDefinition> = [
   { code: "Slash", key: "/", shiftedKey: "?", keyCode: 191 },
 ];
 
-/**
- * Chromium does not infer macOS editing commands from synthetic Meta chords.
- * Keep the common browser editing/navigation shortcuts explicit so dispatched
- * key events behave like their physical-key equivalents.
- */
 const MAC_EDITING_COMMANDS: Readonly<Record<string, string>> = {
   "Meta+Backspace": "deleteToBeginningOfLine",
   "Meta+ArrowUp": "moveToBeginningOfDocument",
@@ -167,10 +162,6 @@ function resolveKeyDefinition(input: PreviewAutomationPressInput): KeyDefinition
   };
 }
 
-/**
- * Build Chromium CDP key packets using the same required fields and down-event
- * choice as Playwright's pinned Chromium keyboard implementation.
- */
 export function makePreviewAutomationKeySequence(
   input: PreviewAutomationPressInput,
   options?: { readonly isMac?: boolean },
@@ -202,7 +193,6 @@ export function makePreviewAutomationKeySequence(
   };
 }
 
-/** Root CDP input can retarget the embedder; native packets address the guest widget. */
 export function makePreviewAutomationNativeKeySequence(
   input: PreviewAutomationPressInput,
   options?: { readonly isMac?: boolean },
@@ -223,7 +213,6 @@ export function makePreviewAutomationNativeKeySequence(
     modifiers,
     skipIfUnhandled: true as const,
   };
-  // Electron lowercases unshifted letters and reports no key for Unicode accelerators.
   const key =
     keyDown.windowsVirtualKeyCode === 0 && keyDown.key.length === 1
       ? ""
@@ -239,7 +228,6 @@ export function makePreviewAutomationNativeKeySequence(
   };
 }
 
-/** Keep macOS editing shortcuts inside the target page without native focus. */
 export function previewAutomationEditingCommandExpression(
   input: PreviewAutomationPressInput,
   sequence: ReturnType<typeof makePreviewAutomationNativeKeySequence>,

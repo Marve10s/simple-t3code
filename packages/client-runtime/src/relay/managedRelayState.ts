@@ -157,8 +157,6 @@ export function setManagedRelaySession(
   if (current?.accountId === input.accountId) {
     const control = managedRelaySessionControls.get(current);
     if (control) {
-      // Clerk can replace its token reader during routine same-account refreshes.
-      // Keep the session stable so those refreshes do not invalidate queries or reconnect leases.
       control.updateReadClerkToken(input.readClerkToken);
       return;
     }
@@ -190,7 +188,6 @@ function readSessionClerkToken(
   );
 }
 
-/** Removes an environment from the signed-in account without contacting that environment. */
 export const deregisterManagedRelayEnvironment = Effect.fn(
   "clientRuntime.managedRelaySession.deregisterEnvironment",
 )(function* (

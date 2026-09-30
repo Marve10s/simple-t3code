@@ -358,10 +358,6 @@ effectIt.layer(NodeServices.layer)("resolveCommandPath", (it) => {
     }),
   );
 
-  // Records every path the scan stats, without ever reporting a match, so the
-  // walk runs to exhaustion and the probe set can be inspected. Assertions
-  // below count probes rather than naming paths: `Path` is the host's, so the
-  // separator differs between a Windows and a Linux CI runner.
   const recordProbes = (env: NodeJS.ProcessEnv) =>
     Effect.gen(function* () {
       const probed: Array<string> = [];
@@ -391,7 +387,6 @@ effectIt.layer(NodeServices.layer)("resolveCommandPath", (it) => {
         PATHEXT: ".COM;.EXE",
       });
 
-      // Two directories, two extensions, upper and lowercase spellings.
       expect(probed).toHaveLength(8);
       expect(new Set(probed).size).toBe(probed.length);
     }),
@@ -404,9 +399,6 @@ effectIt.layer(NodeServices.layer)("resolveCommandPath", (it) => {
         PATHEXT: ".COM;.EXE",
       });
 
-      // Deliberately not folded together. Windows 10+ can mark a directory
-      // case-sensitive, so the two spellings are not provably one directory and
-      // skipping the second could hide a command that is really there.
       expect(probed).toHaveLength(8);
     }),
   );
@@ -428,7 +420,6 @@ effectIt.layer(NodeServices.layer)("resolveCommandPath", (it) => {
           Effect.provideService(CommandResolutionCache, new Map()),
           Effect.provideService(FileSystem.FileSystem, {
             ...fs,
-            // Keep this case-sensitive fixture portable to case-insensitive hosts.
             stat: (filePath) =>
               fs.stat(filePath === executable ? filePath : path.join(cwd, "missing")),
           }),
@@ -489,14 +480,13 @@ effectIt.layer(NodeServices.layer)("resolveCommandPath", (it) => {
         expect(yield* resolveCommandPath("cursor", { env })).toBe(path.join(first, "cursor.CMD"));
         expect(yield* isCommandAvailable("absent", { env })).toBe(false);
         yield* fs.writeFileString(path.join(second, "late.EXE"), "");
-        yield* fs.utimes(second, 4_102_444_800, 4_102_444_800); // seconds: 2100-01-01
+        yield* fs.utimes(second, 4_102_444_800, 4_102_444_800);
         expect(yield* resolveCommandPath("late", { env })).toBe(path.join(second, "late.EXE"));
       }).pipe(
         withPathDirectoryListings,
         Effect.provideService(FileSystem.FileSystem, {
           ...fs,
           stat: (file) => {
-            // Record candidate probes, not the per-lookup directory mtime checks.
             if (file !== first && file !== second) probed.push(file);
             return fs.stat(file);
           },

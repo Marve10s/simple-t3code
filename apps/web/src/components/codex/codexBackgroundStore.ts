@@ -3,11 +3,6 @@ import { useEffect, useState } from "react";
 import { randomUUID } from "../../lib/utils";
 import type { CodexBackground } from "./codexBackgrounds";
 
-/**
- * Images the user adds for new-chat backgrounds. They stay on this device in
- * IndexedDB, downscaled once on import so a large photo never costs more than
- * a screen-sized image to decode.
- */
 const DATABASE_NAME = "simplet3code-backgrounds";
 const STORE_NAME = "images";
 const MAX_EDGE = 2560;
@@ -78,7 +73,6 @@ export async function removeCustomBackground(id: string): Promise<void> {
   window.dispatchEvent(new Event(CHANGE_EVENT));
 }
 
-/** The user's own backgrounds, as object URLs that live while the hook is mounted. */
 export function useCustomBackgrounds(): ReadonlyArray<CodexBackground> {
   const [backgrounds, setBackgrounds] = useState<ReadonlyArray<CodexBackground>>([]);
 

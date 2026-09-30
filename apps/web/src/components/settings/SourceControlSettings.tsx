@@ -235,8 +235,6 @@ function itemSummary({
       );
     }
 
-    // API integrations have no CLI to sign in with; an unverified saved credential falls
-    // through to the "could not verify" detail instead of repeating the setup hint.
     if (!item.executable && auth.status === "unauthenticated") {
       return <span>Available. {item.installHint}</span>;
     }
@@ -508,9 +506,6 @@ function EmptySourceControlDiscovery({
 
 export function SourceControlSettingsPanel() {
   const { scope, environment, connectedEnvironments } = useSettingsScope();
-  // Discovery scans one machine's tools, so it shows the representative
-  // environment (named in the section title when several are selected);
-  // the settings rows above it fan out like everywhere else.
   const environmentId =
     environment?.connection.phase === "connected" ? environment.environmentId : null;
   const aggregate = scope.environmentIds.length !== 1 && connectedEnvironments.length > 1;
@@ -597,7 +592,6 @@ export function SourceControlSettingsPanel() {
                   {item.kind === "bitbucket" ? (
                     <SettingsSearchTarget id={searchableSetting("bitbucket-credentials").id}>
                       <BitbucketCredentialsSettings
-                        // Drafts belong to one environment; switching must not carry them over.
                         key={environmentId}
                         environmentId={environmentId}
                         onSaved={handleScan}

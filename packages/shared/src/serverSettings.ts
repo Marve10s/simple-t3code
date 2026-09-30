@@ -26,7 +26,7 @@ import {
 const ServerSettingsJson = fromLenientJson(ServerSettings);
 const decodeServerSettingsJson = Schema.decodeUnknownOption(ServerSettingsJson);
 
-/** @deprecated Read `resolveProjectSettings(...).settings.enableAgentBrowserAccess`. */
+/** @deprecated */
 export function resolveProjectAgentBrowserAccess(
   settings: Pick<
     ServerSettings,
@@ -41,7 +41,7 @@ export function resolveProjectAgentBrowserAccess(
   );
 }
 
-/** @deprecated Read `resolveProjectSettings(...).settings.defaultAutoPull`. */
+/** @deprecated */
 export function resolveProjectAutoPull(
   settings: Pick<
     ServerSettings,
@@ -50,7 +50,6 @@ export function resolveProjectAutoPull(
   projectId: ProjectId,
   legacyAutoPull: boolean | undefined,
 ): boolean {
-  // Existing opt-ins stay enabled until explicitly overridden or reset.
   return (
     settings.projectSettingsOverrides[projectId]?.defaultAutoPull ??
     settings.projectAutoPullOverrides[projectId] ??
@@ -160,7 +159,6 @@ function mergeModelSelectionOptionsById(input: {
   return [...merged.entries()].map(([id, value]) => ({ id, value }));
 }
 
-/** Upsert each patched entry; `null` removes it. Entries the patch omits are untouched. */
 function mergeSettingsEntries<Value>(
   current: Readonly<Record<string, Value>>,
   patch: Readonly<Record<string, Value | null>>,
@@ -176,11 +174,6 @@ function mergeSettingsEntries<Value>(
   return Object.fromEntries(next);
 }
 
-/**
- * Derived views of `projectSettingsOverrides` for clients that still read
- * the legacy per-key maps. Recomputed on every patch and load so they
- * cannot drift from the generic record.
- */
 export function deriveLegacyProjectOverrides(
   settings: Pick<ServerSettings, "projectSettingsOverrides">,
 ): Pick<
@@ -204,12 +197,6 @@ export function deriveLegacyProjectOverrides(
   return { projectAgentBrowserAccessOverrides, projectAutoPullOverrides, projectScriptOverrides };
 }
 
-/**
- * Rewrite a patch that still uses the legacy per-key project maps into
- * entries of `projectSettingsOverrides`, so older clients keep editing the
- * values the server actually reads. `null` in a legacy map clears that one
- * override.
- */
 function translateLegacyProjectOverridePatch(
   current: Pick<ServerSettings, "projectSettingsOverrides">,
   patch: ServerSettingsPatch,
@@ -232,8 +219,6 @@ function translateLegacyProjectOverridePatch(
   const entries = new Map<string, ProjectSettingsOverrides | null>(
     Object.entries(rest.projectSettingsOverrides ?? {}),
   );
-  // A canonical entry in the same patch is the newer representation; a legacy
-  // map must not resurrect a key that entry deliberately omits.
   const canonicalProjectIds = new Set(Object.keys(rest.projectSettingsOverrides ?? {}));
   const applyKey = <K extends ProjectScopedServerSettingKey>(
     map: Readonly<Record<string, ProjectSettingsOverrides[K] | null>> | undefined,
@@ -274,13 +259,9 @@ export function applyServerSettingsPatch(
     backgroundActivityProfile,
     backgroundActivity,
     worktreeCleanup: worktreeCleanupPatch,
-    // Merged per entry below; its `null` removals must not reach deepMerge.
     usageLimitSources: usageLimitSourcesPatch,
     usagePriceOverrides: usagePriceOverridesPatch,
-    // Entry replacement: deepMerge would keep keys the client meant to clear.
     projectSettingsOverrides: projectSettingsOverridesPatch,
-    // Already translated into `projectSettingsOverrides` above; the legacy
-    // maps are derived views and must never be merged directly.
     projectAgentBrowserAccessOverrides: _legacyBrowserAccess,
     projectAutoPullOverrides: _legacyAutoPull,
     projectScriptOverrides: _legacyScripts,

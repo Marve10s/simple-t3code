@@ -1,13 +1,3 @@
-/**
- * The single floating control over a pull request. Commenting on the change and submitting the
- * review that carries the Code tab's line comments used to float as two buttons that crowded
- * each other and read as the same offer twice; they are two modes of one composer now.
- *
- * Opening picks the mode with work waiting in it, so a reader who has collected line comments
- * lands on the review and everyone else lands on the comment box. Either mode's draft survives
- * the toggle: they are separate texts going to separate places, and merging them would send a
- * summary as a comment or the reverse.
- */
 import type { EnvironmentId, PullRequestDetailView, PullRequestRef } from "@t3tools/contracts";
 import { MessageSquareIcon, Trash2Icon, XIcon } from "lucide-react";
 import { useRef, useState } from "react";
@@ -50,17 +40,12 @@ export function PullRequestComposer({
   const reviewRef = useRef<HTMLTextAreaElement>(null);
   const pendingComments = usePendingReviewComments(reference);
   const clearComments = usePullRequestReviewStore((store) => store.clear);
-  // A summary typed but not sent is review work too, and it outlives the popover. Selected as a
-  // boolean rather than the text, so typing one does not re-render the composer per keystroke.
   const reviewKey = pullRequestReviewKey(reference);
   const summaryStarted = usePullRequestReviewStore(
     (store) => (store.summaries[reviewKey] ?? "").trim().length > 0,
   );
   const reviewStarted = pendingComments.length > 0 || summaryStarted;
 
-  // What is offered is the intersection of two different questions: what this host can do at
-  // all, and what this account may do on this repository. Either one saying no means a control
-  // that would only ever end in a refusal.
   const canComment = detail.capabilities.comment && detail.viewerPermissions.comment;
   const verdicts = detail.capabilities.review.verdicts.filter((verdict) =>
     detail.viewerPermissions.verdicts.includes(verdict),
@@ -79,8 +64,6 @@ export function PullRequestComposer({
     >
       <PopoverTrigger
         render={<Button size="icon" variant="glass" />}
-        // The only label this control has, so the pending count belongs in it: the badge beside
-        // the icon is decorative and a reader who cannot see it still needs the number.
         aria-label={
           pendingComments.length > 0
             ? `Review pull request, ${pendingComments.length} ${pendingComments.length === 1 ? "comment" : "comments"} pending`
@@ -150,8 +133,6 @@ export function PullRequestComposer({
             </PopoverClose>
           </div>
         </div>
-        {/* Keep both forms mounted across toggles and dismissal so drafts and in-flight
-            submit guards survive closing and reopening the composer. */}
         {verdicts.length > 0 ? (
           <div hidden={mode !== "review"}>
             <PullRequestReviewForm

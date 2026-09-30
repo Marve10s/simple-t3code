@@ -135,9 +135,6 @@ export const makeEnvironmentShellState = Effect.fn("EnvironmentShellState.make")
       ),
     );
 
-  // Apply each received batch with one state write. The RPC client's bounded
-  // buffer can split a server chunk, so a bulk action can still need several
-  // writes, but each write includes every event in that batch.
   const applyItems = Effect.fn("EnvironmentShellState.applyItems")(function* (
     items: ReadonlyArray<OrchestrationShellStreamItem>,
   ) {
@@ -204,9 +201,6 @@ export const makeEnvironmentShellState = Effect.fn("EnvironmentShellState.make")
         yield* Ref.set(awaitingCompletion, supportsCompletionMarker);
         yield* setSynchronizing;
 
-        // Foreground resubscriptions on the same live session can resume from
-        // the in-memory cursor. A new session reloads the authoritative HTTP
-        // snapshot so a valid cursor cannot preserve incomplete cached data.
         const hasAuthoritativeSnapshot = (yield* Ref.get(lastAuthoritativeSession)) === session;
         let canResume = hasAuthoritativeSnapshot;
         let current = yield* SubscriptionRef.get(state);
@@ -233,14 +227,10 @@ export const makeEnvironmentShellState = Effect.fn("EnvironmentShellState.make")
           }
         }
 
-        // If the authoritative refresh failed, omit the cached cursor so the
-        // socket fallback sends a complete snapshot for this new session.
         if (!canResume || Option.isNone(current.snapshot)) {
           return supportsCompletionMarker ? { requestCompletionMarker: true as const } : {};
         }
         if (!supportsCompletionMarker) {
-          // Without a completion marker there is no synchronized signal for a
-          // resumed subscription, so report live immediately, like threads.
           yield* SubscriptionRef.update(state, (value) => ({
             ...value,
             status: "live" as const,

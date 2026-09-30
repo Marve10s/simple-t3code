@@ -30,7 +30,6 @@ export const FileExplorerIcon: Icon = (props) => (
   </svg>
 );
 
-// Apple brand mark from Simple Icons (CC0).
 export const AppleIcon: Icon = (props) => (
   <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" {...props}>
     <path d="M12.152 6.896c-.948 0-2.415-1.078-3.96-1.04-2.04.027-3.91 1.183-4.961 3.014-2.117 3.675-.546 9.103 1.519 12.09 1.013 1.454 2.208 3.09 3.792 3.039 1.52-.065 2.09-.987 3.935-.987 1.831 0 2.35.987 3.96.948 1.637-.026 2.676-1.48 3.676-2.948 1.156-1.688 1.636-3.325 1.662-3.415-.039-.013-3.182-1.221-3.22-4.857-.026-3.04 2.48-4.494 2.597-4.559-1.429-2.09-3.623-2.324-4.39-2.376-2-.156-3.675 1.09-4.61 1.09zM15.53 3.83c.843-1.012 1.4-2.427 1.245-3.83-1.207.052-2.662.805-3.532 1.818-.78.896-1.454 2.338-1.273 3.714 1.338.104 2.715-.688 3.559-1.701" />
@@ -275,13 +274,10 @@ export const GrokIcon: Icon = ({ className, ...props }) => (
 
 export const TraeIcon: Icon = (props) => (
   <svg {...props} viewBox="0 0 24 24" fill="currentColor">
-    {/* Back rectangle: left strip + bottom strip drawn separately — empty bottom-left corner is the gap between them */}
     <rect x="1" y="4" width="3" height="14" />
     <rect x="4" y="18" width="18" height="3" />
-    {/* Front frame: top bar + right bar only — left and bottom are replaced by the back strips above */}
     <rect x="4" y="4" width="18" height="3" />
     <rect x="19" y="7" width="3" height="11" />
-    {/* Two diamonds, offset slightly to the right within the open area */}
     <path d="M11 10L13 12L11 14L9 12Z" />
     <path d="M16 10L18 12L16 14L14 12Z" />
   </svg>
@@ -773,7 +769,6 @@ export const PiAgentIcon: Icon = ({ className, ...props }) => (
   </svg>
 );
 
-// Official two-color mark from https://forgejo.org/favicon.svg.
 export const ForgejoIcon: Icon = (props) => (
   <svg viewBox="0 0 212 212" aria-hidden="true" {...props}>
     <g transform="translate(6 6)" fill="none">
@@ -786,8 +781,6 @@ export const ForgejoIcon: Icon = (props) => (
   </svg>
 );
 
-// macOS System Settings > Privacy & Security pane marks, so the SnapShot setup
-// step points at the same icon the user is about to look for.
 export const MacScreenRecordingIcon: Icon = (props) => {
   const gradientId = useId();
   return (
@@ -846,7 +839,6 @@ export const MacAccessibilityIcon: Icon = (props) => {
   );
 };
 
-// Codex's Computer Use app mark, shown on computer-use rows in the work log.
 export const ComputerUseAppIcon: Icon = (props) => {
   const gradientId = `${useId().replaceAll(":", "")}-computer-use-app-gradient`;
   return (

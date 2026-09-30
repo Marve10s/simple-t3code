@@ -88,7 +88,6 @@ const reviewViewedFileIdsByThreadKeyAtom = Atom.family((threadKey: string) =>
 );
 
 export const MAX_CACHED_REVIEW_DIFFS = 8;
-// This bounds source string length, not the parsed or native heap size.
 export const MAX_CACHED_REVIEW_SOURCE_CHARACTERS = 4 * 1024 * 1024;
 
 interface CachedReviewParsedDiff {
@@ -97,7 +96,6 @@ interface CachedReviewParsedDiff {
   readonly sourceCharacterCount: number;
 }
 
-// The factory keeps this mutable cache local to the registry and releases it on reset or disposal.
 const reviewParsedDiffCacheAtom = Atom.make(() => ({
   entries: new Map<string, CachedReviewParsedDiff>(),
   sourceCharacterCount: 0,
@@ -265,7 +263,6 @@ export function updateReviewViewedFileIds(
   });
 }
 
-/** Returns the larger of current input and matching cached source, without changing recency. */
 export function getReviewParsedDiffSourceCharacterCount(input: {
   readonly threadKey: string;
   readonly sectionId: string;

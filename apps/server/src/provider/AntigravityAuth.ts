@@ -58,7 +58,6 @@ interface OwnedProcess {
 
 export interface AntigravityAuth {
   readonly controller: ProviderAuthController;
-  /** Tracks startup and the process scope so sign-out cannot leave cached credentials in memory. */
   readonly withProcess: <A, E, R>(
     stop: Effect.Effect<void>,
     task: Effect.Effect<A, E, R>,
@@ -83,7 +82,6 @@ export interface AntigravityAuthOptions<
   ) => Effect.Effect<void>;
   readonly onSignedOut: Effect.Effect<void>;
   readonly forwardCallback?: (callback: URL) => Effect.Effect<void, ProviderSetupError>;
-  /** False for API key methods, which authenticate without a Google sign-in page. */
   readonly usesBrowser?: boolean;
 }
 
@@ -127,7 +125,6 @@ function safeAuthFailure(cause: Cause.Cause<unknown>, usesBrowser: boolean): str
     : "Antigravity could not authenticate with the configured credentials.";
 }
 
-/** Owns one instance's explicit sign-in and all process admission around sign-out. */
 export const makeAntigravityAuth = Effect.fn("makeAntigravityAuth")(function* <
   Runtime extends AntigravityAuthRuntime,
 >(
@@ -203,7 +200,6 @@ export const makeAntigravityAuth = Effect.fn("makeAntigravityAuth")(function* <
             return child;
           }),
         );
-        // Propagate interruption after the exit wait so concurrent stop waiters stay attached.
         return yield* restore(Fiber.await(fiber)).pipe(
           Effect.flatMap((result) => result),
           Effect.ensuring(Fiber.interrupt(fiber)),
@@ -406,15 +402,10 @@ export const makeAntigravityAuth = Effect.fn("makeAntigravityAuth")(function* <
             authorizationUrl: null,
             message: "Waiting for Google to finish sign-in.",
           });
-          // The instance owns delivery and its failure handling. The RPC that
-          // sent the callback may disconnect before Google answers, and the
-          // flow must still settle instead of sitting at "verifying" until
-          // the deadline.
           const forwarding = yield* (
             options.forwardCallback?.(callback) ??
             forwardAntigravityCallback(options.instanceId, callback)
           ).pipe(
-            // stopFlow interrupts this fiber, so it runs from a sibling fiber.
             Effect.tapError(() =>
               stopFlow(flow, "failed", FORWARDING_FAILED_MESSAGE).pipe(
                 Effect.forkIn(instanceScope),

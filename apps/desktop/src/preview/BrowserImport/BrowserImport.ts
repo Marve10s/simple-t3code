@@ -1,9 +1,3 @@
-/**
- * Browser import service - lists importable sources and writes their cookies
- * into a T3 Code browser profile's Electron partition.
- *
- * @module BrowserImport
- */
 import type {
   BrowserImportInput,
   BrowserImportResult,
@@ -44,12 +38,9 @@ export class BrowserImportFailedError extends Schema.TaggedError<BrowserImportFa
   {
     sourceId: Schema.String,
     reason: BrowserImportFailureReason,
-    /** Kept for the log; the user only ever sees the reason's copy. */
     cause: Schema.optional(Schema.Defect()),
   },
 ) {
-  // The reason token is part of the message on purpose: IPC flattens the error
-  // to its message, and the renderer maps that token back to user-facing copy.
   override get message(): string {
     return `Importing cookies from ${this.sourceId} failed: ${this.reason}.`;
   }
@@ -74,7 +65,6 @@ export class BrowserImport extends Context.Service<
     readonly listSources: Effect.Effect<ReadonlyArray<BrowserImportSource>>;
     readonly importCookies: (input: {
       readonly input: BrowserImportInput;
-      /** Partition scope of the target profile, derived by the caller in main. */
       readonly scope: string;
       readonly persistent: boolean;
       readonly namespace?: BrowserSession.BrowserSessionPartitionNamespace;
@@ -93,11 +83,6 @@ const unavailableReason = Effect.fn("BrowserImport.unavailableReason")(function*
   if (!definition.platforms.includes(context.platform)) return "unsupportedPlatform";
   if (!(yield* isSourceInstalled(definition, context))) return "notInstalled";
   if (yield* isSourceRunning(definition, context)) return "browserRunning";
-  // Safari's jar is found by `stat`, which TCC permits without Full Disk
-  // Access — so a Safari that lists as ready may still refuse the read. Probe
-  // the grant here, so the wizard can open on the permission step and a
-  // post-grant recheck can tell granted from still-denied, rather than only
-  // discovering it by attempting the import.
   if (definition.engine === "safari") {
     const jar = yield* resolveCookieDatabase(definition, context, ".");
     if (jar !== undefined && (yield* safariAccessDenied(jar))) return "needsFullDiskAccess";
@@ -105,7 +90,6 @@ const unavailableReason = Effect.fn("BrowserImport.unavailableReason")(function*
   return undefined;
 });
 
-/** The host a constructed cookie URL points at, for naming what was skipped. */
 const cookieHost = (url: string): string => {
   try {
     return new URL(url).hostname;
@@ -128,8 +112,6 @@ export const writeCookies = Effect.fn("BrowserImport.writeCookies")(function* (
           url: cookie.url,
           name: cookie.name,
           value: cookie.value,
-          // Omitted for host-only cookies: Electron reads any `domain` as a
-          // domain cookie and re-adds the leading dot, widening its scope.
           ...(cookie.domain === undefined ? {} : { domain: cookie.domain }),
           path: cookie.path,
           secure: cookie.secure,
@@ -150,11 +132,6 @@ export const writeCookies = Effect.fn("BrowserImport.writeCookies")(function* (
       skippedDomains.add(cookieHost(cookie.url));
     }
   }
-  // `set` resolves once the cookie is in memory; Chromium writes the store to
-  // disk on its own schedule. Flush before reporting "Done", so a crash right
-  // after does not lose what the user was just told was imported. A failed
-  // flush is logged rather than surfaced: the cookies are still in the
-  // session and land on disk at the next scheduled write.
   if (imported > 0) {
     yield* Effect.tryPromise(() => session.cookies.flushStore()).pipe(
       Effect.tapError((error) =>
@@ -166,13 +143,11 @@ export const writeCookies = Effect.fn("BrowserImport.writeCookies")(function* (
   return { imported, skipped, skippedDomains: [...skippedDomains].slice(0, 20) };
 });
 
-/** @public Service construction is part of the canonical Effect module API. */
+/** @public */
 export const make = Effect.gen(function* BrowserImportMake() {
   const browserSession = yield* BrowserSession.BrowserSession;
   const platform = yield* HostProcessPlatform;
   const executablePath = yield* HostProcessExecutablePath;
-  // Captured here so the service's methods stay free of a requirements
-  // channel: the layer is built where NodeServices is already in scope.
   const platformServices = yield* Effect.context<
     FileSystem.FileSystem | Path.Path | ChildProcessSpawner.ChildProcessSpawner
   >();
@@ -185,8 +160,6 @@ export const make = Effect.gen(function* BrowserImportMake() {
       return {
         id: definition.id,
         name: definition.name,
-        // Listing profiles touches the source's own files, so skip it when the
-        // source is unusable anyway.
         profiles:
           unavailable === undefined ? yield* listSourceProfiles(definition, pathContext) : [],
         ...(unavailable === undefined ? {} : { unavailable }),
@@ -218,19 +191,12 @@ export const make = Effect.gen(function* BrowserImportMake() {
     }
 
     if (platform === "darwin" && definition.engine === "chromium") {
-      // macOS attributes the Keychain prompt and the resulting ACL grant to the
-      // executable that asks, so record which one that was — in a packaged build
-      // it is the signed app, in dev whatever binary hosts the main process.
       yield* Effect.logInfo("Reading browser cookie key from the keychain", {
         sourceId: definition.id,
         executablePath,
       });
     }
 
-    // The profile directory arrives over IPC, so it is only honoured when the
-    // source itself reported it. Forwarding it unchecked would let `..`
-    // segments walk out of the browser's user-data directory and read any
-    // cookie database reachable on disk.
     const sourceProfiles = yield* listSourceProfiles(definition, pathContext).pipe(
       Effect.provide(platformServices),
     );
@@ -244,24 +210,15 @@ export const make = Effect.gen(function* BrowserImportMake() {
       });
     }
 
-    // The profile was listed against a database moments ago; resolve it again
-    // rather than assume a path, since a Chromium jar may sit under `Network/`.
     const databasePath = yield* resolveCookieDatabase(
       definition,
       pathContext,
       requestedProfile.directory,
     ).pipe(Effect.provide(platformServices));
     if (databasePath === undefined) {
-      // A profile we listed moments ago can lose its database before the
-      // import runs (browser data cleanup, a profile reset). That is a read
-      // failure, not a platform problem.
       return yield* new BrowserImportFailedError({ sourceId: definition.id, reason: "readFailed" });
     }
 
-    // Both branches fail with a tagged error, so the union stays structurally
-    // identifiable and each tag is handled on its own below. The success side
-    // is normalized to one shape too, so the skipped tally survives either
-    // engine — Firefox stores plaintext, so nothing there is ever unreadable.
     const userDataDirectory = definition.userDataDirectory(pathContext);
     const read: Effect.Effect<
       CookieReadResult,
@@ -297,15 +254,10 @@ export const make = Effect.gen(function* BrowserImportMake() {
           Effect.fail(
             new BrowserImportFailedError({ sourceId: definition.id, reason: cause.reason, cause }),
           ),
-        // Firefox has one failure mode — its plaintext database would not open
-        // — so its error carries no reason of its own and the user-facing one
-        // is supplied here.
         FirefoxCookieReadError: (cause) =>
           Effect.fail(
             new BrowserImportFailedError({ sourceId: definition.id, reason: "readFailed", cause }),
           ),
-        // Safari's reasons are already user-facing: a TCC refusal is the Full
-        // Disk Access prompt, anything else is a read failure.
         SafariCookieReadError: (cause) =>
           Effect.fail(
             new BrowserImportFailedError({ sourceId: definition.id, reason: cause.reason, cause }),
@@ -326,8 +278,6 @@ export const make = Effect.gen(function* BrowserImportMake() {
         ),
       );
 
-    // Written one at a time rather than in parallel: Chromium's cookie store
-    // serialises writes anyway, and a rejected cookie should only cost itself.
     return yield* writeCookies(session, result);
   });
 

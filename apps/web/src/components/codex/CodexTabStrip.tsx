@@ -20,7 +20,6 @@ import { resolveThreadRouteTarget } from "../../threadRoutes";
 import { type CodexTab, closeCodexTab, openCodexTab, useCodexTabsStore } from "./codexTabs";
 import { ThreadMark, useThreadMarkTones } from "./CodexThreadStatus";
 
-/** Tab state for the "tabs" view: syncs tabs with the route and opens or closes them. */
 export function useCodexTabStrip() {
   const navigate = useNavigate();
   const tabs = useCodexTabsStore((store) => store.tabs);
@@ -63,7 +62,6 @@ export function useCodexTabStrip() {
   }, [routeDraftThreadId, routeTarget]);
   const activeKey = routeTab?.key ?? null;
 
-  // Every chat the user lands on gets a tab, placed after the one they came from.
   const previousActiveKeyRef = useRef<string | null>(null);
   useEffect(() => {
     if (routeTab === null) return;
@@ -84,7 +82,6 @@ export function useCodexTabStrip() {
     [threads],
   );
 
-  // Archived or deleted threads and discarded drafts drop out of the strip.
   useEffect(() => {
     if (!shellsBootstrapped) return;
     const current = useCodexTabsStore.getState().tabs;
@@ -143,7 +140,6 @@ export function useCodexTabStrip() {
 
 export type CodexTabStripState = ReturnType<typeof useCodexTabStrip>;
 
-/** The project's own icon (favicon or one the user set), or its name when it has none. */
 function TabProjectLabel({ project }: { project: EnvironmentProject }) {
   const faviconUrl = useAtomValue(
     projectFaviconUrlAtom({
@@ -164,7 +160,6 @@ function TabProjectLabel({ project }: { project: EnvironmentProject }) {
   );
 }
 
-/** The strip's trailing "+", as in a browser. */
 export function CodexNewTabButton({ strip }: { strip: CodexTabStripState }) {
   return (
     <button type="button" aria-label="New chat" data-codex-part="tab-new" onClick={strip.newChat}>
@@ -173,7 +168,6 @@ export function CodexNewTabButton({ strip }: { strip: CodexTabStripState }) {
   );
 }
 
-/** One tab's contents, shared by the standard and Motion strips. */
 export function CodexTabContents({ strip, tab }: { strip: CodexTabStripState; tab: CodexTab }) {
   const title = strip.titleFor(tab);
   const project = strip.projectFor(tab);
@@ -196,7 +190,6 @@ export function CodexTabContents({ strip, tab }: { strip: CodexTabStripState; ta
   );
 }
 
-/** Browser-style tabs for open chats, shown in the top bar in the "tabs" view. */
 export function CodexTabStrip() {
   const strip = useCodexTabStrip();
   return (
@@ -211,7 +204,6 @@ export function CodexTabStrip() {
             data-codex-part="tab"
             data-active={active ? "true" : undefined}
             onMouseDown={(event) => {
-              // Middle click closes, as in a browser.
               if (event.button === 1) strip.closeTab(event, tab);
             }}
           >

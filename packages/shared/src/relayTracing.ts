@@ -114,9 +114,7 @@ function nonInterferingTracer(delegate: Tracer.Tracer): Tracer.Tracer {
       span.end = (endTime, exit) => {
         try {
           end(endTime, traceSafeExit(exit));
-        } catch {
-          // Telemetry is best-effort and must never change application behavior.
-        }
+        } catch {}
       };
       return span;
     },

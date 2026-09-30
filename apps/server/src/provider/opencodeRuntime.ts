@@ -117,7 +117,6 @@ export function openCodeRuntimeErrorDetail(cause: unknown): string {
   if (OpenCodeRuntimeError.is(cause)) return cause.detail;
   if (cause instanceof Error && cause.message.trim().length > 0) return cause.message.trim();
   if (cause && typeof cause === "object") {
-    // SDK v2 throws { response, request, error? } shapes — extract what's useful
     const anyCause = cause as Record<string, unknown>;
     const status = (anyCause.response as { status?: number } | undefined)?.status;
     const body = anyCause.error ?? anyCause.data ?? anyCause.body;
@@ -192,7 +191,6 @@ export interface OpenCodeInventory {
 
 export type OpenCodeSlashCommand = Pick<Command, "name" | "description" | "source" | "hints">;
 
-/** Command templates stay in OpenCode, which expands arguments and runs MCP prompts. */
 export const loadOpenCodeCommands = (client: OpencodeClient) =>
   runOpenCodeSdk("command.list", (signal) => client.command.list(undefined, { signal })).pipe(
     Effect.map((result): ReadonlyArray<OpenCodeSlashCommand> =>
@@ -226,12 +224,6 @@ const decodeOpenCodeSkillsCliOutputExit = Schema.decodeUnknownExit(
 );
 
 export interface OpenCodeRuntimeShape {
-  /**
-   * Spawns a local OpenCode server process. Its lifetime is bound to the caller's
-   * `Scope.Scope` — the child is killed automatically when that scope closes.
-   * Consumers that want a long-lived server must create and hold a scope explicitly
-   * (see {@link Scope.make}) and close it when done.
-   */
   readonly startOpenCodeServerProcess: (input: {
     readonly binaryPath: string;
     readonly directory: string;
@@ -241,11 +233,6 @@ export interface OpenCodeRuntimeShape {
     readonly hostname?: string;
     readonly timeoutMs?: number;
   }) => Effect.Effect<OpenCodeServerProcess, OpenCodeRuntimeError, Scope.Scope>;
-  /**
-   * Returns a handle to either an externally-managed OpenCode server (when
-   * `serverUrl` is provided — no lifetime is attached to the caller's scope) or a
-   * freshly spawned local server whose lifetime is bound to the caller's scope.
-   */
   readonly connectToOpenCodeServer: (input: {
     readonly binaryPath: string;
     readonly directory: string;
@@ -297,9 +284,6 @@ function parseServerUrlFromOutput(output: string): string | null {
 const SLUG_LINE_RE = /^(\S+\/\S+)\s*$/;
 const AGENT_HEADER_RE = /^(.+)\s+\((\S+)\)\s*$/;
 
-// Agents that are always hidden in OpenCode but the CLI "agent list" command
-// does not expose the hidden flag. Keep in sync with OpenCode agent
-// definitions (in the OpenCode repo: packages/opencode/src/agent/agent.ts).
 const KNOWN_HIDDEN_AGENTS = new Set(["compaction", "summary", "title"]);
 
 /** @internal */
@@ -335,9 +319,7 @@ export function parseModelsCliOutput(stdout: string): {
             }
             provider.models[modelID] = model;
           }
-        } catch {
-          // Skip unparseable model JSON
-        }
+        } catch {}
       }
     }
     currentSlug = null;
@@ -345,12 +327,6 @@ export function parseModelsCliOutput(stdout: string): {
   };
 
   for (const line of lines) {
-    // A model's JSON body is a single `JSON.stringify` line starting with `{`,
-    // while a provider/model slug is a bare `provider/model` header. Only the
-    // latter can be a slug: without this guard a body line with no interior
-    // whitespace and a `/` in one of its values (e.g. an OpenRouter model whose
-    // `id` is `vendor/model`) matches SLUG_LINE_RE, so flushModel runs against
-    // an empty body and the model is silently dropped.
     const slugMatch = line.trimStart().startsWith("{") ? null : SLUG_LINE_RE.exec(line);
     if (slugMatch) {
       flushModel();
@@ -384,9 +360,7 @@ export function parseAgentListCliOutput(stdout: string): ReadonlyArray<Agent> {
             permission,
             options: {},
           });
-        } catch {
-          // Skip unparseable agent
-        }
+        } catch {}
       }
     }
     currentHeader = null;
@@ -443,13 +417,6 @@ export function openCodeQuestionId(
   return header.length > 0 ? `question-${index}-${header}` : `question-${index}`;
 }
 
-/**
- * Attachments OpenCode can hand to a model as a native file part. Anything
- * else (ZIP, binaries, image formats like BMP/AVIF/SVG that model APIs
- * reject, or files over the direct-attachment size limit) would make the turn
- * fail before it starts, so those ride only as the file path ProviderService
- * puts in the prompt.
- */
 const OPENCODE_NATIVE_IMAGE_MIMES = new Set(["image/png", "image/jpeg", "image/gif", "image/webp"]);
 const OPENCODE_NATIVE_FILE_PART_MAX_BYTES = 20 * 1024 * 1024;
 
@@ -509,14 +476,8 @@ export function buildOpenCodePermissionRules(runtimeMode: RuntimeMode): Permissi
     ];
   }
 
-  // "Auto-accept edits" is documented as "auto-approve edits, ask before other
-  // actions", so prompting for every edit ignores the mode the user picked.
-  // "auto" is left asking on purpose: the docs say providers without an AI
-  // reviewer, OpenCode among them, fall back to Supervised for that mode.
   const editAction = runtimeMode === "auto-accept-edits" ? "allow" : "ask";
 
-  // Session rules override OpenCode's agent defaults. Allow reads and task
-  // updates, but keep its default approval rules for environment files.
   return [
     { permission: "*", pattern: "*", action: "ask" },
     { permission: "read", pattern: "*", action: "allow" },
@@ -608,9 +569,7 @@ const makeOpenCodeRuntime = Effect.gen(function* () {
           : Effect.sync(() => {
               try {
                 process.kill(-Number(child.pid), "SIGKILL");
-              } catch {
-                // The command and its process group may already have exited.
-              }
+              } catch {}
             });
       yield* Effect.addFinalizer(() => terminateCommandGroup.pipe(Effect.ignore));
       const collectOptions =
@@ -662,9 +621,6 @@ const makeOpenCodeRuntime = Effect.gen(function* () {
 
   const startOpenCodeServerProcess: OpenCodeRuntimeShape["startOpenCodeServerProcess"] = (input) =>
     Effect.gen(function* () {
-      // Bind this server's lifetime to the caller's scope. When the caller's
-      // scope closes, the spawned child is killed and all associated fibers
-      // are interrupted automatically — no `close()` method needed.
       const runtimeScope = yield* Scope.Scope;
 
       const hostname = input.hostname ?? DEFAULT_HOSTNAME;
@@ -697,13 +653,6 @@ const makeOpenCodeRuntime = Effect.gen(function* () {
             env: {
               ...input.environment,
               ...(serverPassword !== undefined ? { OPENCODE_SERVER_PASSWORD: serverPassword } : {}),
-              // Respect an OPENCODE_CONFIG_CONTENT provided by the caller or
-              // the inherited process environment, only falling back to the
-              // empty config when neither is set. Setting it unconditionally
-              // previously clobbered the user's opencode config, hiding their
-              // providers/models. The value is set explicitly (rather than
-              // relying on inheritance) because `extendEnv` is false whenever
-              // `input.environment` is provided.
               OPENCODE_CONFIG_CONTENT: resolveOpenCodeConfigContent(input.environment),
             },
             extendEnv: input.environment === undefined,
@@ -727,11 +676,7 @@ const makeOpenCodeRuntime = Effect.gen(function* () {
           : Effect.sync(() => {
               try {
                 process.kill(-Number(child.pid), signal);
-              } catch {
-                // The direct child may already have exited after starting the
-                // server; the process group kill is best-effort cleanup for
-                // any serve process left in that group.
-              }
+              } catch {}
             });
       const terminateChild = killOpenCodeProcessGroup("SIGTERM").pipe(
         Effect.andThen(Effect.sleep("1 second")),
@@ -830,9 +775,6 @@ const makeOpenCodeRuntime = Effect.gen(function* () {
         });
       }
 
-      // Keep draining both pipes until the process scope closes. Stopping the
-      // readers can block OpenCode when its output buffers fill. Startup output
-      // is no longer needed, so discard later output instead of retaining it.
       yield* Ref.set(stdoutRef, null);
       yield* Ref.set(stderrRef, null);
 
@@ -980,8 +922,6 @@ const makeOpenCodeRuntime = Effect.gen(function* () {
           ...commandContext,
         }).pipe(Effect.exit);
 
-      // Every OpenCode CLI command opens the same shared SQLite database. Running them
-      // concurrently causes "database is locked" failures, so run them one at a time.
       const [initialModelsResult, initialAgentsResult, initialSkillsResult] = yield* Effect.all(
         [runModelsCli(), runAgentsCli(), runSkillsCli()],
         { concurrency: 1 },
@@ -990,7 +930,6 @@ const makeOpenCodeRuntime = Effect.gen(function* () {
       let agentsResult = initialAgentsResult;
       let skillsResult = initialSkillsResult;
 
-      // Retry once after 1s on transient failures (e.g. SQLite "database is locked")
       const needsModelsRetry = modelsResult._tag === "Failure" || modelsResult.value.code !== 0;
       const needsAgentsRetry = agentsResult._tag === "Failure" || agentsResult.value.code !== 0;
       const needsSkillsRetry = skillsResult._tag === "Failure" || skillsResult.value.code !== 0;
@@ -1037,8 +976,6 @@ const makeOpenCodeRuntime = Effect.gen(function* () {
         }),
       );
 
-      // Agent and skill metadata enrich the provider snapshot but are not required
-      // for an authoritative model inventory, so either may degrade to an empty list.
       let agents: ReadonlyArray<Agent> = [];
       if (agentsResult._tag === "Success" && agentsResult.value.code === 0) {
         agents = parseAgentListCliOutput(agentsResult.value.stdout);

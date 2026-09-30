@@ -30,15 +30,8 @@ function initialConfigOption<E>(
   );
 }
 
-// Bounded so a wedged environment cannot pin the permissions check (and with it
-// the settings UI) in a loading state for long.
 const DEFAULT_SESSION_STATE_TIMEOUT_MS = 6_000;
 
-/**
- * Read the granted scopes of this client's session on one environment via its
- * `/api/auth/session` endpoint, using the connection's authentication method
- * and refreshing relay credentials when needed.
- */
 export const fetchEnvironmentSessionState = Effect.fn(
   "clientRuntime.state.fetchEnvironmentSessionState",
 )(function* (input: {
@@ -54,7 +47,6 @@ export const fetchEnvironmentSessionState = Effect.fn(
     url: (httpBaseUrl) => environmentEndpointUrl(httpBaseUrl, "/api/auth/session"),
     timeoutMs: input.timeoutMs ?? DEFAULT_SESSION_STATE_TIMEOUT_MS,
     request: ({ client, headers }) => client.session({ headers }),
-    // This endpoint returns 200 with authenticated:false for expired credentials.
     isUnauthorizedResponse: (response) => !response.authenticated,
   });
 });
@@ -85,9 +77,6 @@ export function createEnvironmentSessionAtoms<R, E>(
     ),
   );
 
-  // This is only the bootstrap config captured when a transport session is
-  // established. Consumers that need current provider/settings state must use
-  // createServerEnvironmentAtoms(...).configValueAtom instead.
   const initialConfigValueAtom = Atom.family((environmentId: EnvironmentId) =>
     Atom.make((get): ServerConfig | null =>
       Option.getOrNull(
@@ -120,9 +109,6 @@ export function createEnvironmentSessionAtoms<R, E>(
     ).pipe(Atom.withLabel(`environment-prepared-connection:${environmentId}`)),
   );
 
-  // Keyed on the prepared connection's identity: a reconnect (new credential,
-  // new base URL) swaps the prepared value, which re-runs the fetch, so scope
-  // changes from re-pairing are picked up without an explicit refresh.
   const sessionStateAtom = Atom.family((environmentId: EnvironmentId) =>
     runtime
       .atom((get) => {

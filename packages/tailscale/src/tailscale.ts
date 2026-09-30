@@ -12,8 +12,6 @@ export const TAILSCALE_STATUS_TIMEOUT = Duration.millis(1_500);
 const TAILSCALE_SERVE_TIMEOUT = Duration.seconds(10);
 const TAILSCALE_PROBE_TIMEOUT = Duration.millis(2_500);
 
-// tailscale is a real executable everywhere (`tailscale.exe` on Windows), so
-// it is always spawned directly rather than through cmd.exe shell mode.
 const tailscaleCommandForPlatform = (platform: NodeJS.Platform): "tailscale" | "tailscale.exe" =>
   platform === "win32" ? "tailscale.exe" : "tailscale";
 
@@ -23,11 +21,6 @@ const TailscaleCommandContext = {
   argumentCount: Schema.Number,
 };
 
-/**
- * Failure kinds we can name without quoting the CLI. Anything unrecognized
- * becomes "unknown" rather than falling back to raw text — stderr can contain
- * auth keys (`tskey-…`) and node names, and these labels are logged.
- */
 export const TailscaleStderrDiagnostic = Schema.Literals([
   "no-existing-handler",
   "not-logged-in",
@@ -36,8 +29,6 @@ export const TailscaleStderrDiagnostic = Schema.Literals([
 ]);
 export type TailscaleStderrDiagnostic = typeof TailscaleStderrDiagnostic.Type;
 
-// Matched against stderr, most specific first. Patterns are deliberately short
-// and anchored on tailscale's own wording.
 const STDERR_DIAGNOSTIC_PATTERNS: ReadonlyArray<
   readonly [RegExp, Exclude<TailscaleStderrDiagnostic, "unknown">]
 > = [
@@ -46,7 +37,6 @@ const STDERR_DIAGNOSTIC_PATTERNS: ReadonlyArray<
   [/permission denied|access denied|must be root|operation not permitted/i, "permission-denied"],
 ];
 
-/** Classifies stderr into a safe label, dropping the text itself. */
 const stderrDiagnosticOf = (stderr: string): TailscaleStderrDiagnostic | undefined => {
   if (stderr.trim().length === 0) {
     return undefined;
@@ -85,11 +75,6 @@ export class TailscaleCommandExitError extends Schema.TaggedError<TailscaleComma
     exitCode: Schema.Number,
     stdoutLength: Schema.optional(Schema.Number),
     stderrLength: Schema.Number,
-    // A classified diagnostic, never raw CLI output. `tailscale` prints auth
-    // keys and node identifiers into stderr, and this field is surfaced in
-    // dev-runner logs — so it carries only a known-safe label from the closed
-    // set below. Callers that need to recognize a specific failure (e.g.
-    // `serve off` on a port with no mapping) match on the label.
     stderrDiagnostic: Schema.optional(TailscaleStderrDiagnostic),
   },
 ) {
@@ -227,9 +212,6 @@ export const readTailscaleStatus = Effect.gen(function* () {
   return yield* Effect.gen(function* () {
     const child = yield* spawner.spawn(ChildProcess.make(executable, args)).pipe(
       Effect.mapError((cause) => new TailscaleCommandSpawnError({ ...commandContext, cause })),
-      // Spawning can also fail as a defect rather than a typed error - a
-      // non-directory entry on PATH makes node throw ENOTDIR synchronously.
-      // `mapError` never sees that, so it would escape as an uncaught error.
       Effect.catchDefect((cause) =>
         Effect.fail(new TailscaleCommandSpawnError({ ...commandContext, cause })),
       ),

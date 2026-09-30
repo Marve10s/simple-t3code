@@ -97,7 +97,6 @@ it.layer(NodeServices.layer)("settled thread decider", (it) => {
       const events = Array.isArray(result) ? result : [result];
       const settled = events.find((event) => event.type === "thread.settled");
       expect(settled?.payload.settledAt).toBe(SETTLED_AT);
-      // updatedAt stays the command time so the row still moves on settle.
       expect(settled?.payload.updatedAt).toBe(settled?.occurredAt);
       expect(settled?.payload.updatedAt).not.toBe(SETTLED_AT);
     }),
@@ -137,8 +136,6 @@ it.layer(NodeServices.layer)("settled thread decider", (it) => {
         expect(events[0].payload.settledAt).toBe(events[0].payload.updatedAt);
       }
 
-      // Already settled: the engine rejects zero-event commands, so idempotency
-      // is by re-emission — preserving the original settledAt.
       const reEmit = yield* decideOrchestrationCommand({
         command: {
           type: "thread.settle",
@@ -152,8 +149,6 @@ it.layer(NodeServices.layer)("settled thread decider", (it) => {
       expect(reEmitEvents[0]?.type).toBe("thread.settled");
       if (reEmitEvents[0]?.type === "thread.settled") {
         expect(reEmitEvents[0].payload.settledAt).toBe(SETTLED_AT);
-        // updatedAt must NOT rewind to the historical settledAt: sorting and
-        // relative-time labels key on it.
         expect(reEmitEvents[0].payload.updatedAt).not.toBe(SETTLED_AT);
       }
     }),
@@ -245,7 +240,6 @@ it.layer(NodeServices.layer)("settled thread decider", (it) => {
           message: SETTLE_BLOCKED_MESSAGE,
         });
       }
-      // Stopped/error sessions are settleable — only live work is protected.
       const settled = yield* decideOrchestrationCommand({
         command: {
           type: "thread.settle",
@@ -272,7 +266,6 @@ it.layer(NodeServices.layer)("settled thread decider", (it) => {
           createdAt: at,
         }) as OrchestrationThread["activities"][number];
 
-      // Open approval request: settle rejected.
       const openError = yield* decideOrchestrationCommand({
         command: {
           type: "thread.settle",
@@ -289,7 +282,6 @@ it.layer(NodeServices.layer)("settled thread decider", (it) => {
         message: SETTLE_BLOCKED_MESSAGE,
       });
 
-      // Same request later resolved: settleable again.
       const settled = yield* decideOrchestrationCommand({
         command: {
           type: "thread.settle",
@@ -304,7 +296,6 @@ it.layer(NodeServices.layer)("settled thread decider", (it) => {
       const settledEvents = Array.isArray(settled) ? settled : [settled];
       expect(settledEvents[0]?.type).toBe("thread.settled");
 
-      // Open user-input request: also rejected.
       const inputError = yield* decideOrchestrationCommand({
         command: {
           type: "thread.settle",
@@ -446,7 +437,6 @@ it.layer(NodeServices.layer)("settled thread decider", (it) => {
           createdAt: NOW,
         }) as OrchestrationThread["activities"][number];
 
-      // Stale-failure details clear the request, matching the projection flags.
       const settled = yield* decideOrchestrationCommand({
         command: {
           type: "thread.settle",
@@ -467,8 +457,6 @@ it.layer(NodeServices.layer)("settled thread decider", (it) => {
       const settledEvents = Array.isArray(settled) ? settled : [settled];
       expect(settledEvents[0]?.type).toBe("thread.settled");
 
-      // A non-stale respond failure (transient provider error) keeps the
-      // request open: the user can retry, so it is still blocked-on-you.
       const stillOpen = yield* decideOrchestrationCommand({
         command: {
           type: "thread.settle",
@@ -502,10 +490,6 @@ it.layer(NodeServices.layer)("settled thread decider", (it) => {
         updatedAt: createdAt,
       });
 
-      // The decider's clock is the Effect test clock, pinned to the epoch:
-      // timestamps here are relative to 1970-01-01T00:00:00.000Z.
-
-      // Within the grace window: genuinely queued, settle rejected.
       const queuedError = yield* decideOrchestrationCommand({
         command: {
           type: "thread.settle",
@@ -520,9 +504,6 @@ it.layer(NodeServices.layer)("settled thread decider", (it) => {
         message: SETTLE_BLOCKED_MESSAGE,
       });
 
-      // Message timestamp far in the FUTURE (client clock ahead of server):
-      // a negative age must not read as queued forever — past the grace
-      // bound in either direction the thread is settleable.
       const skewed = yield* decideOrchestrationCommand({
         command: {
           type: "thread.settle",
@@ -579,8 +560,6 @@ it.layer(NodeServices.layer)("settled thread decider", (it) => {
         expect(userEvents[0].payload.reason).toBe("user");
       }
 
-      // Re-dispatching against the already-reached state re-emits rather than
-      // producing zero events (the engine rejects empty commands).
       const userAgain = yield* decideOrchestrationCommand({
         command: {
           type: "thread.unsettle",
@@ -596,11 +575,6 @@ it.layer(NodeServices.layer)("settled thread decider", (it) => {
     }),
   );
 
-  // Command-to-projection: an accepted un-settle must land as the re-entry
-  // stamp clients sort by (max of createdAt and unsettledAt, see
-  // activeThreadAnchorTimestampMs in client-runtime), so the thread surfaces
-  // above threads created after it. The projector tests feed events directly;
-  // this one proves the decider actually emits what they consume.
   it.effect("an accepted un-settle re-anchors the thread for the active list", () =>
     Effect.gen(function* () {
       const readModel = makeReadModel("settled");
@@ -623,8 +597,6 @@ it.layer(NodeServices.layer)("settled thread decider", (it) => {
       } as OrchestrationEvent);
       const thread = projected.threads[0]!;
       expect(thread.settledOverride).toBe("active");
-      // The stamp is the decider's accept time: every thread created before
-      // the un-settle anchors below it.
       expect(thread.unsettledAt).toBe(unsettled.occurredAt);
       if (unsettled.type === "thread.unsettled") {
         expect(thread.unsettledAt).toBe(unsettled.payload.updatedAt);
@@ -666,8 +638,6 @@ it.layer(NodeServices.layer)("settled thread decider", (it) => {
           session: makeSession("running"),
           createdAt: NOW,
         },
-        // A keep-active pin is also an override: real activity clears it
-        // back to neutral so auto-settle can apply again later.
         readModel: makeReadModel("active"),
       });
       const sessionEvents = Array.isArray(sessionResult) ? sessionResult : [sessionResult];
@@ -698,8 +668,6 @@ it.layer(NodeServices.layer)("settled thread decider", (it) => {
         readModel: makeReadModel("active"),
       });
       const turnEvents = Array.isArray(turnResult) ? turnResult : [turnResult];
-      // The pin exists to suppress AUTO-settle, not to survive real work:
-      // activity resets it to neutral, restoring the default lifecycle.
       expect(turnEvents.map((event) => event.type)).toEqual([
         "thread.unsettled",
         "thread.message-sent",
@@ -811,7 +779,6 @@ it.layer(NodeServices.layer)("settled thread decider", (it) => {
           onlyIfSettled: true,
         }) as const;
 
-      // Still settled with an idle session: the cleanup stop goes through.
       const stopped = yield* decideOrchestrationCommand({
         command: stopCommand("cmd-stop-settled-idle"),
         readModel: makeReadModel("settled", null, makeSession("ready")),
@@ -819,22 +786,18 @@ it.layer(NodeServices.layer)("settled thread decider", (it) => {
       const stoppedEvents = Array.isArray(stopped) ? stopped : [stopped];
       expect(stoppedEvents.map((event) => event.type)).toEqual(["thread.session-stop-requested"]);
 
-      // Re-engaged before the stop was decided (a turn start unsettles the
-      // thread): the stale cleanup stop must not kill the new session.
       const unsettledError = yield* decideOrchestrationCommand({
         command: stopCommand("cmd-stop-unsettled"),
         readModel: makeReadModel(null, null, makeSession("starting")),
       }).pipe(Effect.flip);
       expect(unsettledError._tag).toBe("OrchestrationCommandInvariantError");
 
-      // Still settled but the session is already coming alive: same drop.
       const aliveError = yield* decideOrchestrationCommand({
         command: stopCommand("cmd-stop-session-alive"),
         readModel: makeReadModel("settled", null, makeSession("starting")),
       }).pipe(Effect.flip);
       expect(aliveError._tag).toBe("OrchestrationCommandInvariantError");
 
-      // Without the flag the stop stays unconditional (archive, stop button).
       const unconditional = yield* decideOrchestrationCommand({
         command: {
           type: "thread.session.stop",

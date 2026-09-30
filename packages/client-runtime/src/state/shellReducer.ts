@@ -1,14 +1,6 @@
 import * as Arr from "effect/Array";
 import type { OrchestrationShellSnapshot, OrchestrationShellStreamEvent } from "@t3tools/contracts";
 
-/**
- * Reduce a single shell stream event into an existing snapshot, returning a new
- * snapshot with the event's changes applied. This is a pure reducer that both
- * web and mobile can use to keep their local shell snapshot in sync.
- *
- * Returns the original snapshot reference unchanged if the event is not
- * recognized (forward-compatible).
- */
 export function applyShellStreamEvent(
   snapshot: OrchestrationShellSnapshot,
   event: OrchestrationShellStreamEvent,

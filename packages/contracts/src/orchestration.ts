@@ -57,31 +57,12 @@ export const ProviderSandboxMode = Schema.Literals([
 ]);
 export type ProviderSandboxMode = typeof ProviderSandboxMode.Type;
 
-/**
- * `ModelSelection` — selection of a model on a configured provider instance.
- *
- * The routing key is `instanceId` (a user-defined slug identifying one
- * configured provider instance). Drivers, credentials, working-directory
- * bindings, and any other per-instance state are recovered from the
- * runtime registry via the instance id.
- *
- * Wire legacy: persisted selections produced before the driver/instance
- * split carried a `provider: <driver-id>` field instead. The schema absorbs
- * that shape via a pre-decoding transform — `{provider, model}` is promoted
- * to `{instanceId: defaultInstanceIdForDriver(provider), model}`. No
- * post-decode compatibility code lives in the runtime; the transform is the
- * only compat surface.
- */
 const ModelSelectionWire = Schema.Struct({
   instanceId: ProviderInstanceId,
   model: TrimmedNonEmptyString,
   options: Schema.optionalKey(ProviderOptionSelections),
 });
 
-// Source shape for persisted legacy payloads. Fields are typed as
-// `Schema.Unknown` so malformed drafts still make it into the transform and
-// fail validation through the target schema (with proper error messages)
-// rather than at the source-struct layer where the error is less actionable.
 const ModelSelectionSource = Schema.Struct({
   provider: Schema.optional(Schema.Unknown),
   instanceId: Schema.optional(Schema.Unknown),
@@ -94,11 +75,6 @@ export const ModelSelection = ModelSelectionSource.pipe(
     ModelSelectionWire,
     SchemaTransformation.transformEffect({
       decode: (raw) => {
-        // Resolve the routing key: prefer an explicit `instanceId`; fall
-        // back to promoting the legacy `provider` slug (the canonical
-        // `defaultInstanceIdForDriver` mapping) so persisted rollout-era
-        // payloads decode without data loss. The target schema brands the
-        // string as `ProviderInstanceId`.
         const instanceIdSource =
           raw.instanceId !== undefined
             ? raw.instanceId
@@ -155,7 +131,6 @@ export type ProviderApprovalDecision = typeof ProviderApprovalDecision.Type;
 export const ProviderApprovalOption = Schema.Struct({
   decision: ProviderApprovalDecision,
   label: TrimmedNonEmptyString,
-  /** Provider-supplied caution shown next to the option, such as a prompt injection warning. */
   warning: Schema.optional(TrimmedNonEmptyString),
 });
 export type ProviderApprovalOption = typeof ProviderApprovalOption.Type;
@@ -177,13 +152,11 @@ const PROVIDER_SEND_TURN_SUPPORTED_IMAGE_MIME_TYPE_SET = new Set<string>(
   PROVIDER_SEND_TURN_SUPPORTED_IMAGE_MIME_TYPES,
 );
 
-/** Whether a pasted or picked image mime type can be sent on a provider turn. */
 export function isProviderSendTurnSupportedImageMimeType(mimeType: string): boolean {
   return PROVIDER_SEND_TURN_SUPPORTED_IMAGE_MIME_TYPE_SET.has(mimeType.toLowerCase());
 }
 const PROVIDER_SEND_TURN_MAX_IMAGE_DATA_URL_CHARS = 14_000_000;
 const CHAT_ATTACHMENT_ID_MAX_CHARS = 128;
-// Correlation id is command id by design in this model.
 export const CorrelationId = CommandId;
 export type CorrelationId = typeof CorrelationId.Type;
 
@@ -322,23 +295,10 @@ export const ChatFileAttachment = Schema.Struct({
     Schema.isGreaterThanOrEqualTo(1),
     Schema.isLessThanOrEqualTo(PROVIDER_SEND_TURN_MAX_FILE_BYTES),
   ),
-  /** Clipboard text folded by a client. Providers keep these path-only so the
-      agent can inspect the file selectively instead of eagerly spending the
-      same context the fold is intended to preserve. */
   source: Schema.optional(PastedTextAttachmentSource),
 });
 export type ChatFileAttachment = typeof ChatFileAttachment.Type;
 
-/**
- * Catch-all for attachment types this build does not know. Attachments ride on
- * persisted events and thread streams, so a newer server or client must be able
- * to introduce a type without making older readers fail to decode the whole
- * message. Decoders keep the shared base fields; consumers skip these or render
- * them as unsupported. Mirrors how `OrchestrationThreadActivity` keeps `kind`
- * open. The known discriminators are excluded so a malformed image or file
- * attachment fails its own schema instead of sliding through here with its
- * size and mime constraints unchecked.
- */
 export const ChatUnknownAttachment = Schema.Struct({
   type: TrimmedNonEmptyString.check(
     Schema.isMaxLength(50),
@@ -353,7 +313,6 @@ export type ChatUnknownAttachment = typeof ChatUnknownAttachment.Type;
 
 const UploadChatImageAttachment = Schema.Struct({
   type: Schema.Literal("image"),
-  /** Client-side id, so context records can bind to the attachment before it has a server id. */
   id: Schema.optional(ChatAttachmentId),
   name: TrimmedNonEmptyString.check(Schema.isMaxLength(255)),
   mimeType: TrimmedNonEmptyString.check(Schema.isMaxLength(100), Schema.isPattern(/^image\//i)),
@@ -425,22 +384,8 @@ export const ProjectScript = Schema.Struct({
   command: TrimmedNonEmptyString,
   icon: ProjectScriptIcon,
   runOnWorktreeCreate: Schema.Boolean,
-  /**
-   * For `runOnWorktreeCreate` scripts: when false, the agent's first turn waits
-   * for the script to exit. Absent or true starts the agent right away and
-   * lets the script finish in the background.
-   */
   async: Schema.optional(Schema.Boolean),
-  /**
-   * URL to open in the in-app browser preview when this script runs (or
-   * when the user explicitly requests a preview). Optional; only honored on
-   * the desktop build.
-   */
   previewUrl: Schema.optional(TrimmedNonEmptyString),
-  /**
-   * When true, automatically open the preview panel pointed at `previewUrl`
-   * the moment this script starts. Ignored without `previewUrl` or on web.
-   */
   autoOpenPreview: Schema.optional(Schema.Boolean),
 });
 export type ProjectScript = typeof ProjectScript.Type;
@@ -480,7 +425,6 @@ const ProjectLucideIconName = TrimmedNonEmptyString.check(
 
 const ProjectEmoji = TrimmedNonEmptyString.check(Schema.isMaxLength(32));
 
-// Grapheme-count validation belongs to the server command boundary, not snapshot decoding.
 export const ProjectMonogramText = TrimmedNonEmptyString.check(
   Schema.isMaxLength(32),
   Schema.isPattern(/^[\p{L}\p{N}][\p{L}\p{N}\p{M}\u200c\u200d]*$/u),
@@ -507,8 +451,6 @@ const ProjectLucideIconWire = Schema.Struct({
   monogram: Schema.optional(ProjectMonogramText),
 });
 
-// Older peers only know lucide/emoji. Keep monograms out of their validated
-// `monogram` field too: old grapheme counters can reject otherwise valid text.
 export const ProjectIconOverride = Schema.Union([
   ProjectLucideIconWire,
   ProjectEmojiIcon,
@@ -544,13 +486,8 @@ export const OrchestrationProject = Schema.Struct({
   workspaceRoot: TrimmedNonEmptyString,
   repositoryIdentity: Schema.optional(Schema.NullOr(RepositoryIdentity)),
   defaultModelSelection: Schema.NullOr(ModelSelection),
-  // Per-project override for where new threads start. Null/absent means
-  // "no override": clients fall back to t3.json, then the global setting.
   defaultThreadEnvMode: Schema.optional(Schema.NullOr(ThreadEnvMode)),
-  // Opt-in because background sync performs network I/O and may move the checkout.
-  // Optional on the wire so cached snapshots from older servers still decode.
   autoPull: Schema.optional(Schema.Boolean),
-  // Optional on the wire so cached snapshots from older servers still decode.
   faviconPath: Schema.optional(Schema.NullOr(ProjectFaviconPath)),
   projectIcon: Schema.optional(Schema.NullOr(ProjectIconOverride)),
   scripts: Schema.Array(ProjectScript),
@@ -560,9 +497,6 @@ export const OrchestrationProject = Schema.Struct({
 });
 export type OrchestrationProject = typeof OrchestrationProject.Type;
 
-/** `reasoning` carries a provider's thinking trace: a reasoning summary, or
- *  the raw chain of thought when the model exposes one. It is a sibling of the
- *  assistant text it precedes, not a replacement for it. */
 export const OrchestrationMessageRole = Schema.Literals([
   "user",
   "assistant",
@@ -689,7 +623,6 @@ export const OrchestrationLatestTurn = Schema.Struct({
 });
 export type OrchestrationLatestTurn = typeof OrchestrationLatestTurn.Type;
 
-// Version changes even when a manual rename keeps the same text.
 export const ThreadTitleState = Schema.Struct({
   source: Schema.Literals(["manual", "generated"]),
   version: CommandId,
@@ -703,11 +636,6 @@ export const ThreadTitleRegeneration = Schema.Struct({
 });
 export type ThreadTitleRegeneration = typeof ThreadTitleRegeneration.Type;
 
-/**
- * Legacy single-PR link. Still emitted as the thread's derived current pull
- * request (see `@t3tools/shared/threadPullRequests`) so clients from before
- * `pullRequests` keep working independently of their release schedule.
- */
 export const ThreadLinkedPullRequest = Schema.Struct({
   projectId: ProjectId,
   repository: TrimmedNonEmptyString,
@@ -716,9 +644,6 @@ export const ThreadLinkedPullRequest = Schema.Struct({
 });
 export type ThreadLinkedPullRequest = typeof ThreadLinkedPullRequest.Type;
 
-/** Who created a thread ↔ pull request link. `stack-dismissed` is a tombstone
- * for a native-stack member the user unlinked, so the sync reactor does not
- * re-add it; clients hide it. */
 export const ThreadPullRequestLinkSource = Schema.Literals([
   "manual",
   "created",
@@ -728,11 +653,6 @@ export const ThreadPullRequestLinkSource = Schema.Literals([
 ]);
 export type ThreadPullRequestLinkSource = typeof ThreadPullRequestLinkSource.Type;
 
-/**
- * Host state persisted on a link by the sync reactor; null until first sync. The overview
- * fields are optional: a host whose cheap read lacks them leaves them out, and snapshots
- * written before they existed still decode.
- */
 export const ThreadPullRequestSnapshot = Schema.Struct({
   state: PullRequestState,
   title: TrimmedNonEmptyString,
@@ -760,7 +680,6 @@ export const ThreadPullRequestStackLayer = Schema.Struct({
 });
 export type ThreadPullRequestStackLayer = typeof ThreadPullRequestStackLayer.Type;
 
-/** A host-native stack the pull request belongs to. Layers run bottom to top. */
 export const ThreadPullRequestStack = Schema.Struct({
   kind: Schema.Literal("native"),
   id: TrimmedNonEmptyString,
@@ -771,8 +690,6 @@ export const ThreadPullRequestStack = Schema.Struct({
 });
 export type ThreadPullRequestStack = typeof ThreadPullRequestStack.Type;
 
-/** Identity of a pull request as a thread link sees it: host-level, so the
- * same PR linked from two projects (or two environments) compares equal. */
 export const ThreadPullRequestKey = Schema.Struct({
   host: TrimmedNonEmptyString,
   repository: TrimmedNonEmptyString,
@@ -802,7 +719,6 @@ export const OrchestrationThread = Schema.Struct({
   branch: Schema.NullOr(TrimmedNonEmptyString),
   worktreePath: Schema.NullOr(TrimmedNonEmptyString),
   linkedPullRequest: Schema.optional(Schema.NullOr(ThreadLinkedPullRequest)),
-  // Optional so payloads from pre-link servers still decode.
   pullRequests: Schema.Array(ThreadPullRequestLink).pipe(
     Schema.withDecodingDefault(Effect.succeed([])),
   ),
@@ -815,34 +731,13 @@ export const OrchestrationThread = Schema.Struct({
     Schema.withDecodingDefault(Effect.succeed(null)),
   ),
   settledAt: Schema.NullOr(IsoDateTime).pipe(Schema.withDecodingDefault(Effect.succeed(null))),
-  // When the thread last re-entered the active list (any thread.unsettled).
-  // Anchors the active-list sort so an unsettled thread surfaces at the top
-  // instead of sinking back to its creation-order slot. Cleared on settle.
-  // Optional so payloads from pre-stamp servers still decode.
   unsettledAt: Schema.optional(Schema.NullOr(IsoDateTime)),
-  // Snooze is an overlay on the active lifecycle, not a fourth destination:
-  // a snoozed thread stays "active" in the model and is only suppressed from
-  // the inbox until snoozedUntil passes (or the thread raises its hand).
-  // Optional so payloads from pre-snooze servers still decode.
   snoozedUntil: Schema.optional(Schema.NullOr(IsoDateTime)),
   snoozedAt: Schema.optional(Schema.NullOr(IsoDateTime)),
-  // Active pinned threads render in the pinned block. Settled and snoozed
-  // threads remain in their respective shelves even when pinned.
-  // Optional so payloads from pre-pinning servers still decode.
   pinnedAt: Schema.optional(Schema.NullOr(IsoDateTime)),
-  // Fractional index for user-arranged pinned order. Keyed threads sort by
-  // string comparison ahead of keyless ones (which keep creation order), so
-  // servers never need each other's threads to agree on the merged list.
-  // Optional so payloads from pre-reorder servers still decode.
   pinOrderKey: Schema.optional(Schema.NullOr(TrimmedNonEmptyString)),
-  // Manual Active placement. Keyless threads retain their creation/re-entry
-  // order above the arranged run. Settling clears this slot.
   activeOrderKey: Schema.optional(Schema.NullOr(TrimmedNonEmptyString)),
-  // Set while the user has turned automatic settlement off for this thread.
-  // Survives manual settle, un-settle, and activity: only the user clears it.
-  // Optional so payloads from older servers still decode.
   autoSettleDisabledAt: Schema.optional(Schema.NullOr(IsoDateTime)),
-  // Pending-only state. Optional so older servers remain compatible.
   titleRegeneration: Schema.optional(Schema.NullOr(ThreadTitleRegeneration)),
   titleState: Schema.optional(Schema.NullOr(ThreadTitleState)),
   deletedAt: Schema.NullOr(IsoDateTime),
@@ -872,7 +767,6 @@ export const OrchestrationProjectShell = Schema.Struct({
   defaultModelSelection: Schema.NullOr(ModelSelection),
   defaultThreadEnvMode: Schema.optional(Schema.NullOr(ThreadEnvMode)),
   autoPull: Schema.optional(Schema.Boolean),
-  // Optional on the wire so cached snapshots from older servers still decode.
   faviconPath: Schema.optional(Schema.NullOr(ProjectFaviconPath)),
   projectIcon: Schema.optional(Schema.NullOr(ProjectIconOverride)),
   scripts: Schema.Array(ProjectScript),
@@ -905,7 +799,6 @@ export const OrchestrationThreadShell = Schema.Struct({
     Schema.withDecodingDefault(Effect.succeed(null)),
   ),
   settledAt: Schema.NullOr(IsoDateTime).pipe(Schema.withDecodingDefault(Effect.succeed(null))),
-  // See OrchestrationThread.unsettledAt: last re-entry into the active list.
   unsettledAt: Schema.optional(Schema.NullOr(IsoDateTime)),
   snoozedUntil: Schema.optional(Schema.NullOr(IsoDateTime)),
   snoozedAt: Schema.optional(Schema.NullOr(IsoDateTime)),
@@ -920,17 +813,7 @@ export const OrchestrationThreadShell = Schema.Struct({
   hasPendingApprovals: Schema.Boolean,
   hasPendingUserInput: Schema.Boolean,
   hasActionableProposedPlan: Schema.Boolean,
-  /**
-   * Native background work alive after the turn settles: "working" while
-   * subagents/workflows run, "monitoring" when watch loops are the only
-   * live work. Optional so old servers/clients interop; absent = none.
-   */
   backgroundLiveness: Schema.optional(Schema.NullOr(Schema.Literals(["working", "monitoring"]))),
-  /**
-   * Current plan step while a turn runs, for the Working indicators
-   * (sidebar row, in-chat working line). Cleared when the turn settles —
-   * never persists as stale UI. Optional so old servers/clients interop.
-   */
   planProgress: Schema.optional(
     Schema.NullOr(
       Schema.Struct({
@@ -988,86 +871,30 @@ export const OrchestrationShellStreamItem = Schema.Union([
 export type OrchestrationShellStreamItem = typeof OrchestrationShellStreamItem.Type;
 
 export const OrchestrationSubscribeShellInput = Schema.Struct({
-  /**
-   * When provided, the server skips the initial full shell snapshot and instead
-   * replays shell events after this sequence before streaming live events.
-   * Clients that already hold a cached (or HTTP-loaded) shell snapshot pass its
-   * sequence here so the subscription resumes without re-sending the entire
-   * projects/threads list (overlapping events are deduped by sequence on the
-   * client).
-   */
   afterSequence: Schema.optionalKey(NonNegativeInt),
-  /**
-   * Requests an explicit marker after the subscription has emitted its initial
-   * snapshot or catch-up replay and before it begins emitting live events.
-   */
   requestCompletionMarker: Schema.optionalKey(Schema.Boolean),
 });
 export type OrchestrationSubscribeShellInput = typeof OrchestrationSubscribeShellInput.Type;
 
 export const OrchestrationSubscribeThreadInput = Schema.Struct({
   threadId: ThreadId,
-  /** Opt in to reasoning roles; older clients receive system messages instead. */
   reasoningMessages: Schema.optionalKey(Schema.Boolean),
-  /**
-   * When provided, the server skips the initial snapshot frame and instead
-   * replays events after this sequence before streaming live events. Clients
-   * that load the snapshot over HTTP pass the snapshot's sequence here so the
-   * live subscription resumes without a gap (overlapping events are deduped by
-   * sequence on the client).
-   */
   afterSequence: Schema.optionalKey(NonNegativeInt),
-  /**
-   * Requests an explicit marker after the subscription has emitted its initial
-   * snapshot or catch-up replay and before it begins emitting live events.
-   */
   requestCompletionMarker: Schema.optionalKey(Schema.Boolean),
-  /**
-   * When provided, the fallback snapshot frame (sent when `afterSequence` is
-   * missing or the catch-up gap is too large) is windowed to the last
-   * `turnLimit` user-anchored turns and carries `page` metadata. Absent means
-   * the fallback snapshot is the full thread, preserving pre-pagination client
-   * behavior. Live events are unaffected either way.
-   */
   turnLimit: Schema.optionalKey(PositiveInt),
 });
 export type OrchestrationSubscribeThreadInput = typeof OrchestrationSubscribeThreadInput.Type;
 
-/**
- * Bounds a thread detail read to a window of recent turns. `turnLimit` counts
- * turns with a user pending message (subagent/fan-out turns between them ride
- * along), so the window always contains the last N user prompts. `beforeCursor`
- * requests the disjoint page of older turns strictly before a previously
- * returned cursor. Requests without a window get the full thread; pagination is
- * strictly opt-in so older clients keep today's behavior on both HTTP and the
- * WebSocket fallback snapshot.
- */
 export const OrchestrationThreadDetailWindow = Schema.Struct({
   turnLimit: Schema.optionalKey(PositiveInt),
   beforeCursor: Schema.optionalKey(TrimmedNonEmptyString),
 });
 export type OrchestrationThreadDetailWindow = typeof OrchestrationThreadDetailWindow.Type;
 
-/**
- * Page metadata for a windowed thread detail read. `beforeCursor` is opaque and
- * exclusive: passing it back returns the adjacent disjoint slice of older
- * turns. `null` means the thread is fully loaded below this page. The
- * `snapshotSequence` mirrors the top-level snapshot sequence so history pages
- * can be sequence-checked against live state before merging.
- */
 export const OrchestrationThreadDetailPage = Schema.Struct({
   beforeCursor: Schema.NullOr(TrimmedNonEmptyString),
   hasMore: Schema.Boolean,
   snapshotSequence: NonNegativeInt,
-  /**
-   * Highest event sequence applied to THIS thread at page read time. The
-   * global `snapshotSequence` advances with every thread's events, so a
-   * client cannot wait for it via its per-thread subscription; this
-   * thread-scoped watermark is reachable. A client merging an older page
-   * must first have applied live events up to it — otherwise a streaming
-   * turn outside the loaded window could have deltas replayed on top of
-   * page content that already includes them, duplicating text.
-   */
   threadSequence: Schema.optionalKey(NonNegativeInt),
 });
 export type OrchestrationThreadDetailPage = typeof OrchestrationThreadDetailPage.Type;
@@ -1075,8 +902,6 @@ export type OrchestrationThreadDetailPage = typeof OrchestrationThreadDetailPage
 export const OrchestrationThreadDetailSnapshot = Schema.Struct({
   snapshotSequence: NonNegativeInt,
   thread: OrchestrationThread,
-  // Present only on windowed responses. Absent on full snapshots (and from
-  // pre-pagination servers), which clients treat as fully loaded.
   page: Schema.optional(OrchestrationThreadDetailPage),
 });
 export type OrchestrationThreadDetailSnapshot = typeof OrchestrationThreadDetailSnapshot.Type;
@@ -1088,8 +913,6 @@ export const ProjectCreateCommand = Schema.Struct({
   title: TrimmedNonEmptyString,
   workspaceRoot: TrimmedNonEmptyString,
   createWorkspaceRootIfMissing: Schema.optional(Schema.Boolean),
-  // Retained for older clients that sent an automatic create-time seed. The
-  // server ignores it; explicit project defaults use project.meta.update.
   defaultModelSelection: Schema.optional(Schema.NullOr(ModelSelection)),
   createdAt: IsoDateTime,
 });
@@ -1101,7 +924,6 @@ const ProjectMetaUpdateCommand = Schema.Struct({
   title: Schema.optional(TrimmedNonEmptyString),
   workspaceRoot: Schema.optional(TrimmedNonEmptyString),
   defaultModelSelection: Schema.optional(Schema.NullOr(ModelSelection)),
-  // Absent = leave unchanged; null = clear the override.
   defaultThreadEnvMode: Schema.optional(Schema.NullOr(ThreadEnvMode)),
   autoPull: Schema.optional(Schema.Boolean),
   faviconPath: Schema.optional(Schema.NullOr(ProjectFaviconPath)),
@@ -1169,9 +991,6 @@ const ThreadUnsettleCommand = Schema.Struct({
   type: Schema.Literal("thread.unsettle"),
   commandId: CommandId,
   threadId: ThreadId,
-  // Commands only carry "user": activity un-settles are decided server-side
-  // (the decider emits thread.unsettled(reason: "activity") events directly,
-  // never through this command), so a client cannot forge the neutral reset.
   reason: Schema.Literal("user"),
 });
 
@@ -1179,9 +998,6 @@ const ThreadSnoozeCommand = Schema.Struct({
   type: Schema.Literal("thread.snooze"),
   commandId: CommandId,
   threadId: ThreadId,
-  // The wake time. Event-based wake conditions (PR merged, review posted)
-  // will arrive as an optional condition field alongside this; time-based
-  // snooze is just the first kind of condition.
   snoozedUntil: IsoDateTime,
 });
 
@@ -1189,10 +1005,6 @@ const ThreadUnsnoozeCommand = Schema.Struct({
   type: Schema.Literal("thread.unsnooze"),
   commandId: CommandId,
   threadId: ThreadId,
-  // Commands only carry "user": activity wakes are decided server-side (the
-  // decider emits thread.unsnoozed(reason: "activity") directly), and timer
-  // wakes need no event at all — clients derive visibility from snoozedUntil,
-  // so a passed wake time simply stops classifying as snoozed.
   reason: Schema.Literal("user"),
 });
 
@@ -1200,9 +1012,6 @@ const ThreadPinCommand = Schema.Struct({
   type: Schema.Literal("thread.pin"),
   commandId: CommandId,
   threadId: ThreadId,
-  // Initial slot in the user-arranged pinned order (see ThreadPinReorderCommand).
-  // Optional: clients on pre-reorder servers omit it, and the pinned block
-  // falls back to creation order for keyless threads.
   orderKey: Schema.optional(TrimmedNonEmptyString),
 });
 
@@ -1216,10 +1025,6 @@ const ThreadPinReorderCommand = Schema.Struct({
   type: Schema.Literal("thread.pin.reorder"),
   commandId: CommandId,
   threadId: ThreadId,
-  // Fractional index key: pinned threads sort by plain string comparison of
-  // these keys, so a drag writes one key to one thread — neighbors (possibly
-  // on other servers) are never touched. Clients compute a key that sorts
-  // between the dropped position's neighbors.
   orderKey: TrimmedNonEmptyString,
 });
 
@@ -1227,7 +1032,6 @@ const ThreadAutoSettleSetCommand = Schema.Struct({
   type: Schema.Literal("thread.auto-settle.set"),
   commandId: CommandId,
   threadId: ThreadId,
-  // false turns automatic settlement off for this thread, true turns it back on.
   enabled: Schema.Boolean,
 });
 
@@ -1385,9 +1189,6 @@ const ThreadUserInputRespondCommand = Schema.Struct({
   createdAt: IsoDateTime,
 });
 
-// Closes an async question without answering it. The agent is not messaged;
-// the composer is simply released. Native callback questions cannot be dismissed
-// this way because the provider is blocked waiting on a reply.
 const ThreadUserInputDismissCommand = Schema.Struct({
   type: Schema.Literal("thread.user-input.dismiss"),
   commandId: CommandId,
@@ -1404,8 +1205,6 @@ const ThreadCheckpointRevertCommand = Schema.Struct({
   createdAt: IsoDateTime,
 });
 
-// A separate command makes older servers reject history-only rewinds rather than
-// ignoring an unfamiliar option and restoring files.
 const ThreadConversationRevertCommand = Schema.Struct({
   ...ThreadCheckpointRevertCommand.fields,
   type: Schema.Literal("thread.conversation.revert"),
@@ -1416,11 +1215,6 @@ const ThreadSessionStopCommand = Schema.Struct({
   commandId: CommandId,
   threadId: ThreadId,
   createdAt: IsoDateTime,
-  // Settle-cleanup stops are conditional: the decider drops the stop if the
-  // thread was re-engaged (unsettled, session starting/running, or a queued
-  // turn start) between the settle and this command. Guarding in the decider
-  // closes the race a post-settle snapshot read cannot: commands are decided
-  // serially against the authoritative read model.
   onlyIfSettled: Schema.optional(Schema.Boolean),
 });
 
@@ -1551,11 +1345,6 @@ const ThreadHistoryImportCommand = Schema.Struct({
   ).check(Schema.isNonEmpty()),
 });
 
-/**
- * Persists a user message without starting a turn. Used by worktree bootstraps
- * so the send is durable while the worktree is still being prepared; the
- * turn that follows references the same message id.
- */
 const ThreadMessageUserAppendCommand = Schema.Struct({
   type: Schema.Literal("thread.message.user.append"),
   commandId: CommandId,
@@ -1734,7 +1523,6 @@ export const ProjectCreatedPayload = Schema.Struct({
   workspaceRoot: TrimmedNonEmptyString,
   repositoryIdentity: Schema.optional(Schema.NullOr(RepositoryIdentity)),
   defaultModelSelection: Schema.NullOr(ModelSelection),
-  // Optional so persisted events from older servers still decode.
   faviconPath: Schema.optional(Schema.NullOr(ProjectFaviconPath)),
   projectIcon: Schema.optional(Schema.NullOr(ProjectIconOverride)),
   scripts: Schema.Array(ProjectScript),
@@ -1813,10 +1601,6 @@ export const ThreadSnoozedPayload = Schema.Struct({
 
 export const ThreadUnsnoozedPayload = Schema.Struct({
   threadId: ThreadId,
-  // user: explicit "wake now". activity: real work arrived (user message /
-  // session coming alive) and the decider cleared the snooze — mirrors
-  // thread.unsettled's activity resets. Timer wakes emit no event: clients
-  // derive them from snoozedUntil passing.
   reason: Schema.Literals(["user", "activity"]),
   updatedAt: IsoDateTime,
 });
@@ -1824,8 +1608,6 @@ export const ThreadUnsnoozedPayload = Schema.Struct({
 export const ThreadPinnedPayload = Schema.Struct({
   threadId: ThreadId,
   pinnedAt: IsoDateTime,
-  // Absent on re-pins of an already-pinned thread (the existing key wins)
-  // and on pins from clients that predate reordering.
   pinOrderKey: Schema.optional(TrimmedNonEmptyString),
   updatedAt: IsoDateTime,
 });
@@ -1843,30 +1625,21 @@ export const ThreadPinReorderedPayload = Schema.Struct({
 
 export const ThreadAutoSettleSetPayload = Schema.Struct({
   threadId: ThreadId,
-  // Null re-enables automatic settlement.
   autoSettleDisabledAt: Schema.NullOr(IsoDateTime),
   updatedAt: IsoDateTime,
 });
 
 export const ThreadMetaUpdatedPayload = Schema.Struct({
   threadId: ThreadId,
-  // Order updates use this existing event so older clients can ignore the
-  // new field while continuing to decode the event stream.
   activeOrderKey: Schema.optional(Schema.NullOr(TrimmedNonEmptyString)),
   title: Schema.optional(TrimmedNonEmptyString),
-  /** Intent marker consumed by the title-generation reactor. Keeping this on
-      the existing event lets older clients safely ignore the new field. */
   regenerateTitle: Schema.optional(Schema.Literal(true)),
-  /** Title at request time, used to avoid overwriting a later manual rename. */
   previousTitle: Schema.optional(TrimmedNonEmptyString),
-  /** Pending state shared with clients. Null clears a matching request. */
   titleRegeneration: Schema.optional(Schema.NullOr(ThreadTitleRegeneration)),
   titleState: Schema.optional(Schema.NullOr(ThreadTitleState)),
   modelSelection: Schema.optional(ModelSelection),
   branch: Schema.optional(Schema.NullOr(TrimmedNonEmptyString)),
   worktreePath: Schema.optional(Schema.NullOr(TrimmedNonEmptyString)),
-  // No longer produced; kept so persisted events from before
-  // thread.pull-request-linked still decode and replay into the link table.
   linkedPullRequest: Schema.optional(Schema.NullOr(ThreadLinkedPullRequest)),
   branchPullRequest: Schema.optional(Schema.NullOr(ThreadLinkedPullRequest)),
   updatedAt: IsoDateTime,
@@ -1916,7 +1689,6 @@ export const ThreadMessageSentPayload = Schema.Struct({
   text: Schema.String,
   attachments: Schema.optional(Schema.Array(ChatAttachment)),
   context: Schema.optional(OrchestrationMessageContext),
-  // Events persisted before the field existed carry no key at all.
   turnId: Schema.NullOr(TurnId).pipe(Schema.withDecodingDefault(Effect.succeed(null))),
   streaming: Schema.Boolean,
   createdAt: IsoDateTime,
@@ -2000,12 +1772,6 @@ export const ThreadActivityAppendedPayload = Schema.Struct({
   activity: OrchestrationThreadActivity,
 });
 
-/**
- * Which client connection dispatched the command that produced an event.
- * Stamped by the orchestration engine on client-dispatched commands; absent on
- * provider/server-originated events and on commands from clients too old to
- * report it.
- */
 export const OrchestrationClientOrigin = Schema.Struct({
   surface: Schema.optional(ClientSurface),
   appVersion: Schema.optional(TrimmedNonEmptyString),
@@ -2019,11 +1785,6 @@ export const OrchestrationEventMetadata = Schema.Struct({
   requestId: Schema.optional(ApprovalRequestId),
   ingestedAt: Schema.optional(IsoDateTime),
   historyImport: Schema.optional(Schema.Boolean),
-  /**
-   * The user message was persisted ahead of its turn (worktree bootstrap).
-   * Reactors that key off a user message as "turn is starting" wait for the
-   * turn-start event instead.
-   */
   deferredTurn: Schema.optional(Schema.Boolean),
   origin: Schema.optional(OrchestrationClientOrigin),
 });
@@ -2294,8 +2055,6 @@ export type OrchestrationGetFullThreadDiffResult = typeof OrchestrationGetFullTh
 export const OrchestrationThreadSearchSource = Schema.Literals(["user", "assistant"]);
 export type OrchestrationThreadSearchSource = typeof OrchestrationThreadSearchSource.Type;
 
-// The server's SQLite client is synchronous and single-connection. Bound both
-// scan input and response size so a search cannot monopolize that connection.
 export const OrchestrationSearchThreadsInput = Schema.Struct({
   query: TrimmedString.check(Schema.isMinLength(2), Schema.isMaxLength(200)),
   limit: Schema.optionalKey(Schema.Int.check(Schema.isBetween({ minimum: 1, maximum: 50 }))),
@@ -2318,8 +2077,6 @@ export type OrchestrationSearchThreadsResult = typeof OrchestrationSearchThreads
 
 export const OrchestrationGetWorkflowScriptInput = Schema.Struct({
   threadId: ThreadId,
-  /** Absolute path from the workflow's runHandles.scriptPath. The server
-   * re-derives containment; the client value is a hint, never trusted. */
   scriptPath: TrimmedNonEmptyString,
 });
 export type OrchestrationGetWorkflowScriptInput = typeof OrchestrationGetWorkflowScriptInput.Type;

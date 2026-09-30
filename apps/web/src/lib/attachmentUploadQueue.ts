@@ -43,28 +43,17 @@ export const useAttachmentUploadStore = create<AttachmentUploadStore>(() => ({
 interface UploadJob {
   readonly image: ComposerImageAttachment | ComposerFileAttachment;
   readonly environmentId: EnvironmentId;
-  /**
-   * The draft that owned this file when the job started. Completion resolves
-   * the current owner because the file can move while the upload is pending.
-   */
   readonly draftTarget?: ComposerThreadTarget;
   readonly previous?: ReadyAttachmentUpload;
-  /**
-   * The draft's persisted server-side upload, to verify instead of re-upload.
-   * The draft owns this id; the queue never deletes it on cancel or retry.
-   * Deleting it goes through `releasePersistedAttachmentUpload` only.
-   */
   readonly persistedAttachmentId?: string;
   readonly settled: Promise<void>;
   resolveSettled: () => void;
-  /** Only ids this queue minted itself. Cancel and retry may delete these. */
   attachmentId: string | null;
   cancelled: boolean;
   abort: (() => void) | null;
   stopWatchingConnection: () => void;
 }
 
-// Failed jobs retain their source and connection subscription until retry or release.
 const jobsByImageId = new Map<string, UploadJob>();
 const queue: UploadJob[] = [];
 const activeUploadsByEnvironment = new Map<EnvironmentId, number>();
@@ -90,7 +79,6 @@ export function readAttachmentUpload(imageId: string): AttachmentUploadState | u
   return useAttachmentUploadStore.getState().uploadsByImageId[imageId];
 }
 
-/** Finds the file's current same-environment draft after any in-flight move. */
 function resolveCurrentFileDraftTarget(job: UploadJob): ComposerThreadTarget | undefined {
   if (job.draftTarget === undefined || job.image.type !== "file") {
     return undefined;
@@ -107,8 +95,6 @@ function resolveCurrentFileDraftTarget(job: UploadJob): ComposerThreadTarget | u
       }
       continue;
     }
-    // Tests and legacy callers can use a DraftId without session metadata.
-    // Only its original job supplies enough environment identity to trust it.
     if (typeof job.draftTarget === "string" && job.draftTarget === key) {
       return DraftId.make(key);
     }
@@ -120,13 +106,6 @@ function resolveCurrentFileDraftTarget(job: UploadJob): ComposerThreadTarget | u
   return undefined;
 }
 
-/**
- * Persists a finished upload's ids onto the draft that owns the file. The
- * mounted composer effect performs the same write for live UI updates, but a
- * background completion (user navigated away, upload finished, reload) must
- * not depend on a mounted composer to survive. `setFileUpload` no-ops when
- * the draft row is gone or already carries these ids.
- */
 function stampDraftFileUpload(job: UploadJob, attachmentId: string): void {
   const draftTarget = resolveCurrentFileDraftTarget(job);
   if (draftTarget === undefined) {
@@ -216,10 +195,6 @@ async function runUpload(job: UploadJob): Promise<void> {
       }
     }
     if (verification.status === "failed" || !job.image.file) {
-      // No `attachmentId` here: a failed state's id marks a pending upload
-      // this queue minted, which retry and release then delete. The persisted
-      // id is the only server copy of a hydrated file, so a transient
-      // verification failure must leave it in place for the next retry.
       setUploadState(job.image.id, {
         status: "failed",
         environmentId: job.environmentId,
@@ -385,7 +360,6 @@ function pumpUploads(): void {
 export function startAttachmentUpload(input: {
   readonly environmentId: EnvironmentId;
   readonly image: ComposerImageAttachment | ComposerFileAttachment;
-  /** Draft that owns the file; lets a background completion persist its ids. */
   readonly draftTarget?: ComposerThreadTarget;
 }): void {
   const existingJob = jobsByImageId.get(input.image.id);
@@ -452,8 +426,6 @@ export function startAttachmentUpload(input: {
     const reconnected = connected && !wasConnected;
     wasConnected = connected;
     if (!reconnected) return;
-    // The HTTP failure can arrive after the socket has already reconnected.
-    // Wait for that attempt, then retry only if this job still owns the file.
     void job.settled.then(() => {
       if (
         jobsByImageId.get(job.image.id) === job &&
@@ -474,11 +446,6 @@ export function startAttachmentUpload(input: {
   pumpUploads();
 }
 
-/**
- * Stops the job and deletes only the pending upload it minted itself. A
- * persisted draft upload survives cancellation (an environment switch cancels
- * the old job, and the draft still references that server copy).
- */
 function cancelAttachmentUpload(imageId: string): void {
   const job = jobsByImageId.get(imageId);
   if (!job) {
@@ -533,8 +500,6 @@ export function releasePersistedAttachmentUpload(input: {
     job?.environmentId === input.environmentId &&
     job.persistedAttachmentId === input.attachmentId
   ) {
-    // Tears down the in-flight verification or re-upload. The queue only
-    // deletes ids it minted, so the persisted id still needs the delete below.
     releaseAttachmentUpload(input.id);
   }
   deletePendingUpload(input.environmentId, input.attachmentId);
@@ -547,9 +512,6 @@ export function retryAttachmentUpload(input: {
 }): void {
   const previous = readAttachmentUpload(input.image.id);
   cancelAttachmentUpload(input.image.id);
-  // A failed state's `attachmentId` is always one this queue minted, so this
-  // never deletes a persisted draft upload. Retrying a hydrated file whose
-  // verification failed leaves the server copy alone and verifies it again.
   if (previous?.status === "failed" && previous.attachmentId) {
     deletePendingUpload(previous.environmentId, previous.attachmentId);
   }
@@ -561,11 +523,6 @@ export function retryAttachmentUpload(input: {
   startAttachmentUpload(input);
 }
 
-/**
- * Checks that a stashed upload still exists on the server. Pending uploads
- * are swept after 24 hours, so a stash restore asks first instead of handing
- * the composer a dead reference.
- */
 export function verifyStashedAttachmentUpload(input: {
   readonly environmentId: EnvironmentId;
   readonly attachmentId: string;
@@ -604,14 +561,6 @@ export function getUploadedAttachments(input: {
   return attachments;
 }
 
-/**
- * The one owner for discarding a draft attachment's server-side upload. The
- * queue-keyed release only sees in-memory state, so after a reload it finds
- * nothing and the pending upload leaks. When the draft carries a persisted
- * `uploadedAttachmentId` (which survives reloads), route through the persisted
- * release; it still prefers the queue path when the queue owns that same
- * attachment. Every draft discard path must funnel through here.
- */
 export function releaseDraftAttachment(
   attachment: ComposerImageAttachment | ComposerFileAttachment,
 ): void {
@@ -625,9 +574,6 @@ export function releaseDraftAttachment(
       environmentId: attachment.uploadEnvironmentId,
       attachmentId: attachment.uploadedAttachmentId,
     });
-    // A failed re-upload after verification can hold a newer minted
-    // attachment under the queue key. Release whatever is left so neither
-    // copy stays behind. (The pending delete is idempotent server-side.)
     if (jobsByImageId.has(attachment.id) || readAttachmentUpload(attachment.id)) {
       releaseAttachmentUpload(attachment.id);
     }

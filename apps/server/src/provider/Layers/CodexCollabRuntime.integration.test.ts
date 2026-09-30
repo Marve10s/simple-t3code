@@ -1,12 +1,3 @@
-/**
- * Runtime-level collab regression: boots the REAL CodexSessionRuntime against
- * a scripted mock app-server peer that replays the captured multi-agent wire
- * sequence (codexMultiAgentWire.json) plus the shapes the capture alone can't
- * script (receiver-turn bookkeeping via collabAgentToolCall, child terminal
- * lifecycle, approval pass-through). This is the layer the pure routing-table
- * test can't reach: ordering between the legacy receiver-turn suppressor and
- * v2 interception, registration state, and synthetic event emission.
- */
 // @effect-diagnostics nodeBuiltinImport:off
 import * as NodeFS from "node:fs";
 import * as NodeOS from "node:os";
@@ -38,13 +29,6 @@ const decodeMcpElicitationResponse = Schema.decodeUnknownEffect(
   ),
 );
 
-/**
- * The captured sequence, extended with the shapes the live capture didn't
- * include: a collabAgentToolCall with receiverThreadIds (feeds the legacy
- * receiver-turn map, so ordering vs. v2 interception is exercised), child
- * terminal lifecycle, and a serverRequest/resolved addressed to a child
- * (must pass through to the parent path, not vanish).
- */
 function buildScript() {
   const captured = wireFixture.notifications;
   const extras = [
@@ -62,9 +46,6 @@ function buildScript() {
         },
       },
     },
-    // Child terminal lifecycle AFTER the receiver map knows the children —
-    // pre-fix, the legacy suppressor dropped these before interception saw
-    // them, so no synthetic agent events were emitted.
     {
       method: "turn/completed",
       params: {
@@ -73,8 +54,6 @@ function buildScript() {
       },
     },
     { method: "thread/closed", params: { threadId: CHILD_B } },
-    // Parent-owned traffic addressed to a child conversation: must reach the
-    // parent path (approval correlation cleanup), not be swallowed.
     { method: "serverRequest/resolved", params: { threadId: CHILD_A, requestId: "req-1" } },
   ];
   return {
@@ -159,7 +138,6 @@ function readRecordedRequests() {
 }
 
 const scriptPath = NodePath.join(import.meta.dirname, "../testFixtures/.collab-script.json");
-// Windows cannot run the shebang wrapper; the .cmd sibling does the same job.
 const peerPath = NodePath.join(
   import.meta.dirname,
   `../testFixtures/codexCollabMockPeer.${HostProcessPlatform.defaultValue() === "win32" ? "cmd" : "sh"}`,
@@ -428,9 +406,6 @@ describe("CodexSessionRuntime collab integration", () => {
       const events = Array.from(yield* Fiber.join(eventsFiber));
       const methods = events.map((event) => event.method);
 
-      // Children registered from subAgentActivity become synthetic agent
-      // lifecycle — including terminal rows that arrive AFTER the receiver
-      // map knows them (the ordering this test exists to pin).
       assert.include(methods, "collabAgent/activity");
       assert.include(methods, "collabAgent/turnCompleted");
       assert.include(methods, "collabAgent/closed");
@@ -449,15 +424,10 @@ describe("CodexSessionRuntime collab integration", () => {
       );
       assert.isDefined(childClosed, "child B's close becomes an agent event");
 
-      // Parent-owned resolution passes through — not swallowed, not
-      // re-labelled as an agent event.
       assert.include(methods, "serverRequest/resolved");
 
-      // The root's own subAgentActivity about "/root" must NOT register the
-      // root as a child: the parent turn completion still flows.
       assert.include(methods, "turn/completed");
 
-      // No raw child conversation methods leak onto the parent stream.
       const leaked = events.filter((event) => {
         const payload = event.payload as { threadId?: string } | undefined;
         const addressedToChild = payload?.threadId === CHILD_A || payload?.threadId === CHILD_B;
@@ -473,21 +443,8 @@ describe("CodexSessionRuntime collab integration", () => {
     }).pipe(Effect.scoped, Effect.provide(NodeServices.layer)),
   );
 
-  // it.live: the runtime talks to a real child process; under it.effect's
-  // TestClock the internal timers freeze and the join never completes.
   it.live("Stop interrupts every live child regardless of registration timing", () =>
     Effect.gen(function* () {
-      // Ordering + liveness torture for stop-everything: child A's
-      // turn/started arrives BEFORE anything registers it (foreign
-      // suppression path must record the live turn); child B's arrives after
-      // registration; child A's interrupt HANGS (RPC never settles — worse
-      // than rejecting) and the bounded deadline must still deliver B's and
-      // the parent's interrupts. The turn stays open so children are live
-      // when Stop fires.
-      // Build from REAL captured rows (hand-written shapes fail notification
-      // schema validation and are silently dropped): reorder so child A's
-      // turn/started precedes its registration, and drop terminal rows so
-      // children stay live when Stop fires.
       const byIndex = wireFixture.notifications;
       const isTurnStarted = (entry: (typeof byIndex)[number], child: string) =>
         entry.method === "turn/started" &&
@@ -558,9 +515,6 @@ describe("CodexSessionRuntime collab integration", () => {
         environment: { ...process.env, T3_CODEX_COLLAB_SCRIPT: scriptPath },
       });
 
-      // Wait for both children's turnStarted signals to be processed before
-      // stopping (B via the registered-child path; A only produces live-turn
-      // bookkeeping, so key on B's synthetic event).
       const childBStartedFiber = yield* runtime.events.pipe(
         Stream.filter(
           (event) =>
@@ -579,8 +533,6 @@ describe("CodexSessionRuntime collab integration", () => {
       );
       assert.isTrue(childBStarted._tag === "Some", "child B turnStarted never arrived");
 
-      // Stop everything. A's interrupt hangs forever — the bounded child
-      // deadline must expire and the parent interrupt must still be sent.
       yield* runtime.interruptTurn();
 
       const parseInterruptLine = (line: string) => JSON.parse(line) as { threadId?: string };
@@ -605,13 +557,8 @@ describe("CodexSessionRuntime collab integration", () => {
     }).pipe(Effect.scoped, Effect.provide(NodeServices.layer)),
   );
 
-  // it.live: the runtime talks to a real child process; under it.effect's
-  // TestClock the internal timers freeze and the join never completes.
   it.live("Stop answers a parked app-permission approval with a withheld grant", () =>
     Effect.gen(function* () {
-      // Interrupting a turn whose app-permission prompt is still parked must
-      // settle that prompt: the handler resumes with "cancel", the peer gets
-      // an empty grant (permission withheld), and nothing hangs until close.
       const script = {
         rootThreadId: ROOT,
         holdTurnOpen: true,
@@ -651,9 +598,6 @@ describe("CodexSessionRuntime collab integration", () => {
         environment: { ...process.env, T3_CODEX_COLLAB_SCRIPT: scriptPath },
       });
 
-      // One consumer for the whole stream: `events` is a plain queue stream,
-      // so two forks would compete for events and each could starve the
-      // other's filter. Signal the two milestones through Deferreds instead.
       const requestedReady = yield* Deferred.make<ProviderEvent>();
       const settledReady = yield* Deferred.make<ProviderEvent>();
       yield* runtime.events.pipe(
@@ -678,11 +622,6 @@ describe("CodexSessionRuntime collab integration", () => {
 
       yield* runtime.interruptTurn();
 
-      // The peer emits serverRequest/resolved only AFTER recording the
-      // runtime's answer, so awaiting this receipt makes reading the sidecar
-      // race-free. The runtime correlates that receipt back to the canonical
-      // request (requestKind + requestId) — the same event chain the adapter
-      // folds into approval.resolved, so the card actually closes.
       const settled = yield* Deferred.await(settledReady).pipe(Effect.timeoutOption("15 seconds"));
       assert.isTrue(settled._tag === "Some", "interrupt did not settle the parked approval");
       const settledEvent = settled._tag === "Some" ? settled.value : undefined;
@@ -700,7 +639,6 @@ describe("CodexSessionRuntime collab integration", () => {
       const answer = recorded[0];
       assert.isDefined(answer);
       assert.equal(answer.label, "perm-1");
-      // Cancelled approvals withhold the grant: an empty permission profile.
       assert.deepEqual(answer.result, { permissions: {} });
 
       yield* runtime.close;
@@ -884,7 +822,6 @@ describe("CodexSessionRuntime compaction", () => {
       const script = {
         rootThreadId: ROOT,
         recordRequests: true,
-        // A child's compaction must not inject into the root thread.
         notifications: [compacted(CHILD_A), compacted(ROOT)],
       };
       // @effect-diagnostics-next-line preferSchemaOverJson:off
@@ -918,7 +855,6 @@ describe("CodexSessionRuntime compaction", () => {
       yield* runtime.sendTurn({ input: "keep going", interactionMode: "default" });
       yield* Fiber.join(completedFiber);
 
-      // The restore is awaited before later notifications, so it has landed.
       const requests = readRecordedRequests();
       assert.lengthOf(requests, 1);
       const [inject] = requests;

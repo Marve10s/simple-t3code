@@ -23,7 +23,6 @@ import {
 const isMessageContext = Schema.is(OrchestrationMessageContext);
 const decodeMessageContext = Schema.decodeUnknownOption(OrchestrationMessageContext);
 
-/** Recovery drafts can exceed wire limits, but must never enter the outbox in that state. */
 export function composerContextSendBlockReason(
   context?: OrchestrationMessageContext,
 ): string | null {
@@ -36,7 +35,6 @@ export function composerContextSendBlockReason(
     : null;
 }
 
-/** Resolve the tapped source, not its display label, which can be only a basename. */
 export function composerMentionPath(source: string, context?: OrchestrationMessageContext) {
   const reference = collectComposerContextReferences(source)[0];
   if (reference) {
@@ -54,10 +52,6 @@ export interface ComposerDocumentAttachment {
   readonly sizeBytes: number;
 }
 
-/**
- * The attachment behind a chip when it is a document rather than a picture, video or PDF.
- * Those three open in native viewers; documents open in the file screen.
- */
 export function composerDocumentAttachment(
   source: string,
   context?: OrchestrationMessageContext,
@@ -79,7 +73,6 @@ export function composerDocumentAttachmentRecord(
   return record;
 }
 
-/** Retain a bounded native undo history without persisting removed payloads in the draft. */
 export function createComposerContextHistory() {
   const records = new Map<string, ComposerContextRecord>();
   return (text: string, current?: OrchestrationMessageContext) => {
@@ -87,7 +80,6 @@ export function createComposerContextHistory() {
       records.delete(record.contextId);
       records.set(record.contextId, record);
     }
-    // Recovery drafts can exceed the send cap. Evict undo-only entries, never live payloads.
     const limit = Math.max(COMPOSER_CONTEXT_MAX_RECORDS, current?.records.length ?? 0);
     while (records.size > limit) {
       const oldest = records.keys().next().value;
@@ -126,7 +118,6 @@ export function pullRequestComposerContext(
   };
 }
 
-/** Native editors collapse the canonical source range to a single atomic attachment. */
 export function composerContextEditorTokens(text: string, tokens: readonly ComposerInlineToken[]) {
   const references = collectComposerContextReferences(text);
   return [
@@ -141,7 +132,6 @@ export function composerContextEditorTokens(text: string, tokens: readonly Compo
   ].sort((a, b) => a.start - b.start);
 }
 
-/** Prunes removed references, retaining the screenshot bound to a preview annotation. */
 export function referencedComposerContext(text: string, context?: OrchestrationMessageContext) {
   if (!context) return undefined;
   const ids = new Set(collectComposerContextReferences(text).map((ref) => ref.contextId));
@@ -160,7 +150,6 @@ export function referencedComposerContext(text: string, context?: OrchestrationM
   return records.length ? { version: 1 as const, records } : undefined;
 }
 
-/** Uploads change attachment ids; keep context bindings attached to the same ordered file. */
 export function uploadedComposerContext(
   context: OrchestrationMessageContext | undefined,
   drafts: readonly { readonly id: string }[],
@@ -178,7 +167,6 @@ export function uploadedComposerContext(
   };
 }
 
-/** Imports with fresh identities so a pasted record cannot overwrite an existing snapshot. */
 export function reidentifyComposerContext(
   text: string,
   records: readonly ComposerContextRecord[],
@@ -212,7 +200,6 @@ export function reidentifyComposerContext(
   };
 }
 
-/** Keep queued records canonical; choose the wire format against the host at dispatch time. */
 export function serializeComposerMessageForServer(
   text: string,
   context: OrchestrationMessageContext | undefined,

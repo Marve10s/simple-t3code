@@ -6,7 +6,6 @@ import { Button } from "../ui/button";
 import { Popover, PopoverPopup, PopoverTrigger } from "../ui/popover";
 import { ComposerBanner, type ComposerBannerVariant } from "./ComposerBanner";
 
-// Match the duration-220 exit transition before removing a dismissed notice.
 const DISMISS_TRANSITION_MS = 220;
 
 export interface ComposerBannerStackItem {
@@ -88,7 +87,6 @@ export function ComposerBannerStack({ className, items }: ComposerBannerStackPro
     return null;
   }
 
-  // Activity stays attached. Urgency and severity only order the notices behind it.
   const orderedItems = items.toSorted((a, b) => bannerPriority(a) - bannerPriority(b));
   const frontItem = orderedItems[0];
   if (!frontItem) {
@@ -242,7 +240,6 @@ export function ComposerBannerStack({ className, items }: ComposerBannerStackPro
   );
 }
 
-/** Keep full descriptions reachable only when their inline copy is clipped. */
 function NoticeDescription({ children, compact }: { children: ReactNode; compact?: boolean }) {
   const descriptionRef = useRef<HTMLSpanElement>(null);
   const detailsRef = useRef<HTMLButtonElement>(null);
@@ -252,8 +249,6 @@ function NoticeDescription({ children, compact }: { children: ReactNode; compact
     const description = descriptionRef.current;
     if (!description) return;
     const measure = () => {
-      // Ignore the space taken by the details button itself so it cannot
-      // sustain its own overflow after the description would otherwise fit.
       const recoveredWidth = detailsRef.current ? detailsRef.current.offsetWidth + 4 : 0;
       const hidden = getComputedStyle(description).position === "absolute";
       setShowDetails(
@@ -266,7 +261,6 @@ function NoticeDescription({ children, compact }: { children: ReactNode; compact
     measure();
     const observer = new ResizeObserver(measure);
     observer.observe(description);
-    // A child can reveal new text without resizing its clipped box.
     const mutations = new MutationObserver(measure);
     mutations.observe(description, { childList: true, subtree: true, characterData: true });
     return () => {

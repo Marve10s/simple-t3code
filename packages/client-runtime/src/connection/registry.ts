@@ -95,11 +95,6 @@ export class EnvironmentRegistry extends Context.Service<
       | PlatformEnvironmentRemovalError
     >;
     readonly retryNow: (environmentId: EnvironmentId) => Effect.Effect<void>;
-    /**
-     * Switches a saved environment on or off. Off drops the socket, stops the
-     * retry ladder, and persists so the next launch stays off. Registration,
-     * credentials, and cache are untouched.
-     */
     readonly setEnabled: (
       environmentId: EnvironmentId,
       enabled: boolean,
@@ -148,7 +143,7 @@ interface EnvironmentServiceScope {
   readonly scope: Scope.Closeable;
 }
 
-/** @public Service construction is part of the canonical Effect module API. */
+/** @public */
 export const make = Effect.gen(function* () {
   const registryScope = yield* Scope.Scope;
   const storage = yield* Persistence.ConnectionTargetStore;
@@ -445,7 +440,6 @@ export const make = Effect.gen(function* () {
         if ((yield* Ref.get(platformEnvironmentIds)).has(environmentId)) {
           return;
         }
-        // Editing a saved environment must preserve its disabled state.
         const previous = (yield* SubscriptionRef.get(entries)).get(environmentId);
         const entry: ConnectionCatalogEntry =
           previous === undefined
@@ -524,10 +518,6 @@ export const make = Effect.gen(function* () {
             return next;
           });
 
-          // Secondary desktop-local backends (e.g. a parallel WSL backend) live
-          // on their own loopback origin, so they authenticate with a bearer
-          // token instead of the primary's same-origin cookie. Stash it where
-          // the resolver's bearer broker looks it up.
           if (registration._tag === "BearerConnectionRegistration") {
             yield* credentials.put(registration.target.connectionId, registration.credential).pipe(
               Effect.catch((error) =>
@@ -566,10 +556,6 @@ export const make = Effect.gen(function* () {
     },
   );
 
-  // Tear down a platform-managed environment that the host no longer reports
-  // (e.g. the user turned the parallel WSL backend off). Platform environments
-  // bypass the user-facing `remove` guard since they are reconciled from the
-  // bootstrap rather than removed by hand.
   const removePlatformEnvironment = Effect.fn("EnvironmentRegistry.removePlatformEnvironment")(
     function* (environmentId: EnvironmentId) {
       yield* withLeaseLock(
@@ -635,9 +621,6 @@ export const make = Effect.gen(function* () {
     yield* installPlatformRegistration(registration);
   });
 
-  // Reconcile the full set of platform-managed environments against what the
-  // host currently reports: add/refresh the desired ones and tear down any
-  // platform environment that disappeared (WSL toggled off, distro switched).
   const reconcilePlatform = Effect.fn("EnvironmentRegistry.reconcilePlatform")(function* (
     platformRegistrations: ReadonlyArray<PlatformConnectionRegistration>,
   ) {
@@ -759,14 +742,10 @@ export const make = Effect.gen(function* () {
         if (entry.enabled === enabled) {
           return;
         }
-        // Platform-managed environments are reconciled from the host and are
-        // never persisted, so only user-saved ones write the flag.
         if (!(yield* Ref.get(platformEnvironmentIds)).has(environmentId)) {
           yield* registrations.setEnabled(environmentId, enabled);
         }
         const next: ConnectionCatalogEntry = { ...entry, enabled };
-        // Update the lease in place so the supervisor keeps its generation and
-        // durable streams; `installEntryLocked` would tear it down instead.
         const lease = (yield* SubscriptionRef.get(serviceScopes)).get(environmentId);
         if (lease !== undefined) {
           yield* SubscriptionRef.update(serviceScopes, (current) => {
@@ -785,8 +764,6 @@ export const make = Effect.gen(function* () {
         } else if (enabled) {
           yield* createServiceScope(next);
         }
-        // The supervisor only owns the RPC session. A managed SSH backend and
-        // its tunnel outlive it, so switching off tears those down as well.
         if (
           !enabled &&
           entry.target._tag === "SshConnectionTarget" &&

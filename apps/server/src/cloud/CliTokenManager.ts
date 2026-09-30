@@ -40,9 +40,7 @@ const CLOUD_CLI_OAUTH_TOKEN_SECRET = "cloud-cli-oauth-token";
 const CLOUD_CLI_OAUTH_CALLBACK_TIMEOUT = Duration.minutes(10);
 const CLOUD_CLI_OAUTH_REFRESH_EARLY_MS = Duration.toMillis(Duration.minutes(5));
 const DEVICE_CODE_GRANT_TYPE = "urn:ietf:params:oauth:grant-type:device_code";
-// RFC 8628 defaults, used only when Clerk omits the field.
 const DEVICE_AUTHORIZATION_DEFAULT_INTERVAL = Duration.seconds(5);
-// RFC 8628 §3.5: a slow_down response means "add 5 seconds to the interval".
 const DEVICE_AUTHORIZATION_SLOW_DOWN_INCREMENT = Duration.seconds(5);
 const boldTerminalText = (value: string): string => `\u001b[1m${value}\u001b[22m`;
 
@@ -161,11 +159,6 @@ const OidcIdentityClaimsJson = Schema.fromJsonString(
 );
 const decodeOidcIdentityClaimsJson = Schema.decodeUnknownOption(OidcIdentityClaimsJson);
 
-/**
- * Best-effort read of the `email` (or fallback) claim from an OIDC id_token.
- * Only used to show the operator which account they linked, so a malformed
- * token degrades to "no identity" rather than an error.
- */
 function idTokenIdentity(idToken: string | undefined): string | null {
   if (!idToken) return null;
   const payload = idToken.split(".")[1];
@@ -317,13 +310,6 @@ export interface DeviceAuthorizationPrompt {
 const isTransportError = (error: unknown) =>
   HttpClientError.isHttpClientError(error) && error.reason._tag === "TransportError";
 
-/**
- * Polls Clerk's token endpoint until the user approves or denies the device
- * request in the browser (RFC 8628 §3.4/3.5). `authorization_pending` keeps
- * waiting, while `slow_down` and transient failures widen the interval before
- * the next tick; the caller bounds the whole loop with the device code's
- * lifetime.
- */
 const pollDeviceToken = Effect.fn("cloud.cli_token.poll_device_token")(function* (
   metadata: Pick<CloudCliOAuthConfig, "tokenEndpoint" | "clientId">,
   deviceCode: string,
@@ -344,10 +330,6 @@ const pollDeviceToken = Effect.fn("cloud.cli_token.poll_device_token")(function*
       Effect.asSome,
       Effect.catchIf(isTransportError, () => Effect.succeedNone),
     );
-    // Transport failures and upstream 5xx are transient while the device code
-    // is still valid. RFC 8628 §3.5 asks clients to back off before retrying,
-    // so widen the interval like slow_down; drain the body so the connection
-    // returns to the pool for the next poll.
     if (Option.isNone(response) || response.value.status >= 500) {
       if (Option.isSome(response)) yield* Effect.ignore(response.value.text);
       interval = Duration.sum(interval, DEVICE_AUTHORIZATION_SLOW_DOWN_INCREMENT);
@@ -375,13 +357,6 @@ const pollDeviceToken = Effect.fn("cloud.cli_token.poll_device_token")(function*
   }
 });
 
-/**
- * OAuth device authorization grant for machines without a local browser
- * (SSH). Clerk issues a short user code; the user approves it on Clerk's
- * hosted device page from any browser while this process polls the token
- * endpoint. Nothing is typed into the terminal and no redirect URI is
- * involved, so the hosted app plays no part in this flow.
- */
 export const deviceAuthorizationLogin = Effect.fn("cloud.cli_token.device_authorization_login")(
   function* <E, R>(showPrompt: (prompt: DeviceAuthorizationPrompt) => Effect.Effect<void, E, R>) {
     const metadata = yield* cloudCliOAuthConfig;
@@ -394,7 +369,6 @@ export const deviceAuthorizationLogin = Effect.fn("cloud.cli_token.device_author
       httpClient.execute,
       Effect.flatMap(HttpClientResponse.schemaBodyJson(DeviceAuthorizationResponse)),
     );
-    // Clerk's advertised lifetime and interval are authoritative.
     const expiresIn = Duration.seconds(authorization.expires_in);
     const interval =
       authorization.interval === undefined
@@ -415,10 +389,8 @@ export const deviceAuthorizationLogin = Effect.fn("cloud.cli_token.device_author
   },
 );
 
-/** @public Service construction is part of the canonical Effect module API. */
+/** @public */
 export const make = Effect.gen(function* () {
-  // Capture exactly the services the login/refresh flows need at build time,
-  // not the whole ambient context.
   const crypto = yield* Crypto.Crypto;
   const httpClient = yield* HttpClient.HttpClient;
   const services = Context.make(Crypto.Crypto, crypto).pipe(
@@ -490,10 +462,6 @@ export const make = Effect.gen(function* () {
       ),
       Layer.build,
     );
-    // The hosted /connect page establishes a Clerk session before forwarding
-    // the request to /oauth/authorize with the loopback redirect URI. Sending
-    // a signed-out browser to /oauth/authorize directly loses the authorize
-    // parameters across Clerk's sign-in redirect (#5051).
     const authorizationUrl = buildConnectAuthorizeRequestUrl({
       hostedAppUrl,
       state,
@@ -549,10 +517,6 @@ export const make = Effect.gen(function* () {
   );
   const get = semaphore.withPermits(1)(
     Effect.gen(function* () {
-      // A stored credential that can't be read or refreshed (corrupt, revoked,
-      // expired grant) must fall through to a fresh login rather than dead-end
-      // the command — authorizeCli applies the same fallback to device
-      // authorization.
       const token = yield* getExistingNoLock().pipe(
         Effect.orElseSucceed(() => Option.none<PersistedToken>()),
       );

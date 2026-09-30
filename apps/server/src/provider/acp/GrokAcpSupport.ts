@@ -98,10 +98,6 @@ export const makeGrokAcpRuntime = (
     return yield* makeXAiPromptCompletionRuntime(runtime);
   });
 
-/**
- * T3's built-in Grok slug. It is the CLI's product name, not a model id the ACP accepts,
- * so selecting it means "use whatever model the Grok session currently runs on".
- */
 export const GROK_DEFAULT_MODEL_SLUG = "grok-build";
 
 export function resolveGrokAcpBaseModelId(model: string | null | undefined): string {
@@ -161,7 +157,6 @@ export function applyGrokAcpModelSelection<E>(input: {
   readonly requestedReasoningEffort?: string | undefined;
   readonly mapError: (cause: EffectAcpErrors.AcpError) => E;
 }): Effect.Effect<string | undefined, E> {
-  // The product slug is never sent over the wire; it keeps the session's current model.
   const requestedModelId =
     input.requestedModelId === GROK_DEFAULT_MODEL_SLUG ? undefined : input.requestedModelId;
   const modelChanged = requestedModelId !== undefined && requestedModelId !== input.currentModelId;
@@ -177,11 +172,6 @@ export function applyGrokAcpModelSelection<E>(input: {
   }
   const reasoningMeta =
     reasoningProvided && reasoningEffort !== undefined ? { reasoningEffort } : undefined;
-  // When reasoning was explicitly provided but invalid (normalize => undefined), we deliberately
-  // send no meta so the invalid value is dropped rather than forwarded. When reasoning was not
-  // provided at all, we also send no meta, but we only reach this call when the model itself
-  // changed - an omitted reasoning preference must not be treated as an explicit clear of the
-  // CLI-advertised default (e.g. Extra High) on same-model reselections.
   return input.runtime
     .setSessionModel(targetModelId, reasoningMeta)
     .pipe(Effect.mapError(input.mapError), Effect.as(targetModelId));

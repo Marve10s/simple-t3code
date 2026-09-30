@@ -1,14 +1,4 @@
 // @effect-diagnostics nodeBuiltinImport:off
-/**
- * WorkspaceFileSystem - Effect service contract for workspace file mutations.
- *
- * Owns workspace-root-relative file read/write operations and their associated
- * safety checks and cache invalidation hooks. Reads also accept absolute host
- * paths so clients can show files an agent left outside the workspace; writes
- * never leave the root.
- *
- * @module WorkspaceFileSystem
- */
 import * as NodeFS from "node:fs";
 import * as NodeFSP from "node:fs/promises";
 
@@ -103,26 +93,15 @@ export const WorkspaceFileSystemError = Schema.Union([
 ]);
 export type WorkspaceFileSystemError = typeof WorkspaceFileSystemError.Type;
 
-/** Service tag for workspace file operations. */
 export class WorkspaceFileSystem extends Context.Service<
   WorkspaceFileSystem,
   {
-    /**
-     * Read a UTF-8 text file relative to the workspace root, or any host file by
-     * absolute path.
-     */
     readonly readFile: (
       input: ProjectReadFileInput,
     ) => Effect.Effect<
       ProjectReadFileResult,
       WorkspaceFileSystemError | WorkspacePaths.WorkspacePathOutsideRootError
     >;
-    /**
-     * Write a file relative to the workspace root.
-     *
-     * Creates parent directories as needed and rejects paths that escape the
-     * workspace root.
-     */
     readonly writeFile: (
       input: ProjectWriteFileInput,
     ) => Effect.Effect<
@@ -132,18 +111,13 @@ export class WorkspaceFileSystem extends Context.Service<
   }
 >()("t3/workspace/WorkspaceFileSystem") {}
 
-/** @public Service construction is part of the canonical Effect module API. */
+/** @public */
 export const make = Effect.gen(function* () {
   const fileSystem = yield* FileSystem.FileSystem;
   const path = yield* Path.Path;
   const workspacePaths = yield* WorkspacePaths.WorkspacePaths;
   const workspaceEntries = yield* WorkspaceEntries.WorkspaceEntries;
 
-  /**
-   * Resolves the file a read targets. Workspace-relative paths must stay inside the
-   * root, symlinks included. An absolute path reads a host file in place, such as a
-   * report an agent wrote to a temp directory; it gets no root check.
-   */
   const resolveReadTarget = Effect.fn("WorkspaceFileSystem.resolveReadTarget")(function* (
     input: ProjectReadFileInput,
   ) {
@@ -217,8 +191,6 @@ export const make = Effect.gen(function* () {
 
     return yield* Effect.acquireUseRelease(
       Effect.tryPromise({
-        // Non-blocking so a FIFO cannot hang the open; the stat below rejects
-        // it. Regular files ignore the flag. Windows lacks it.
         try: () =>
           NodeFSP.open(
             realTargetPath,

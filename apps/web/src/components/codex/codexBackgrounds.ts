@@ -31,12 +31,6 @@ function bundled(
   };
 }
 
-/**
- * Default new-chat backgrounds: calm, mid-tone scenes that stay readable under
- * both light and dark themes once the theme scrim sits on top. Paintings are
- * public domain (The Met Open Access, CC0); photos are free under the Unsplash
- * License. Files live in apps/web/public/backgrounds.
- */
 export const BUNDLED_BACKGROUNDS: ReadonlyArray<CodexBackground> = [
   bundled(
     "hokusai-great-wave",
@@ -112,7 +106,6 @@ export const BUNDLED_BACKGROUNDS: ReadonlyArray<CodexBackground> = [
   ),
 ];
 
-/** "random" picks a new image for every new chat; otherwise the id of one image. */
 export function useCodexBackgroundChoice() {
   return useLocalStorage("simplet3code:background-choice", "random", Schema.String);
 }
@@ -121,7 +114,6 @@ export function useCodexBackgroundEnabled() {
   return useLocalStorage("simplet3code:background-enabled", true, Schema.Boolean);
 }
 
-/** Stable per new chat: the same draft keeps its image, the next one gets another. */
 export function pickBackgroundForDraft<T>(pool: ReadonlyArray<T>, draftId: string): T | null {
   if (pool.length === 0) return null;
   let hash = 2166136261;

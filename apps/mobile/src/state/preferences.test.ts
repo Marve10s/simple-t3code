@@ -157,8 +157,6 @@ describe("mobile preferences state", () => {
         setters.push(useSavePreferences());
         return null;
       }
-      // Exercise the real React setter, which treats bare functions as updates
-      // to the atom's read value. Direct registry.set calls bypass that behavior.
       renderToString(
         createElement(RegistryContext.Provider, { value: registry }, createElement(CaptureSetter)),
       );

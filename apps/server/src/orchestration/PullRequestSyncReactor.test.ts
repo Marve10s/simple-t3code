@@ -273,7 +273,6 @@ const sweepAgain = Effect.fn("sweepPullRequestSyncHarness")(function* (
   yield* reactor.drain;
 });
 
-/** What the reactor would have persisted, so the next sweep sees its own writes. */
 function applySync(
   snapshot: OrchestrationShellSnapshot,
   commands: ReadonlyArray<SyncCommand>,
@@ -521,7 +520,6 @@ describe("PullRequestSyncReactor", () => {
             ],
           );
           assert.strictEqual((yield* Ref.get(fixture.stackCalls)).length, 1);
-          // Reads only linked threads, never the full shell snapshot of every thread.
           assert.strictEqual(yield* Ref.get(fixture.shellSnapshotReads), 0);
         }).pipe(Effect.provide(fixture.layer));
       }),
@@ -601,7 +599,6 @@ describe("PullRequestSyncReactor", () => {
 
           yield* sweepAgain(fixture, reactor);
 
-          // Still open on an active thread, so the host was asked again, but nothing changed.
           assert.strictEqual((yield* Ref.get(fixture.summaryCalls)).length, 2);
           assert.strictEqual((yield* Ref.get(fixture.stackCalls)).length, 1);
           assert.strictEqual((yield* Ref.get(fixture.syncCommands)).length, 1);
@@ -817,7 +814,6 @@ describe("PullRequestSyncReactor", () => {
                 command.type === "thread.pull-request.link"
                   ? { ...thread, pullRequests: [...thread.pullRequests, makeLink(command.number)] }
                   : applySync(makeSnapshot([thread]), [command]).threads[0]!;
-              // Every projected event may wake settlement, including the terminal root update.
               assert.isNull(
                 resolveAutoSettlementAt({
                   thread,

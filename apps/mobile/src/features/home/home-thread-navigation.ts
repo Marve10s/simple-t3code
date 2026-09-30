@@ -21,8 +21,6 @@ export function createHomeThreadNavigationAction(input: {
     threadId: input.thread.id,
   };
 
-  // Native swipe-back pops the outgoing route after its animation. Reusing
-  // that key would also discard this selection when the dismissal arrives.
   if (input.dismissingRouteKey !== null && currentRoute?.key === input.dismissingRouteKey) {
     return StackActions.push("Thread", params);
   }
@@ -39,8 +37,6 @@ export function useHomeThreadSelection() {
     const clear = () => {
       dismissingRouteKey.current = null;
     };
-    // This listener belongs to Home, so swipe-back is its opening transition.
-    // Thread's closing event is targeted at the outgoing Thread route.
     const removeTransitionStart = navigation.addListener("transitionStart", ({ data }) => {
       const state = navigation.getState();
       const currentRoute = state.routes[state.index];

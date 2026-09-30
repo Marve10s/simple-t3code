@@ -1,17 +1,3 @@
-/**
- * OpenCodeDriver — `ProviderDriver` for the OpenCode runtime.
- *
- * Mirrors the Codex / Claude drivers: a plain value whose `create()`
- * bundles `snapshot` / `adapter` / `textGeneration` closures over the
- * per-instance `OpenCodeSettings`.
- *
- * Two instances with different `serverUrl`s therefore talk to independent
- * OpenCode servers; when no `serverUrl` is set, the adapter + text-generation
- * shares spin up their own scoped child processes, and those child
- * processes are released when the registry scope closes.
- *
- * @module provider/Drivers/OpenCodeDriver
- */
 import { OpenCodeSettings, ProviderDriverKind } from "@t3tools/contracts";
 import * as Crypto from "effect/Crypto";
 import * as Effect from "effect/Effect";
@@ -168,14 +154,6 @@ export const OpenCodeDriver: ProviderDriver<OpenCodeSettings, OpenCodeDriverEnv>
         Effect.provideService(OpenCodeServerOwner.OpenCodeServerOwner, serverOwner),
         Effect.provideService(OpenCodeRuntime, openCodeRuntime),
       );
-      // NOTE: the local branch intentionally uses the shared SDK server
-      // instead of `opencode debug skill` (loadSkillsFromCli). The CLI writes
-      // its full JSON inventory to stdout, but the Bun-compiled binary does
-      // not flush more than one 64KB pipe buffer to a non-TTY stdout, so the
-      // piped output arrives truncated and unparseable — which degrades to an
-      // empty skill list and poisons the workspace snapshot the `$` picker
-      // reads. The SDK `app.skills` endpoint honors the per-request directory
-      // and returns complete results regardless of size.
       const loadWorkspaceInventory = (client: Parameters<typeof loadOpenCodeCommands>[0]) =>
         Effect.all(
           {

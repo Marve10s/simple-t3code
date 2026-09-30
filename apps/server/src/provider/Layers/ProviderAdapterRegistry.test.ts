@@ -147,8 +147,6 @@ const fakeInstanceRegistryLayer = Layer.succeed(ProviderInstanceRegistry.Provide
   listInstances: Effect.succeed(fakeInstances),
   listUnavailable: Effect.succeed([]),
   streamChanges: Stream.empty,
-  // Tests never drive changes through this fake; acquire a throwaway
-  // subscription on an unused PubSub so the shape is satisfied.
   subscribeChanges: Effect.flatMap(PubSub.unbounded<void>(), (pubsub) => PubSub.subscribe(pubsub)),
 });
 
@@ -277,7 +275,6 @@ it.effect("blocks shared credential session startup and preserves guarded adapte
       })
       .pipe(Effect.forkChild);
     yield* Deferred.await(entered);
-    // Signing out through another instance must drain its peer's startup too.
     yield* auth.logout(Effect.void);
     yield* Deferred.await(stopped);
     assert.strictEqual(Exit.isFailure(yield* Fiber.await(startup)), true);

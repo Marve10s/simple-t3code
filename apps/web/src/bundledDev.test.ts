@@ -73,8 +73,6 @@ export const startup = Promise.resolve().then(() => globalThis.onStarted(Shared(
         rolldownOptions: {
           experimental: { devMode: { lazy: false } },
           output: {
-            // Reproduce the shared chunks Vite creates after lazy routes load,
-            // without needing a browser to trigger the lazy compiler first.
             codeSplitting: {
               groups: [
                 { name: "vendor", test: /node_modules|@react-refresh/, priority: 10 },
@@ -93,8 +91,6 @@ export const startup = Promise.resolve().then(() => globalThis.onStarted(Shared(
       await NodeFSP.writeFile(target, code);
     }
 
-    // Run the actual generated ES modules so their import order and refresh
-    // checks execute. These stubs replace only the browser and HMR transport.
     const runner = NodePath.join(output, "check.mjs");
     await NodeFSP.writeFile(
       runner,
@@ -170,7 +166,6 @@ it("hot updates Tailwind classes when a source file changes in bundled dev", asy
             if (id.endsWith("/style.css")) css = code;
           },
           async generateBundle() {
-            // Keep the build pending until the socket can receive Vite's ready message.
             await connected;
           },
         },
@@ -198,7 +193,6 @@ it("hot updates Tailwind classes when a source file changes in bundled dev", asy
     socket.addEventListener("message", ({ data }) => {
       const message: unknown = JSON.parse(String(data));
       if (message !== null && typeof message === "object" && "type" in message) {
-        // generateBundle runs before Vite stores the files for HTTP requests.
         if (
           message.type === "full-reload" &&
           "ifFallback" in message &&

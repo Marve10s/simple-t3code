@@ -76,9 +76,6 @@ it("rejects contradictory service state", () => {
   );
 });
 
-// A pinned runtime is an executable at <versionDir>/t3. The tests stand one up
-// as a Node shebang script so the launcher spawns it the way it spawns the
-// real single-executable, IPC channel included.
 const writeFakeRuntime = (
   fs: FileSystem.FileSystem,
   path: Path.Path,
@@ -144,14 +141,10 @@ it.layer(NodeServices.layer)("service state persistence", (it) => {
           yield* Effect.promise(() => running);
         });
 
-      // A launcher that is still the old version leaves a marker that waits
-      // for a newer one.
       yield* fs.writeFileString(restartPending, "1.0.1\n");
       yield* run();
       assert.isTrue(yield* fs.exists(restartPending));
 
-      // Whoever restarted the service, the launcher now runs what the unit
-      // names, so the deferred-restart marker is gone.
       yield* fs.writeFileString(restartPending, "1.0.0\n");
       yield* run();
       assert.isFalse(yield* fs.exists(restartPending));
@@ -180,9 +173,6 @@ it.layer(NodeServices.layer)("service state persistence", (it) => {
       const launcher = new Launcher(root, yield* Effect.promise(() => readServiceState(statePath)));
       const running = launcher.run();
       const stopping = launcher.stop("SIGTERM");
-      // An explicit stop leaves the marker that tells a child shutting down
-      // mid-update that no replacement server is coming. It is present as
-      // soon as stop() returns its promise, before queued transitions run.
       assert.isTrue(yield* fs.exists(path.join(root, "runtime", SERVICE_STOP_MARKER_FILE)));
       yield* Effect.promise(() => stopping);
       yield* Effect.promise(() => running);

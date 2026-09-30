@@ -173,7 +173,6 @@ const makeHarness = Effect.fn("makePullRequestsToolkitHarness")(function* (
     toolkit.handle(name, params).pipe(
       Stream.unwrap,
       Stream.runCollect,
-      // Failure mode is "error", so a delivered result is always the success shape.
       Effect.map(
         (chunk) => chunk.at(-1)!.result as Tool.Success<(typeof PullRequestsToolkit.tools)[Name]>,
       ),

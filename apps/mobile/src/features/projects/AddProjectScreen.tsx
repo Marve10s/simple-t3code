@@ -80,7 +80,6 @@ interface EnvironmentOption {
   readonly connectionState: EnvironmentConnectionPhase;
   readonly connectionError: string | null;
   readonly connectionErrorTraceId: string | null;
-  /** Server runs clones in the background and streams progress; older servers block. */
   readonly supportsCloneTracking: boolean;
 }
 
@@ -142,11 +141,6 @@ function AddProjectShell(props: { readonly children: ReactNode; readonly title: 
   const insets = useSafeAreaInsets();
 
   return (
-    // collapsable={false} is load-bearing: if this wrapper is flattened, the
-    // ScrollView lands directly under RNSSafeAreaView and RNS's formSheet
-    // scroll-view frame correction mistakes this full-height wrapper for a
-    // "header" sibling, coercing the ScrollView to zero height (blank sheet
-    // as soon as the sheet re-lays-out, e.g. when the keyboard opens).
     <SettingsScreen title={props.title}>
       <ScrollView
         keyboardShouldPersistTaps="handled"
@@ -286,9 +280,6 @@ function ProjectPathInput(props: {
   );
 }
 
-// `pinnedDirectoryName` is the repository folder the clone destination keeps
-// appended to whatever folder the user browses to. The plain add-project flow
-// passes nothing, so it keeps proposing the browsed folder itself.
 function useBrowsePathInput(environment: EnvironmentOption | null, pinnedDirectoryName = "") {
   const environmentId = environment?.environmentId ?? null;
   const environmentBaseDirectory = environment?.baseDirectory ?? null;
@@ -824,8 +815,6 @@ function FolderBrowser(props: {
           input: browseInput,
         }),
   );
-  // A pinned repository folder does not exist yet, so filtering the listing by
-  // it would empty the folder picker. Anything the user typed still filters.
   const pinnedDirectoryName = props.pinnedDirectoryName ?? "";
   const pinnedDirectoryMatches = isWindowsPlatform(props.environment.platform)
     ? browsePath.filterQuery.toLowerCase() === pinnedDirectoryName.toLowerCase()
@@ -971,10 +960,6 @@ export function AddProjectDestinationScreen(props: {
   const createProject = useCreateProject(environment);
   const remoteUrl = stringParam(props.remoteUrl);
   const repositoryTitle = stringParam(props.repositoryTitle);
-  // A lookup derives this from "owner/repo", a pasted clone URL from its own
-  // last segment. Older links without the param keep the browsed folder.
-  // Trim once here: the path input and the folder-list filter must compare the
-  // same value, or a deep link with a padded param empties the folder picker.
   const repositoryName = stringParam(props.repositoryName)?.trim() ?? "";
   const { isBrowseNavigating, navigateToBrowsePath, pathInput, setPathInput } = useBrowsePathInput(
     environment,
@@ -998,8 +983,6 @@ export function AddProjectDestinationScreen(props: {
 
     setIsSubmitting(true);
     if (environment.supportsCloneTracking) {
-      // The server creates the project and clones in the background; the
-      // draft screen shows progress and holds Start until the files land.
       const projectId = ProjectId.make(uuidv4());
       const title = inferProjectTitleFromPath(resolved.path);
       const startResult = await startProjectClone({
@@ -1015,10 +998,6 @@ export function AddProjectDestinationScreen(props: {
       if (AsyncResult.isFailure(startResult)) {
         setError(errorMessage(Cause.squash(startResult.cause)));
       } else {
-        // The draft screen resolves its project from the client store, so it
-        // must not open before the create event has arrived (it would fall
-        // back to the project picker and lose the clone controls). Stay in
-        // the submitting state until then; the clone keeps running either way.
         const project = await waitForProject(
           { environmentId: environment.environmentId, projectId },
           15_000,

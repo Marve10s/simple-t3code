@@ -14,15 +14,8 @@ export const PersistedServerRuntimeState = Schema.Struct({
   host: Schema.optional(Schema.String),
   port: Schema.Int,
   origin: Schema.String,
-  // Present when the server fronts a dev web server (VITE_DEV_SERVER_URL).
-  // Dev is single-origin: browsers must pair through this URL, not `origin`.
   devUrl: Schema.optional(Schema.String),
   startedAt: Schema.String,
-  /**
-   * Set when the boot-service launcher supervises this server. Lets a CLI
-   * tell a service-managed server apart from one started by hand, which is
-   * the difference between "restart the service" and "stop your terminal".
-   */
   serviceManaged: Schema.optional(Schema.Boolean),
 });
 export type PersistedServerRuntimeState = typeof PersistedServerRuntimeState.Type;
@@ -112,12 +105,6 @@ export const clearPersistedServerRuntimeState = (path: string) =>
     );
   });
 
-/**
- * Report whether the pid recorded in a persisted runtime state is still
- * running. Signal 0 delivers nothing; it only reports whether the pid exists.
- * EPERM means it exists but belongs to another user, which still counts as
- * alive.
- */
 export const isProcessAlive = (pid: number): boolean => {
   try {
     process.kill(pid, 0);

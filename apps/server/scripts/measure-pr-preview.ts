@@ -1,9 +1,3 @@
-// Run with: node apps/server/scripts/measure-pr-preview.ts owner/repo 123 456
-// Numbers form a session with shared repository-permission caches. Browser and
-// service caches are excluded. Uses real GitHub reads, without a server or database.
-// CLI-generated GraphQL
-// queries are replayed with rateLimit.cost, outside the timed section, to measure
-// their cost without confusing other applications' traffic with this process's.
 import * as NodeServices from "@effect/platform-node/NodeServices";
 import * as Effect from "effect/Effect";
 import * as Console from "effect/Console";
@@ -55,8 +49,6 @@ const services = GitHubPullRequestCli.layer.pipe(
 const decodeJson = Schema.decodeSync(Schema.fromJsonString(Schema.Unknown));
 const encodeJson = Schema.encodeSync(Schema.fromJsonString(Schema.Unknown));
 const graphqlCost = Effect.fn("measurePrPreview.graphqlCost")(function* (read: Read) {
-  // The REST quota probe synthesizes rateLimit.cost for budget admission.
-  // It does not spend GraphQL points.
   if (!read.graphqlRequests) return 0;
   if (read.cost) return read.cost;
   const vcs = yield* VcsProcess.VcsProcess;
@@ -92,7 +84,6 @@ const graphqlCost = Effect.fn("measurePrPreview.graphqlCost")(function* (read: R
 });
 
 for (const mode of ["detail", "preview"] as const) {
-  // Start each side cold, then retain the caches shared across PRs in one session.
   const rows = await Effect.runPromise(
     Effect.scoped(
       Effect.gen(function* () {

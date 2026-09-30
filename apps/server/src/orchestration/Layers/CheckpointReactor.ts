@@ -203,10 +203,6 @@ const make = Effect.gen(function* () {
     return project ? [project] : [];
   });
 
-  // Resolves the workspace CWD for checkpoint operations, preferring the
-  // active provider session CWD and falling back to the thread/project config.
-  // Returns undefined when no CWD can be determined or the workspace is not
-  // a git repository.
   const resolveCheckpointCwd = Effect.fn("resolveCheckpointCwd")(function* (input: {
     readonly threadId: ThreadId;
     readonly thread: { readonly projectId: ProjectId; readonly worktreePath: string | null };
@@ -239,7 +235,6 @@ const make = Effect.gen(function* () {
     return cwd;
   });
 
-  // Capture the completed turn's files, then publish its summary and receipts.
   const captureAndDispatchCheckpoint = Effect.fn("captureAndDispatchCheckpoint")(function* (input: {
     readonly threadId: ThreadId;
     readonly turnId: TurnId;
@@ -287,13 +282,8 @@ const make = Effect.gen(function* () {
       checkpointRef: targetCheckpointRef,
     });
 
-    // Refresh the workspace entry index so the @-mention file picker
-    // reflects files created or deleted during this turn.
     yield* refreshWorkspaceEntries(input.cwd);
 
-    // Git may have been initialized during this turn, leaving no pre-turn
-    // snapshot. Keep the completion checkpoint for future turns, but do not
-    // invent a baseline or attempt a diff against a ref that does not exist.
     const files = yield* (
       fromCheckpointExists
         ? checkpointStore.diffCheckpoints({
@@ -389,7 +379,6 @@ const make = Effect.gen(function* () {
     });
   });
 
-  // Capture the files left by a completed or interrupted turn.
   const captureCheckpointFromTurnCompletion = Effect.fn("captureCheckpointFromTurnCompletion")(
     function* (event: Extract<ProviderRuntimeEvent, { type: "turn.completed" | "turn.aborted" }>) {
       const turnId = toTurnId(event.turnId);
@@ -402,14 +391,10 @@ const make = Effect.gen(function* () {
         return;
       }
 
-      // When a primary turn is active, only that turn may produce completion checkpoints.
       if (thread.session?.activeTurnId && !sameId(thread.session.activeTurnId, turnId)) {
         return;
       }
 
-      // Only skip if a real (non-placeholder) checkpoint already exists for this turn.
-      // ProviderRuntimeIngestion may insert placeholder entries with status "missing"
-      // before this reactor runs; those must not prevent real git capture.
       if (
         thread.checkpoints.some(
           (checkpoint) => checkpoint.turnId === turnId && checkpoint.status !== "missing",
@@ -429,8 +414,6 @@ const make = Effect.gen(function* () {
         return;
       }
 
-      // If a placeholder checkpoint exists for this turn, reuse its turn count
-      // instead of incrementing past it.
       const existingPlaceholder = thread.checkpoints.find(
         (checkpoint) => checkpoint.turnId === turnId && checkpoint.status === "missing",
       );
@@ -541,9 +524,6 @@ const make = Effect.gen(function* () {
     }
   });
 
-  // Retry a missing PR after the agent finishes its push and PR creation.
-  // Re-read the projected branch after drift adoption. A rejected metadata
-  // update must not let this thread refresh another thread's checkout.
   const refreshPullRequestAfterTurn = Effect.fn("refreshPullRequestAfterTurn")(function* (input: {
     readonly threadId: ThreadId;
     readonly turnId: TurnId | null;
@@ -568,20 +548,11 @@ const make = Effect.gen(function* () {
     );
   });
 
-  // A `git checkout` run inside a thread's dedicated worktree (by an agent or
-  // the user) bypasses T3's commands, so the thread's recorded branch goes
-  // stale. Since #4460 the client only attributes PR state to a thread when
-  // the checked-out branch equals the recorded one, so stale metadata silently
-  // orphans the thread's PR. Follow the drift here: adopt the checked-out
-  // branch as the thread's branch, but only when the worktree belongs to
-  // exactly this thread — for shared cwds the strict matching is the point.
   const followWorktreeBranchDrift = Effect.fn("followWorktreeBranchDrift")(function* (input: {
     readonly threadId: ThreadId;
     readonly cwd: string;
     readonly local: VcsStatusLocalResult;
   }) {
-    // Detached HEAD has no branch to adopt; a temporary placeholder checkout
-    // means the first-turn auto-rename is still in flight — don't race it.
     const checkedOutBranch = input.local.refName;
     if (checkedOutBranch === null || isTemporaryWorktreeBranch(checkedOutBranch)) {
       return;
@@ -609,9 +580,6 @@ const make = Effect.gen(function* () {
         return;
       }
 
-      // expectedBranch makes this a compare-and-swap in the decider: if the
-      // recorded branch moved between our read and the dispatch (rename,
-      // concurrent drift-follow), the stale update is dropped.
       yield* orchestrationEngine.dispatch({
         type: "thread.meta.update",
         commandId: yield* serverCommandId("worktree-branch-drift"),
@@ -636,9 +604,6 @@ const make = Effect.gen(function* () {
     );
   });
 
-  // Refreshing git status ends in a remote PR lookup under the vcs status
-  // write lock. Run it on its own worker so file capture for this turn (and
-  // checkpoints for other threads) never wait behind that network call.
   const statusRefreshWorker = yield* makeDrainableWorker(
     (event: Extract<ProviderRuntimeEvent, { type: "turn.completed" }>) =>
       refreshLocalGitStatusFromTurnCompletion(event).pipe(
@@ -661,9 +626,6 @@ const make = Effect.gen(function* () {
     >,
   ) {
     if (event.type === "thread.message-sent") {
-      // A bootstrap message lands before the worktree exists; its baseline
-      // would snapshot the project checkout. The turn-start event that
-      // follows captures it against the right cwd.
       if (
         event.metadata.historyImport === true ||
         event.metadata.deferredTurn === true ||
@@ -718,7 +680,6 @@ const make = Effect.gen(function* () {
     });
   });
 
-  // Checkpoints contain the whole checkout, so restoring a shared cwd can erase a sibling's work.
   const isRestoreWorkspaceIsolated = Effect.fn("isRestoreWorkspaceIsolated")(function* (
     thread: { readonly id: ThreadId; readonly worktreePath: string | null },
     cwd: string,
@@ -757,7 +718,6 @@ const make = Effect.gen(function* () {
           (!path.isAbsolute(relative) && relative !== ".." && !relative.startsWith(`..${path.sep}`))
         );
       };
-      // Parent and nested owners can both have files inside the restore target.
       if (isWithin(canonicalCwd, otherCwd) || isWithin(otherCwd, canonicalCwd)) return false;
     }
     return true;
@@ -861,8 +821,6 @@ const make = Effect.gen(function* () {
         return;
       }
 
-      // Refresh the workspace entry index so the @-mention file picker
-      // reflects the reverted filesystem state.
       yield* refreshWorkspaceEntries(checkpointCwd);
     }
 

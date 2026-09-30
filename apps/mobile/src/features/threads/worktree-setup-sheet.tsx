@@ -28,7 +28,6 @@ export function WorktreeSetupSheet({ children, height, onClose }: WorktreeSetupS
     >
       <View collapsable={false} className="flex-1 bg-sheet-solid">
         <ContextSheetSize height={height + headerHeight} />
-        {/* The nested stack supplies UIKit's navigation bar inside the sheet. */}
         <ScreenStack style={{ flex: 1 }}>
           <NativeScreen
             activityState={2}

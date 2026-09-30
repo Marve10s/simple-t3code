@@ -35,7 +35,6 @@ function normalizeSelectedOptionValues(value: string[] | undefined): string[] {
     return [];
   }
 
-  // Provider option IDs must stay unchanged, including whitespace.
   return Array.from(new Set(value.filter((entry) => typeof entry === "string")));
 }
 
@@ -84,12 +83,6 @@ export function setPendingUserInputCustomAnswer(
 
 const DISPLACED_ANSWER_SEPARATOR = "\n\n";
 
-/**
- * Selecting an option replaces the custom answer, because a non-empty custom
- * answer outranks selected options in `resolvePendingUserInputAnswer`. Text the
- * user typed into the answer field must not vanish on that click: it moves back
- * into the thread draft, after whatever was already waiting there.
- */
 export function carryDisplacedCustomAnswerIntoPrompt(
   prompt: string,
   customAnswer: string | undefined,

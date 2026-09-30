@@ -5,14 +5,12 @@ import { ProviderSetupError, type ProviderInstanceId } from "@t3tools/contracts"
 import * as Deferred from "effect/Deferred";
 import * as Effect from "effect/Effect";
 
-/** Keep rotating tokens and their active profile atomic across servers sharing a secret store. */
 export const withChatGptSessionLock = <A, E, R>(
   directory: string | undefined,
   key: string,
   instanceId: ProviderInstanceId,
   task: Effect.Effect<A, E, R>,
 ): Effect.Effect<A, E | ProviderSetupError, R> => {
-  // In-memory stores have no shared filesystem; the auth controller still serializes its callers.
   if (!directory) return task;
   const failure = () =>
     new ProviderSetupError({

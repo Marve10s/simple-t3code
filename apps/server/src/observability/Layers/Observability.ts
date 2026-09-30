@@ -24,8 +24,6 @@ export const ObservabilityLive = Layer.unwrap(
 
     const traces = config.otlpTracesExport;
     const metrics = config.otlpMetricsExport;
-    // The trace serializer stays in the returned context because the browser
-    // trace forwarder exports on the same signal.
     const serializationLayer = otlpSerializationLayer(traces.protocol);
     const resource = ServerConfig.otlpResource(config);
     const attribution = yield* ResourceAttribution.ResourceAttribution;
@@ -88,7 +86,6 @@ export const ObservabilityLive = Layer.unwrap(
             resource,
           }).pipe(Layer.provide(otlpSerializationLayer(metrics.protocol)));
 
-    // Logged once the server's loggers are installed, so the warnings use them.
     const otelWarningsLayer = Layer.effectDiscard(
       Effect.forEach(config.otelEnvironment.warnings, (warning) => Effect.logWarning(warning)),
     );

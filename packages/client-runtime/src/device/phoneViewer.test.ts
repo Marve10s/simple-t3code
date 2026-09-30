@@ -155,7 +155,6 @@ it("retains the drawn phone until resize and redraw commit together, without rep
   viewer.resize(500, 700, 2);
   viewer.resize(450, 700, 2);
   viewer.frameUpdated();
-  // ResizeObserver runs after rAF. A cleared buffer here would reach the browser's next paint.
   expect(state.blank).toBe(false);
   expect(state.allocations).toBe(allocations);
   expect(pending.size).toBe(1);

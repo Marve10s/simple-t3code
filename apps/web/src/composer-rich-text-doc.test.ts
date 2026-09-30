@@ -67,13 +67,10 @@ const schema = getSchemaByResolvedExtensions(
 function roundTrip(value: string) {
   const json = buildDocJson(value, (name) => ({ label: name, description: null }));
   const doc = ProseMirrorNode.fromJSON(schema, json);
-  // `insertContent` validates every node against the schema; `fromJSON` does not.
   doc.check();
   return serializeEditorDoc(doc);
 }
 
-// Plain mode: the same engine with the mark extensions off. Markers stay
-// literal characters and task lines stay paragraphs.
 const plainSchema = getSchemaByResolvedExtensions(
   resolveExtensions([
     StarterKit.configure({
@@ -354,7 +351,6 @@ describe("composer rich text document model", () => {
     const value = "a **bold** c";
     const map = roundTrip(value);
     expect(map.value).toBe(value);
-    // document text is "a bold c" (flat), markdown has the markers.
     expect(flatToMarkdown(map, 2)).toBe(4);
     expect(flatToMarkdown(map, 6)).toBe(10);
     expect(collapsedToFlat(map, 3)).toBe(2);

@@ -1,9 +1,3 @@
-/**
- * CursorAdapterLive — Cursor CLI (`agent acp`) via ACP.
- *
- * @module CursorAdapterLive
- */
-
 import {
   ApprovalRequestId,
   type CursorSettings,
@@ -101,22 +95,7 @@ export interface CursorAdapterLiveOptions {
   readonly environment?: NodeJS.ProcessEnv;
   readonly nativeEventLogPath?: string;
   readonly nativeEventLogger?: EventNdjsonLogger;
-  /**
-   * Selections are honored when `modelSelection.instanceId` matches this value.
-   * Defaults to the legacy built-in instance id (`cursor`).
-   */
   readonly instanceId?: ProviderInstanceId;
-  /**
-   * Optional per-session settings resolver. When provided the adapter yields
-   * this effect at the start of every session and uses the result instead of
-   * the `cursorSettings` captured at construction.
-   *
-   * Production instances bind settings to the instance scope (the hydration
-   * layer rebuilds the adapter on config change) and leave this undefined.
-   * Test suites that mutate `ServerSettingsService` mid-flight — e.g. to
-   * swap `binaryPath` to a mock ACP wrapper — pass a resolver that reads
-   * the latest snapshot so the closure isn't stale.
-   */
   readonly resolveSettings?: Effect.Effect<CursorSettings>;
   readonly onAvailableCommands?: (
     commands: ReadonlyArray<EffectAcpSchema.AvailableCommand>,
@@ -145,9 +124,6 @@ interface CursorSessionContext {
   lastPlanFingerprint: string | undefined;
   activeTurnId: TurnId | undefined;
   cursorSkillNames: ReadonlySet<string> | undefined;
-  /** Number of sendTurn prompts currently in flight or being prepared.
-   * >0 means a turn is actively running, so a new sendTurn is a steer that
-   * continues it, and only the last remaining prompt settles the turn. */
   promptsInFlight: number;
   assistantReply: CursorTransportFailure;
   stopped: boolean;
@@ -532,14 +508,6 @@ export function makeCursorAdapter(
             threadId: input.threadId,
           });
 
-          // Resolve the CursorSettings used to spawn the ACP child. Production
-          // leaves `options.resolveSettings` undefined so we use the value
-          // captured at adapter construction — per-instance isolation is
-          // enforced by the hydration layer rebuilding this adapter whenever
-          // its config changes. Tests set `resolveSettings` to pull the latest
-          // snapshot from `ServerSettingsService` so that mid-suite
-          // `updateSettings({ providers: { cursor: { binaryPath } } })` calls
-          // actually take effect when the next session spawns.
           const effectiveCursorSettings = options?.resolveSettings
             ? yield* options.resolveSettings
             : cursorSettings;
@@ -878,8 +846,6 @@ export function makeCursorAdapter(
                     );
                     return;
                   case "ThoughtDelta":
-                    // Thoughts are narration, not the reply: they stay out of
-                    // `assistantReply` so a resumed turn replays only answers.
                     yield* logNative(
                       ctx.threadId,
                       "session/update",
@@ -925,12 +891,6 @@ export function makeCursorAdapter(
             Effect.catch((cause) =>
               Effect.logError("Failed to process Cursor runtime notification.", { cause }),
             ),
-            // Fork into the session scope, not the calling fiber. `forkChild`
-            // makes this a child of `startSession`, and Effect interrupts a
-            // fiber's children when it completes, so the consumer died as soon
-            // as `startSession` returned and every later notification was
-            // dropped. The scope is created, stored on the context and closed
-            // on teardown already; only the fork target was wrong.
             Effect.forkIn(ctx.scope),
           );
 
@@ -967,14 +927,8 @@ export function makeCursorAdapter(
     const sendTurn: CursorAdapterShape["sendTurn"] = (input) =>
       Effect.gen(function* () {
         const ctx = yield* requireSession(input.threadId);
-        // A sendTurn while a prompt is in flight is a steer: the agent folds
-        // the new prompt into the ongoing work, so the active turn id is
-        // reused instead of opening a new turn.
         const steeringTurnId = ctx.promptsInFlight > 0 ? ctx.activeTurnId : undefined;
         const turnId = steeringTurnId ?? TurnId.make(yield* randomUUIDv4);
-        // Count this prompt immediately so a superseded in-flight prompt
-        // resolving from here on does not settle the turn; the matching
-        // decrement is the `ensuring` below.
         ctx.promptsInFlight += 1;
 
         return yield* Effect.gen(function* () {
@@ -1044,8 +998,6 @@ export function makeCursorAdapter(
           }
           if (input.attachments && input.attachments.length > 0) {
             for (const attachment of input.attachments) {
-              // Cursor ingests images only. Generic files reach the agent
-              // through the path line ProviderService puts in the prompt.
               if (attachment.type !== "image") {
                 continue;
               }
@@ -1087,8 +1039,6 @@ export function makeCursorAdapter(
             });
           }
 
-          // ACP commands parse the complete text. Extra context can turn an exact
-          // command into an ordinary model prompt or change its arguments.
           const result = yield* ctx.acp
             .prompt({
               prompt: /^\/[^\s/]+(?:\s|$)/.test(rawPrompt)
@@ -1131,9 +1081,6 @@ export function makeCursorAdapter(
             model: resolvedModel,
           };
 
-          // Only the last remaining prompt settles the turn — a steer-
-          // superseded prompt resolving (usually cancelled) while another is
-          // in flight or pending must leave the merged turn running.
           if (ctx.promptsInFlight === 1) {
             yield* offerRuntimeEvent({
               type: "turn.completed",

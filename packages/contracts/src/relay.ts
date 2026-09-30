@@ -50,10 +50,6 @@ export const RelayDeviceRegistrationRequest = Schema.Struct({
   iosMajorVersion: Schema.optional(Schema.Int.check(Schema.isGreaterThanOrEqualTo(18))),
   androidApiLevel: Schema.optional(Schema.Int.check(Schema.isGreaterThanOrEqualTo(24))),
   appVersion: Schema.optional(TrimmedNonEmptyString),
-  // APNs routing for this install: the topic must match the app's bundle id
-  // (dev/preview/prod variants differ) and development-signed builds receive
-  // sandbox tokens. Optional so older app builds keep registering; the relay
-  // falls back to its configured defaults.
   bundleId: Schema.optional(TrimmedNonEmptyString),
   apsEnvironment: Schema.optional(RelayApnsEnvironment),
   pushToken: Schema.optional(TrimmedNonEmptyString),
@@ -97,7 +93,6 @@ export const RelayListDevicesResponse = Schema.Struct({
 });
 export type RelayListDevicesResponse = typeof RelayListDevicesResponse.Type;
 
-// Installed clients decode v1 as iOS-only. Keep that response contract frozen.
 export const RelayListDevicesResponseV1 = Schema.Struct({
   devices: Schema.Array(
     Schema.Struct({
@@ -413,7 +408,6 @@ export class RelayAuthInvalidError extends Schema.TaggedError<RelayAuthInvalidEr
   {
     code: Schema.Literal("auth_invalid"),
     reason: RelayAuthInvalidReason,
-    // Older relays do not send a DPoP failure category.
     dpopFailureReason: Schema.optionalKey(RelayDpopFailureReason),
     traceId: TrimmedNonEmptyString,
   },
@@ -468,8 +462,6 @@ export class RelayEnvironmentConnectNotAuthorizedError extends Schema.TaggedErro
   "RelayEnvironmentConnectNotAuthorizedError",
   {
     code: Schema.Literal("environment_connect_not_authorized"),
-    // Optional so responses from relays deployed before the reason was
-    // threaded through still decode.
     reason: Schema.optional(RelayEnvironmentConnectNotAuthorizedReason),
     traceId: TrimmedNonEmptyString,
   },
@@ -992,9 +984,6 @@ export const RelayAgentActivitySnapshotResponse = Schema.Struct({
 });
 export type RelayAgentActivitySnapshotResponse = typeof RelayAgentActivitySnapshotResponse.Type;
 
-// Lets the app decide whether arming a Live Activity is worthwhile before
-// creating one (no empty lock-screen card when nothing is running) and seed
-// the card with the real aggregate instead of a placeholder.
 export const RelayAgentActivitySnapshotEndpoint = HttpApiEndpoint.get(
   "getAgentActivitySnapshot",
   "/v1/mobile/agent-activity",

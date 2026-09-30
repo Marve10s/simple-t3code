@@ -126,7 +126,6 @@ const makeIdentity = Effect.gen(function* () {
         prefix: ".environment-id-",
       });
       yield* fileSystem.writeFileString(tempPath, `${value}\n`);
-      // Publish the completed file without replacing an ID created by another process.
       yield* fileSystem.link(tempPath, destinationPath).pipe(
         Effect.catchIf(
           (cause) => cause.reason._tag === "AlreadyExists",
@@ -134,7 +133,6 @@ const makeIdentity = Effect.gen(function* () {
         ),
       );
       if (mode === "recover") {
-        // Keep the recovery ID so delayed initializers also publish the same winner.
         yield* fileSystem.remove(tempPath);
         yield* fileSystem.copyFile(destinationPath, tempPath);
         yield* fileSystem.rename(tempPath, serverConfig.environmentIdPath);
@@ -179,7 +177,7 @@ const makeIdentity = Effect.gen(function* () {
   });
 });
 
-/** @public Service construction is part of the canonical Effect module API. */
+/** @public */
 export const make = Effect.gen(function* () {
   const path = yield* Path.Path;
   const serverConfig = yield* ServerConfig.ServerConfig;
@@ -196,10 +194,6 @@ export const make = Effect.gen(function* () {
     desktopManaged: serverConfig.mode === "desktop",
     launcherManaged: launcher.managed,
   });
-  // Static is correct: the control fd is known at bootstrap, and the desktop
-  // app and its bundled server ship in one artifact, so a present fd means
-  // the app speaks the requestDesktopUpdate protocol. WSL backends never get
-  // the fd and correctly do not advertise.
   const desktopAppUpdate =
     serverSelfUpdate === "desktop-managed" && serverConfig.desktopTelemetryControlFd !== undefined;
 
@@ -255,9 +249,6 @@ export const make = Effect.gen(function* () {
 
   return ServerEnvironment.of({
     getEnvironmentId: Effect.succeed(environmentId),
-    // The publish opt-in and relay link change at runtime (`t3 connect
-    // publish`, the client settings toggle), so the capability is read per
-    // descriptor request rather than baked in at startup.
     getDescriptor: readAgentActivityPublishingActive(secrets).pipe(
       Effect.map((agentActivityPublishing) => ({
         ...descriptor,
@@ -269,12 +260,6 @@ export const make = Effect.gen(function* () {
 
 export const identityLayer = Layer.effect(ServerEnvironmentIdentity, makeIdentity);
 
-/**
- * ServerEnvironment is acquired from persisted filesystem and host-process
- * state. It intentionally has no fallback Layer.succeed value: callers must
- * provide the external platform services, a ServerConfig, and the
- * ServerSecretStore backing the descriptor's publishing capability.
- */
 export const layer = Layer.effect(ServerEnvironment, make).pipe(
   Layer.provideMerge(identityLayer),
   Layer.provide(ProcessRunner.layer),

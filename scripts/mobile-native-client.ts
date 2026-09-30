@@ -49,7 +49,6 @@ export function clientStatus(
   return record.fingerprint === fingerprint ? "compatible" : "stale";
 }
 
-/** Keep native sources stable during ensure, as with a normal build; endpoint checks reject detected edits. */
 export const ensureClient = Effect.fn("ensureClient")(function* <E, R, E2, R2>(operations: {
   fingerprint: Effect.Effect<string, E, R>;
   installedBinary: Effect.Effect<string | null, E, R>;
@@ -95,7 +94,6 @@ const digest = Effect.fn("nativeClient.digest")(function* (value: string | Uint8
   return Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join("");
 });
 
-/** Hash fixed-size chunks to bound memory, including resources and symlink targets. */
 export const hashBundle = Effect.fn("hashBundle")(function* (root: string) {
   const fs = yield* FileSystem.FileSystem;
   const path = yield* Path.Path;
@@ -110,7 +108,6 @@ export const hashBundle = Effect.fn("hashBundle")(function* (root: string) {
       for (const name of names) {
         const key = path.join(relative, name);
         const absolute = path.join(root, key);
-        // FileSystem.stat follows links; readLink distinguishes them without following a cycle.
         const link = yield* fs.readLink(absolute).pipe(
           Effect.catchIf(
             (error) => isNotLink(error.reason.cause),
@@ -346,7 +343,6 @@ const main = Command.make(
           const output = yield* fs.makeTempDirectoryScoped({ prefix: "t3-native-client-" });
           const { mobile } = yield* roots;
           yield* command("pod", ["install"], true, path.join(mobile, "ios"));
-          // Target this simulator only, without Expo's desktop activation or log streaming.
           yield* command(
             "xcrun",
             [

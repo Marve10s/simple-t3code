@@ -1,6 +1,3 @@
-// This order mirrors GhosttyKey in ghostty/vt/key/event.h. The values are
-// intentionally derived from the official W3C-aligned enum instead of
-// maintaining a second keyboard protocol.
 const ghosttyKeyboardCodes = [
   "Unidentified",
   "Backquote",
@@ -233,8 +230,6 @@ export function loadGhosttyKeyboardLayoutMap(): Promise<GhosttyKeyboardLayoutMap
   return promise;
 }
 
-// Browsers do not expose consumed modifiers; treat Shift as consumed for
-// unchorded character input.
 export function ghosttyConsumedMods(
   event: Pick<KeyboardEvent, "altKey" | "ctrlKey" | "key" | "metaKey" | "shiftKey">,
 ): number {
@@ -259,8 +254,6 @@ export function ghosttyUnshiftedCodepoint(
     if (lowercase !== event.key && [...lowercase].length === 1) {
       return lowercase.codePointAt(0) ?? 0;
     }
-    // Without layout data the unshifted form of a shifted key is unknowable;
-    // reporting the shifted character as unshifted corrupts Kitty alternate keys.
     return 0;
   }
   return event.key.codePointAt(0) ?? 0;

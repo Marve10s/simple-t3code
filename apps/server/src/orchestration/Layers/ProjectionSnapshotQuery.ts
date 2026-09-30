@@ -91,14 +91,8 @@ const decodeImportedTranscriptsPayload = Schema.decodeUnknownOption(
   ),
 );
 const decodeAgentSessionImportSource = Schema.decodeUnknownOption(AgentSessionImportSource);
-// Keep detail reads consistent with the in-memory projector's retained
-// activity window. Applying the limit in SQL avoids decoding an unbounded
-// payload_json set before the projector can enforce that invariant.
 const THREAD_DETAIL_ACTIVITY_LIMIT = 500;
-// Snapshot payloads are decoded and projected in small sequential batches so
-// one client read does not retain the raw payloads for the full activity window.
 const THREAD_DETAIL_ACTIVITY_PAYLOAD_BATCH_SIZE = 25;
-// SQLite trim defaults to spaces. Match the whitespace removed by String.trim.
 const MESSAGE_TRIM_WHITESPACE =
   "\t\n\v\f\r \u00a0\u1680\u2000\u2001\u2002\u2003\u2004\u2005\u2006\u2007\u2008\u2009\u200a\u2028\u2029\u202f\u205f\u3000\ufeff";
 const ProjectionProjectDbRowSchema = ProjectionProject.mapFields(
@@ -221,31 +215,19 @@ const ThreadActivityKindsLookupInput = Schema.Struct({
 const ThreadActivityIdsLookupInput = Schema.Struct({
   activityIds: Schema.Array(ProjectionThreadActivity.fields.activityId),
 });
-// Windowed reads order turns by the stable keyset (anchor, turn key), where
-// anchor is requested_at and turn key is
-// COALESCE(turn_id, ''). Both are event-derived, so cursors survive the
-// revert projector's row-id rewrite and full projection rebuilds.
 const ThreadTurnWindowLookupInput = Schema.Struct({
   threadId: ThreadId,
-  // Exclusive keyset upper bound. Sentinels "~"/"" mean unbounded ("~" sorts
-  // after every ISO timestamp).
   beforeAnchorAt: Schema.String,
   beforeTurnKey: Schema.String,
   userTurnLimit: Schema.Number,
   maxRawTurns: Schema.Number,
 });
 const ProjectionTurnWindowRowSchema = Schema.Struct({
-  // The turn's timeline anchor, used to bound rows that have no turn linkage
-  // (user messages and turnless activities) to the same page window.
   anchorAt: Schema.String,
   turnKey: Schema.String,
 });
 const ThreadTurnRangeLookupInput = Schema.Struct({
   threadId: ThreadId,
-  // Turn-linked rows are bounded by the keyset range [min, before) over
-  // (anchor, turn key); turnless rows by the matching [minAnchorAt,
-  // beforeAnchorAt) time range. Unbounded ends use sentinels: "" for the
-  // lower bound, "~" (sorts after ISO dates) for the upper bound.
   minAnchorAt: Schema.String,
   minTurnKey: Schema.String,
   beforeAnchorAt: Schema.String,
@@ -453,10 +435,6 @@ function groupPullRequestRowsByThread(
   return byThread;
 }
 
-/**
- * The link array plus the legacy single-link field derived from it, so clients
- * from before `pullRequests` keep seeing the thread's current pull request.
- */
 function mapThreadPullRequests(
   pullRequests: ReadonlyArray<ThreadPullRequestLink>,
   projectId: ProjectId,
@@ -601,7 +579,6 @@ const makeProjectionSnapshotQuery = Effect.gen(function* () {
       `,
   });
 
-  // Background sweeps skip settled threads, the same check PR discovery makes.
   const unsettledThreadsFilter = (unsettledOnly: boolean) =>
     unsettledOnly
       ? sql`AND threads.settled_at IS NULL AND threads.settled_override IS NOT 'settled'`
@@ -811,7 +788,6 @@ const makeProjectionSnapshotQuery = Effect.gen(function* () {
       `,
   });
 
-  // One row per link, in the shell snapshot's thread order and link order.
   const listActiveThreadPullRequestSyncRows = SqlSchema.findAll({
     Request: Schema.Void,
     Result: ProjectionThreadPullRequestDbRowSchema.mapFields(
@@ -1720,28 +1696,6 @@ const makeProjectionSnapshotQuery = Effect.gen(function* () {
       `,
   });
 
-  // Resolves a page of recent turns for a windowed thread detail read. Walks
-  // back from the exclusive (beforeAnchorAt, beforeTurnKey) keyset boundary
-  // (sentinels "~"/"" mean unbounded, i.e. the first page) until it has seen
-  // `userTurnLimit` user-anchored turns — turns whose pending message is a
-  // user message; subagent/fan-out turns between them ride along — or hits the
-  // `maxRawTurns` ceiling that bounds pathological fan-out. The `candidates`
-  // CTE applies the keyset bound and LIMIT before the window functions run;
-  // its ORDER BY uses raw columns so the migration-037
-  // (thread_id, requested_at, turn_id) index serves both range and order with
-  // no temp B-tree — the scan is genuinely bounded by the LIMIT. (Raw
-  // turn_id DESC places NULLs exactly where COALESCE-to-'' would, below every
-  // real id.) The caller derives the continuation cursor from the oldest
-  // returned row.
-  // Highest thread-DETAIL event sequence for this thread that the projection
-  // has applied (bounded by the global snapshot sequence read in the same
-  // transaction). This is the thread-scoped watermark a windowed page carries
-  // so clients can defer merging until their live subscription has caught up;
-  // the global sequence is not waitable per-thread. The event_type filter
-  // must match ws.ts's isThreadDetailEvent exactly: the subscription only
-  // delivers these types, so a watermark counting any other event could
-  // never be reached by the client and would park the page forever. Served
-  // by the event store's (aggregate_kind, stream_id, sequence) index.
   const getThreadEventWatermarkRow = SqlSchema.findOneOption({
     Request: Schema.Struct({ threadId: ThreadId, maxSequence: Schema.Number }),
     Result: Schema.Struct({ threadSequence: Schema.NullOr(Schema.Number) }),
@@ -1807,13 +1761,6 @@ const makeProjectionSnapshotQuery = Effect.gen(function* () {
       `,
   });
 
-  // Windowed variants of the two heavy collections. Turn-linked rows are
-  // bounded by the page's (anchor, turn key) keyset range over
-  // projection_turns; rows with no turn linkage (user messages always, and
-  // turnless activities like pre-turn context-window updates) are bounded by
-  // the matching turn-anchor time range so they land on the same page as the
-  // turns around them. Proposed plans and checkpoints stay unwindowed: they
-  // are metadata-scale.
   const listThreadMessageRowsByThreadWindow = SqlSchema.findAll({
     Request: ThreadTurnRangeLookupInput,
     Result: ProjectionThreadMessageDbRowSchema,
@@ -1929,9 +1876,6 @@ pending_approval_requests AS (
         )
   `;
 
-  // Blocking request payloads must remain available even if they predate the
-  // recent activity window. Each CTE returns at most one unresolved row per
-  // request, so the merge below stays bounded by actionable work.
   const listPinnedThreadActivityRowsByThread = SqlSchema.findAll({
     Request: ThreadIdLookupInput,
     Result: ProjectionThreadActivityDbRowSchema,
@@ -2757,9 +2701,6 @@ pending_approval_requests AS (
               );
               const pullRequestsByThread = groupPullRequestRowsByThread(pullRequestRows);
 
-              // Built from schema-decoded rows, so no second decode here. The HTTP
-              // and RPC layers encode it against OrchestrationShellSnapshot on the
-              // way out, like the per-item shells from getThreadShellById.
               return {
                 snapshotSequence: computeSnapshotSequence(stateRows),
                 projects: Arr.filterMap(projectRows, (row) =>
@@ -3394,9 +3335,6 @@ pending_approval_requests AS (
     }));
   });
 
-  // Contiguous turn range bounding a windowed detail read; undefined loads the
-  // full thread. Resolved from a window request inside the snapshot
-  // transaction (see getThreadDetailSnapshot).
   interface ThreadDetailBounds {
     readonly minAnchorAt: string;
     readonly minTurnKey: string;
@@ -3689,24 +3627,13 @@ pending_approval_requests AS (
       ...(query === undefined ? {} : { query }),
     });
 
-  // Bounds pathological fan-out: one user turn that spawned hundreds of
-  // subagent turns still pages in bounded chunks, at the cost of splitting the
-  // fan-out group across pages (the cursor continues the same group). Also
-  // structurally bounds the window scan via the candidates CTE's LIMIT.
   const THREAD_DETAIL_MAX_RAW_TURNS_PER_PAGE = 150;
-  // Sentinels for unbounded keyset ends; "~" sorts after any ISO timestamp.
   const ANCHOR_UNBOUNDED = "~";
 
   const getThreadDetailSnapshot: ProjectionSnapshotQueryShape["getThreadDetailSnapshot"] = (
     threadId,
     window,
   ) =>
-    // Read the thread detail and the snapshot sequence within a single
-    // transaction so the sequence is consistent with the returned state; a
-    // projector update landing between two separate reads could otherwise return
-    // a sequence ahead of the thread detail, causing the client to resume from
-    // too far and drop events. Window resolution runs inside the same
-    // transaction so the page boundary is consistent with the returned rows.
     sql
       .withTransaction(
         Effect.gen(function* () {
@@ -3721,9 +3648,6 @@ pending_approval_requests AS (
             return Option.some({ snapshotSequence, thread: thread.value });
           }
 
-          // A malformed or foreign-thread cursor falls back to the first page
-          // rather than failing: the client's stale cursor after a revert or
-          // reconnect should degrade to "reload recent history", not error.
           const decodedCursor =
             window.beforeCursor === undefined
               ? null
@@ -3762,13 +3686,6 @@ pending_approval_requests AS (
                 ),
               ),
             )).length > 0;
-          // An empty window (no turns before the cursor, or a thread with no
-          // turns at all) still returns thread metadata with empty collections
-          // for turn-linked rows; turnless rows are bounded to the same empty
-          // range. The first page of a turnless thread stays unwindowed so
-          // pre-turn content (e.g. a just-created thread) is not hidden. Once
-          // paging reaches the oldest turn, include turnless messages before
-          // the first turn, such as history imported from a provider session.
           const bounds: ThreadDetailBounds | undefined =
             oldest === undefined && cursor === null
               ? undefined
@@ -3778,7 +3695,6 @@ pending_approval_requests AS (
                   beforeAnchorAt: cursor?.beforeAnchorAt ?? ANCHOR_UNBOUNDED,
                   beforeTurnKey: cursor?.beforeTurnId ?? "",
                 };
-          // Empty window behind a cursor: nothing older remains.
           const emptyBounds =
             oldest === undefined && cursor !== null
               ? { minAnchorAt: "", minTurnKey: "", beforeAnchorAt: "", beforeTurnKey: "" }

@@ -12,7 +12,6 @@ const LABELS: Record<CodexAnimationStyle, string> = {
   motion: "Motion",
 };
 
-/** Settings → Appearance → Motion: Standard (T3 Code's own) or Motion-powered animations. */
 export function CodexAnimationSetting() {
   const [style, setStyle] = useCodexAnimationStyle();
   return (

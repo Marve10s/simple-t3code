@@ -16,8 +16,6 @@ export type {
   SelectableMarkdownSkill,
 } from "@t3tools/mobile-markdown-text/types";
 
-// The renderer falls back to React Native Text outside iOS, so Android can use
-// the same Markdown chunking while retaining native text selection.
 export function hasNativeSelectableMarkdownText(): boolean {
   return true;
 }

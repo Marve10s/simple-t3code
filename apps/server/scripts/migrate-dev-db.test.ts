@@ -14,8 +14,6 @@ const withDatabase = <A, E>(
   effect: Effect.Effect<A, E, SqlClient.SqlClient>,
 ) => effect.pipe(Effect.provide(NodeSqliteClient.layer({ filename: databasePath })));
 
-/** A migrated source db with one thread per lifecycle state. Only
- * `stopped-thread` qualifies for the clone. */
 const createFixtureSource = Effect.fn("createMigrateDevDbFixtureSource")(function* (
   baseDir: string,
 ) {
@@ -29,8 +27,6 @@ const createFixtureSource = Effect.fn("createMigrateDevDbFixtureSource")(functio
     Effect.gen(function* () {
       const sql = yield* SqlClient.SqlClient;
       yield* runMigrations();
-      // The real shared db carries this column from a branch build without a
-      // matching migration; reproduce that drift so the filter is exercised.
       yield* sql`ALTER TABLE projection_threads ADD COLUMN monitor_json TEXT`;
 
       yield* sql`INSERT INTO projection_projects
@@ -109,8 +105,6 @@ it.layer(NodeServices.layer)("migrate-dev-db", (it) => {
       const sourceDir = yield* fs.makeTempDirectoryScoped({ prefix: "migrate-dev-db-slot-" });
       const destDir = yield* fs.makeTempDirectoryScoped({ prefix: "migrate-dev-db-slot-dest-" });
       const source = yield* createFixtureSource(sourceDir);
-      // Simulate another branch having claimed slot 1 first: the id is
-      // recorded, so this checkout's migration 1 silently never runs.
       yield* withDatabase(
         source,
         Effect.gen(function* () {
@@ -139,7 +133,6 @@ it.layer(NodeServices.layer)("migrate-dev-db", (it) => {
       const sourceDir = yield* fs.makeTempDirectoryScoped({ prefix: "migrate-dev-db-busy-" });
       const destDir = yield* fs.makeTempDirectoryScoped({ prefix: "migrate-dev-db-busy-dest-" });
       const source = yield* createFixtureSource(sourceDir);
-      // This test process stands in for a live dev server.
       const stateDir = path.join(destDir, "userdata");
       yield* fs.makeDirectory(stateDir, { recursive: true });
       yield* fs.writeFileString(
@@ -164,8 +157,6 @@ it.layer(NodeServices.layer)("migrate-dev-db", (it) => {
       const path = yield* Path.Path;
       const sharedDir = yield* fs.makeTempDirectoryScoped({ prefix: "migrate-dev-db-overlap-" });
       const destDir = yield* fs.makeTempDirectoryScoped({ prefix: "migrate-dev-db-overlap-dest-" });
-      // A leftover snapshot from a prior failed run, passed as --source: it
-      // must not be deleted before it is read.
       const leftoverSnapshot = path.join(destDir, "userdata", "state.sqlite.migrate-dev-db-tmp");
       yield* fs.makeDirectory(path.dirname(leftoverSnapshot), { recursive: true });
       yield* fs.writeFileString(leftoverSnapshot, "not a real db");

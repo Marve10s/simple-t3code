@@ -122,7 +122,6 @@ export class EnvironmentAuthInvalidError extends Schema.TaggedError<EnvironmentA
   {
     code: Schema.Literal("auth_invalid"),
     reason: EnvironmentAuthInvalidReason,
-    // Older servers do not send a DPoP failure category.
     dpopFailureReason: Schema.optionalKey(DpopFailureReason),
     traceId: TrimmedNonEmptyString,
   },
@@ -379,10 +378,6 @@ export const EnvironmentCloudLinkStateResult = Schema.Struct({
   cloudUserId: Schema.NullOr(Schema.String),
   relayUrl: Schema.NullOr(Schema.String),
   relayIssuer: Schema.NullOr(Schema.String),
-  // A managed Cloudflare tunnel is provisioned for this link. False for a
-  // publish-only link (activity publishing without a relay-managed tunnel), so
-  // clients can present the two capabilities as independent settings.
-  // Optional so newer clients tolerate older environment servers.
   managedTunnelActive: Schema.optional(Schema.Boolean),
   publishAgentActivity: Schema.Boolean,
 });
@@ -494,9 +489,6 @@ const EnvironmentOrchestrationThreadSnapshotParams = Schema.Struct({
   threadId: ThreadId,
 });
 
-// Query-string window for windowed thread snapshots (GET payloads must encode
-// to strings). Both fields optional: omitting them keeps the full-snapshot
-// behavior, so pagination stays opt-in per request.
 const EnvironmentOrchestrationThreadSnapshotQuery = {
   reasoningMessages: Schema.optional(Schema.Literal("true")),
   turnLimit: Schema.optional(
@@ -538,7 +530,6 @@ export class EnvironmentOrchestrationHttpApi extends HttpApiGroup.make("orchestr
     }).middleware(EnvironmentAuthenticatedAuth),
   ) {}
 
-/** Large, compressible pull-request payloads travel over HTTP rather than the RPC socket. */
 class EnvironmentPullRequestsHttpApi extends HttpApiGroup.make("pullRequests").add(
   HttpApiEndpoint.post("diff", "/api/pull-requests/diff", {
     headers: OptionalBearerHeaders,

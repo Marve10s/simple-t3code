@@ -30,7 +30,6 @@ const CursorUsageResponse = Schema.Struct({
   ),
 });
 
-/** Cursor's dashboard percentages include bonus usage; spend / limit does not. */
 export function cursorUsageResponseToLimits(
   response: typeof CursorUsageResponse.Type,
   checkedAt: string,
@@ -76,7 +75,6 @@ export const readCursorUsageLimits = Effect.fn("readCursorUsageLimits")(function
       DEFAULT_CURSOR_API_ENDPOINT
     ).replace(/\/$/, "");
     let token = environment.CURSOR_AUTH_TOKEN?.trim();
-    // An explicit API key can name a different account from the stored login.
     if (!token && environment.CURSOR_API_KEY?.trim()) {
       return makeUnavailableUsageLimits({ checkedAt, reason: "unsupported" });
     }

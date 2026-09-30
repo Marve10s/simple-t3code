@@ -130,9 +130,6 @@ export function BranchToolbarBranchSelector({
   const createRefMutation = useAtomCommand(vcsEnvironment.createRef, {
     reportFailure: false,
   });
-  // ---------------------------------------------------------------------------
-  // Thread / project state (pushed down from parent to colocate with mutation)
-  // ---------------------------------------------------------------------------
   const threadRef = useMemo(
     () => scopeThreadRef(environmentId, threadId),
     [environmentId, threadId],
@@ -170,9 +167,6 @@ export function BranchToolbarBranchSelector({
       draftThreadEnvMode: draftThread?.envMode,
     });
 
-  // ---------------------------------------------------------------------------
-  // Thread branch mutation (colocated — only this component calls it)
-  // ---------------------------------------------------------------------------
   const setThreadBranch = useCallback(
     (branch: string | null, worktreePath: string | null, automatic = false) => {
       if (!activeThreadId || !activeProject) return;
@@ -227,9 +221,6 @@ export function BranchToolbarBranchSelector({
     ],
   );
 
-  // ---------------------------------------------------------------------------
-  // Git ref queries
-  // ---------------------------------------------------------------------------
   const [isBranchMenuOpen, setIsBranchMenuOpen] = useState(false);
   const [branchQuery, setBranchQuery] = useState("");
   const deferredBranchQuery = useDeferredValue(branchQuery);
@@ -244,10 +235,6 @@ export function BranchToolbarBranchSelector({
   );
   const trimmedBranchQuery = branchQuery.trim();
   const deferredTrimmedBranchQuery = deferredBranchQuery.trim();
-  // The server filters refs by substring, so it has to be given the sanitized
-  // name as well: querying the raw "new branch" drops an existing new-branch
-  // from the response entirely, which would defeat the collision check below.
-  // Ref names cannot contain an ASCII space, so sanitizing loses no matches.
   const branchRefQuery = sanitizeNewRefName(deferredTrimmedBranchQuery);
   const branchRefTarget = useMemo(
     () => ({
@@ -288,9 +275,6 @@ export function BranchToolbarBranchSelector({
   const checkoutPullRequestItemValue =
     prReference && onCheckoutPullRequestRequest ? `__checkout_pull_request__:${prReference}` : null;
   const canCreateBranch = !isSelectingWorktreeBase && trimmedBranchQuery.length > 0;
-  // The ref is created under its sanitized name, so the collision check has to
-  // use that name too. Matching on the raw query would offer to create a ref
-  // that already exists whenever sanitizing changes the name.
   const newRefName = sanitizeNewRefName(trimmedBranchQuery);
   const hasExactBranchMatch = branchByName.has(newRefName);
   const createBranchItemValue = canCreateBranch
@@ -362,9 +346,6 @@ export function BranchToolbarBranchSelector({
         ? `Showing ${refs.length} of ${totalBranchCount} refs`
         : null;
 
-  // ---------------------------------------------------------------------------
-  // Branch actions
-  // ---------------------------------------------------------------------------
   const copyBranchName = useCallback((branchName: string) => {
     void writeTextToClipboard(branchName, "branch name").then(
       (didCopy) => {
@@ -509,8 +490,6 @@ export function BranchToolbarBranchSelector({
     });
   };
 
-  // Default the worktree base to the repo default branch (origin/HEAD), only
-  // falling back to the checked-out branch when no default is known.
   const defaultBranchName = useMemo(
     () => refs.find((refName) => refName.isDefault)?.name ?? null,
     [refs],
@@ -537,9 +516,6 @@ export function BranchToolbarBranchSelector({
     worktreeBaseBranchCandidate,
   ]);
 
-  // ---------------------------------------------------------------------------
-  // Combobox / list plumbing
-  // ---------------------------------------------------------------------------
   const branchListScrollElementRef = useRef<HTMLElement | null>(null);
   const previousBranchListScrollTopRef = useRef<number | null>(null);
   const handleOpenChange = useCallback((open: boolean) => {
@@ -597,8 +573,6 @@ export function BranchToolbarBranchSelector({
   }, [fetchNextBranchPage, hasNextPage, isBranchMenuOpen, isFetchingNextPage]);
 
   const branchListRef = useRef<LegendListRef | null>(null);
-  // Tracks the highlighted picker value so Enter can activate it even when the
-  // virtualized row is not mounted (Base UI Enter clicks the mounted element).
   const highlightedBranchValueRef = useRef<string | null>(null);
   const updateBranchListScrollFades = useCallback(() => {
     const scrollElement = branchListRef.current?.getScrollableNode?.();
@@ -650,7 +624,6 @@ export function BranchToolbarBranchSelector({
     startFromOrigin,
   });
 
-  // Branch status is the fallback when this thread has no linked pull requests.
   const branchPrBranch = resolveBranchToolbarPrBranch({
     activeThreadBranch,
     resolvedActiveBranch,
@@ -798,17 +771,12 @@ export function BranchToolbarBranchSelector({
             if (prUrl) openPrLink(event, prUrl);
           }}
         />
-        {/* Context menu lives on the wrapper: the disabled Button has
-            pointer-events-none, so the trigger itself never sees right-clicks
-            while refs are loading or a branch action is pending. */}
         <span
           className="flex min-w-0"
           onContextMenu={(event) => handleBranchContextMenu(event, resolvedActiveBranch)}
         >
           <ComboboxTrigger
             render={<ComposerControl size="xs" />}
-            // No press-scale: the popup aligns live to this trigger, so a
-            // momentary 0.97 shrink would drag the open popup ~3px sideways.
             className="min-w-0 max-w-full active:scale-100"
             disabled={isInitialBranchesLoadPending || isBranchActionPending}
           >

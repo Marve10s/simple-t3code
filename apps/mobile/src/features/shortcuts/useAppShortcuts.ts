@@ -16,12 +16,6 @@ import {
   withRecentThreadShortcut,
 } from "./appShortcuts";
 
-/**
- * Owns the launcher app shortcuts (Android long-press menu): keeps the
- * static "New task" entry plus the recently opened threads in sync, and
- * routes shortcut taps — cold start included — to their in-app screens.
- * Mounted once in the root stack layout.
- */
 export function useAppShortcuts(state: NavigationState): void {
   useShortcutNavigation();
   useRecentThreadShortcutSync(state);
@@ -32,9 +26,6 @@ function useShortcutNavigation(): void {
   const handledInitialAction = useRef(false);
 
   useEffect(() => {
-    // Cold start: the tapped shortcut arrives as the launch action, before
-    // any listener can fire. Navigating from here pushes the target over the
-    // initial Home route, so back returns home instead of exiting the app.
     if (!handledInitialAction.current) {
       handledInitialAction.current = true;
       const initialHref = QuickActions.initial ? shortcutHref(QuickActions.initial) : null;
@@ -54,25 +45,13 @@ function useShortcutNavigation(): void {
 }
 
 function useRecentThreadShortcutSync(state: NavigationState): void {
-  // Launcher shortcuts are Android-only. A null ref on iOS keeps this hook
-  // (mounted in the root stack layout) from subscribing the root to the
-  // active thread's shell, which would re-render every screen on each
-  // title/status/session change.
   const threadRef = useMemo(
     () => (Platform.OS === "android" ? activeThreadRef(state) : null),
     [state],
   );
   const threadShell = useThreadShell(threadRef);
-  // null until the persisted list loads; recording waits on it so the first
-  // thread opened after a cold start cannot clobber older entries.
   const [recents, setRecents] = useState<ReadonlyArray<RecentThreadShortcut> | null>(null);
-  // Gates storage writes: a failed load falls back to an empty in-memory
-  // list (so the launcher still gets the "New task" item), but persisting
-  // that fallback would erase valid history over a transient read error.
-  // Real thread opens flip this on — by then the list is the new truth.
   const persistableRef = useRef(false);
-  // Saves are fire-and-forget; chaining them keeps an older list from
-  // finishing after (and overwriting) a newer one.
   const saveQueueRef = useRef<Promise<unknown>>(Promise.resolve());
 
   useEffect(() => {
@@ -108,8 +87,6 @@ function useRecentThreadShortcutSync(state: NavigationState): void {
       return;
     }
 
-    // withRecentThreadShortcut returns the same array when nothing changed,
-    // so React bails out and the persist effect below does not re-fire.
     setRecents((current) => {
       if (current === null) {
         return current;

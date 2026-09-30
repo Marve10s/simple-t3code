@@ -29,7 +29,6 @@ import {
 
 const EMPTY_FAVICON_URL = Atom.make<string | null>(null);
 
-/* ─── Component ──────────────────────────────────────────────────────── */
 export function ProjectFavicon(props: {
   readonly environmentId: EnvironmentId;
   readonly open?: boolean;
@@ -51,8 +50,6 @@ export function ProjectFavicon(props: {
         }),
   );
   const renderableFaviconUrl = isProjectFaviconFallbackUrl(faviconUrl) ? null : faviconUrl;
-  // Inline images are self-contained; remote URLs key on their revision so signed-token
-  // rotation reuses the disk cache while a changed icon starts from the loading state.
   const cacheKey =
     renderableFaviconUrl && props.workspaceRoot
       ? renderableFaviconUrl.startsWith("data:")
@@ -164,7 +161,6 @@ function ProjectFaviconImage(props: {
         justifyContent: "center",
       }}
     >
-      {/* Folder icon fallback (matches web's FolderIcon) */}
       {!showImage ? (
         <SymbolView
           name={{ ios: "folder.fill", android: props.open ? "folder_open" : "folder" }}
@@ -174,7 +170,6 @@ function ProjectFaviconImage(props: {
         />
       ) : null}
 
-      {/* Favicon image (hidden until loaded) */}
       {requestIsActive ? (
         <Image
           key={faviconRequest.faviconUrl}

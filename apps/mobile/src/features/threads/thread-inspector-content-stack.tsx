@@ -65,9 +65,6 @@ export function ThreadInspectorContentStack(props: {
       return;
     }
 
-    // The file tree is expensive to detach because UIKit rebuilds its focus
-    // graph. Keep both chat inspectors alive after the opening animation so a
-    // later Files/Git switch only changes visibility.
     const alternateMode = props.mode === "files" ? "git" : "files";
     const timeout = setTimeout(() => {
       setMountedModes((current) => {

@@ -101,8 +101,6 @@ const ElicitationRpc = Rpc.make(CLIENT_METHODS.session_elicitation, {
   error: AcpSchema.Error,
 });
 
-// The pinned v0.11.3 schema predates the SDK's method name and flat response.
-// Keep its RPC for existing peers and translate the SDK alias at the boundary.
 const CreateElicitationRpc = Rpc.make("elicitation/create", {
   payload: Schema.Unknown,
   success: Schema.Struct({

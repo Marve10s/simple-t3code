@@ -27,7 +27,6 @@ import {
   type WorkLogEntry,
 } from "./threadActivity";
 
-// Match Hermes: these ES2023 array methods are absent on mobile.
 beforeEach(() => {
   const methods = ["toSorted", "toReversed"] as const;
   const descriptors = methods.map((method) =>
@@ -1620,7 +1619,6 @@ describe("buildThreadFeed", () => {
           summaryToolIcon: "browser",
           hasFailure,
           live: true,
-          // A successful trailing call keeps shining; a failure hands off to "Thinking".
           shimmer: !hasFailure,
         },
         {
@@ -2267,8 +2265,6 @@ describe("buildThreadFeed", () => {
         new Set(),
         latestTurn.startedAt,
       );
-      // The shimmering row is the turn's live slot; once it stops shimmering
-      // the slot belongs to "Thinking" and the group keeps its own identity.
       expect(rows.slice(0, 3).map((entry) => [entry.id, entry.type])).toEqual([
         ["work-toggle:work-group:activity-1", "work-toggle"],
         ["activity-2", "activity-group"],
@@ -2286,7 +2282,6 @@ describe("buildThreadFeed", () => {
         shimmer,
       });
       expect(rows[0]).toMatchObject({ live: false, shimmer: false });
-      // Exactly one live activity: the shimmering call, or "Thinking" once it fails.
       expect(rows.filter((entry) => entry.type === "thinking")).toHaveLength(shimmer ? 0 : 1);
       expect(rows.at(-1)?.type).toBe(shimmer ? "work-toggle" : "thinking");
 
@@ -2355,7 +2350,6 @@ describe("buildThreadFeed", () => {
       state: "completed" as const,
       completedAt: "2026-04-01T00:00:06.000Z",
     };
-    // Reasoning alone stays visible, including a streaming flag left behind on settlement.
     expect(deriveThreadFeedPresentation(feed, settledTurn, new Set())).toMatchObject([
       { type: "work-toggle", summary: "Thought (×4)", hiddenCount: 4 },
     ]);
@@ -2576,7 +2570,6 @@ describe("buildThreadFeed", () => {
         (entry) => entry.type === "message" && entry.message.role === "reasoning",
       );
       if (boundary === "failed-tool") {
-        // A failed call stays inside the run instead of splitting it.
         expect(rows.filter((entry) => entry.type === "work-toggle")).toMatchObject([
           { hasFailure: true, hiddenCount: 3 },
         ]);
@@ -2625,11 +2618,9 @@ describe("buildThreadFeed", () => {
     const rows = deriveThreadFeedPresentation(feed, latestTurn, new Set(), new Set(), "now");
     expect(rows.map((entry) => entry.type)).toEqual(["message", "thinking"]);
     expect(rows[1]).toMatchObject({ id: "live-activity-row", createdAt: "now", turnId });
-    // The row identity is stable across re-derivations so the list can reuse it.
     expect(deriveThreadFeedPresentation(feed, latestTurn, new Set(), new Set(), "now")[1]).toBe(
       rows[1],
     );
-    // Idle threads show no live activity.
     expect(
       deriveThreadFeedPresentation(feed, latestTurn, new Set(), new Set(), null).map(
         (entry) => entry.type,
@@ -2638,10 +2629,6 @@ describe("buildThreadFeed", () => {
   });
 
   it("keeps one live slot while calls fail and restart", () => {
-    // Recorded from a Claude session whose Bash was broken: every call went
-    // inProgress → failed within two seconds. Each transition used to insert
-    // or remove a Thinking row under the group; now the same row id holds
-    // the live call and then "Thinking", so the list updates it in place.
     const turnId = TurnId.make("turn-failing-calls");
     const latestTurn = {
       turnId,
@@ -2692,8 +2679,6 @@ describe("buildThreadFeed", () => {
     expect(liveIds([call(1, "inProgress"), call(1, "failed"), call(2, "inProgress")])).toEqual([
       "work-toggle:live-activity-row",
     ]);
-    // A call whose end was never reported, in a run before an error row,
-    // keeps its own identity: only the trailing run can hold the live slot.
     const errorRow = makeActivity({
       id: EventId.make("runtime-error"),
       kind: "runtime.error",
@@ -3061,7 +3046,6 @@ describe("quiet timeline: nested agents", () => {
       const rows = buildThreadFeed(thread).flatMap((entry) =>
         entry.type === "activity-group" ? entry.activities : [],
       );
-      // The agent folds into its spawn batch, which stays live after a resume.
       expect(rows).toMatchObject([
         {
           lifecycleStatus: "inProgress",
@@ -3129,8 +3113,6 @@ describe("quiet timeline: nested agents", () => {
         }),
       ).flatMap((entry) => (entry.type === "activity-group" ? entry.activities : []));
 
-    // The batch anchors on the first task.started: a fixed id and timestamp,
-    // unlike progress ticks (which the server rewrites in place).
     const running = rowsFor([]);
     expect(running.map((row) => [row.id, row.summary])).toEqual([
       ["a-start", "Kicked off 2 subagents · 2 working"],
@@ -3292,7 +3274,6 @@ describe("quiet timeline: nested agents", () => {
         latestTurn.startedAt,
       );
 
-    // A working card is the live activity; no Thinking row sits under it.
     const single = presentFor([agent("a-start", "task.started", "a", 1)]);
     expect(single.map((row) => row.type)).toEqual(["agent-spawn"]);
     expect(single[0]).toMatchObject({
@@ -3300,8 +3281,6 @@ describe("quiet timeline: nested agents", () => {
       summary: { title: "Agent a", status: "Working", tone: "working" },
     });
 
-    // The server upserts the progress row with a new createdAt each tick;
-    // the card keeps its identity and only the status line changes.
     const tick = (seconds: number, detail: string) =>
       presentFor([
         agent("a-start", "task.started", "a", 1),
@@ -3397,7 +3376,6 @@ describe("quiet timeline: nested agents", () => {
       const rows = buildThreadFeed(thread).flatMap((entry) =>
         entry.type === "activity-group" ? entry.activities : [],
       );
-      // Turn-less batches never share a spawn group, so each keeps its own row.
       expect(rows).toHaveLength(2);
       expect(rows[0]).toMatchObject({
         lifecycleStatus: status === "failed" ? "failed" : "stopped",
@@ -3440,7 +3418,6 @@ describe("quiet timeline: nested agents", () => {
             status: "running",
           },
         }),
-        // Members are synthesized with timelineBypass and never render alone.
         ...[0, 1].map((index) =>
           makeActivity({
             id: EventId.make(`member-${index}`),
@@ -3480,7 +3457,6 @@ describe("quiet timeline: nested agents", () => {
       entry.type === "activity-group" ? entry.activities : [],
     );
     expect(rows).toHaveLength(1);
-    // The member that never reported its own end settles with the coordinator.
     expect(rows[0]).toMatchObject({
       id: "wf-progress",
       summary: "Ran 2 subagents · completed",
@@ -3510,7 +3486,6 @@ describe("quiet timeline: nested agents", () => {
       agents,
     });
 
-    // The newest report wins regardless of member order.
     expect(
       agentSpawnSummary(
         direct([
@@ -3521,13 +3496,10 @@ describe("quiet timeline: nested agents", () => {
       ),
     ).toMatchObject({ title: "2 subagents", status: "Reading b.ts", tone: "working" });
 
-    // A declined request is a failed batch, not a completed one.
     expect(
       agentSpawnSummary(direct([member("Agent 0", "declined", "", 1)]), "declined"),
     ).toMatchObject({ status: "failed", tone: "failed" });
 
-    // A coordinator that failed on its own reports the failure even when every
-    // member succeeded; before any member reports, the card has a neutral title.
     const workflow = (agents: ReadonlyArray<Member>) => ({
       workflowId: "wf",
       agentTaskIds: ["wf", ...agents.map((_, index) => `wf:wf:${index}`)],
@@ -3592,7 +3564,6 @@ describe("quiet timeline: nested agents", () => {
       projectId: ProjectId.make("project-1"),
       title: "Nested agents",
       activities: [
-        // A subagent's own shell: internal, covered by the owner's liveness.
         makeActivity({
           id: EventId.make("shell-done"),
           kind: "task.completed",
@@ -3600,8 +3571,6 @@ describe("quiet timeline: nested agents", () => {
           createdAt: "2026-04-01T00:00:02.000Z",
           payload: { taskId: "sh-1", agentId: "owner", agentKind: "background" },
         }),
-        // A nested AGENT's completion: mobile has no Agents sheet, so this
-        // terminal row is the only signal it ever finished.
         makeActivity({
           id: EventId.make("nested-done"),
           kind: "task.completed",

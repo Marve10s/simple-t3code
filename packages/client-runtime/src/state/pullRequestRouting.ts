@@ -89,7 +89,6 @@ function isLocal(entry: ConnectionCatalogEntry): boolean {
   }
 }
 
-/** A guard rejection is returned before the operation starts. Other write failures are ambiguous. */
 function rejectedBeforeDispatch(error: unknown): boolean {
   return (
     typeof error === "object" &&
@@ -153,7 +152,6 @@ const invalidateTarget = Effect.fn("PullRequestRouting.invalidateTarget")(functi
     inputs,
     (input) =>
       registry.run(target, request(WS_METHODS.pullRequestsInvalidate, input)).pipe(
-        // GitHub already accepted the write. A stalled reader must not delay its confirmation.
         Effect.timeoutOption("1 second"),
         Effect.orElseSucceed(() => undefined),
       ),
@@ -161,7 +159,6 @@ const invalidateTarget = Effect.fn("PullRequestRouting.invalidateTarget")(functi
   );
 });
 
-/** Credentials stay on their environments. Only a verified host and account cross the wire. */
 export function createPullRequestRouter() {
   const routedRequest = Effect.fn("PullRequestRouting.request")(function* <
     T extends EnvironmentUnaryRpcTag,
@@ -262,7 +259,6 @@ export function createPullRequestRouter() {
         Cause.hasInterrupts(cause) ? Effect.interrupt : Effect.succeed(null),
       ),
     );
-    // Old servers and unknown accounts retain the existing path.
     if (identity === null || identity.provider !== "github") return yield* finish(source);
 
     const routedInput = {
@@ -317,7 +313,6 @@ export function createPullRequestRouter() {
         if (id !== origin.target.environmentId) {
           if (!(yield* routingAllowed(registry, origin.target.environmentId, id, writes.has(tag))))
             return yield* visit(index + 1);
-          // An older server would discard expectedAccountId. Verify it implements the guard first.
           const alternate = yield* registry
             .run(id, request(WS_METHODS.pullRequestsRoutingIdentity, { host: identity.host }))
             .pipe(

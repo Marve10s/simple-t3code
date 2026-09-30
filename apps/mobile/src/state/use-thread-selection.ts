@@ -113,8 +113,6 @@ function useResolvedThreadSelection(params: ThreadSelectionRouteParams | undefin
       : scopedThreadKey(selectedThreadRef.environmentId, selectedThreadRef.threadId);
   const queuedMessagesByThreadKey = useThreadOutboxMessages();
   const creationOutcome = useAtomValue(pendingThreadCreationOutcomesAtom);
-  // A creation the outbox still holds or just delivered: the thread screen
-  // opened before the server made the thread, so present a stand-in shell.
   const pendingCreation = useMemo<PendingThreadCreation | null>(() => {
     if (selectedThreadKey === null) {
       return null;
@@ -126,8 +124,6 @@ function useResolvedThreadSelection(params: ThreadSelectionRouteParams | undefin
     const message = queued ?? outcome?.message ?? null;
     return message === null ? null : { message, outcome };
   }, [creationOutcome, queuedMessagesByThreadKey, selectedThreadKey]);
-  // Until the creation is delivered the server has no thread to subscribe
-  // to; subscribing anyway would retry "not found" for the whole setup.
   const selectedThreadDetailRef =
     selectedThreadShell !== null ||
     pendingCreation === null ||

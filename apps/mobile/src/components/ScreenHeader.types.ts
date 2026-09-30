@@ -68,9 +68,7 @@ export interface ScreenHeaderProps {
   };
   readonly hideBottomBorder?: boolean;
   readonly trailing?: ReactNode;
-  /** Search scenes use sheet colors on iOS and header colors on Android. */
   readonly matchSearchSurface?: boolean;
-  /** Custom native layouts can override options without duplicating the header renderer. */
   readonly options?: AppNativeStackNavigationOptions;
   readonly optionsVersion?: unknown;
 }

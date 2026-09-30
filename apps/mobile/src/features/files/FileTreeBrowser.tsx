@@ -125,8 +125,6 @@ export function FileTreeBrowser(props: {
     readonly selectedPathAtPress: string | null;
   } | null>(null);
   const insets = useSafeAreaInsets();
-  // Native transparent-header height ≈ safe-area top + nav bar (~44). Matches the
-  // observed adjustedContentInset bottom (~102) seen in the native trace.
   const headerInset = NATIVE_LIQUID_GLASS_SUPPORTED ? insets.top + IOS_NAV_BAR_HEIGHT : 0;
   const {
     onLoadDirectory,
@@ -234,11 +232,6 @@ export function FileTreeBrowser(props: {
     ],
   );
 
-  // SPIKE: render the FlatList as the screen's DIRECT content (no wrapping View), and
-  // mirror the Home ScrollView exactly — `contentInsetAdjustmentBehavior: "automatic"`
-  // with NO manual contentInset. iOS only applies the nav-bar top inset + scroll-edge
-  // blur to a scroll view in the screen's primary position; a scroll view buried in
-  // flex-1 Views is ignored, which is why the tree rendered under the header with no blur.
   return (
     <FlatList
       alwaysBounceVertical

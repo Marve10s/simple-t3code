@@ -14,9 +14,6 @@ export function measureComposerMultilinePrompt(body: HTMLElement): boolean | nul
   range.selectNodeContents(editor);
   const bounds = range.getBoundingClientRect();
 
-  // Measure content, not the editor's minimum height. While resting, the
-  // prompt is unwrapped: compare its width with the expanded row so that
-  // moving the actions inline cannot make collapse and expansion oscillate.
   return bounds.height > lineHeight + 1 || bounds.width > expandedWidth + 1;
 }
 

@@ -246,7 +246,7 @@ it("keeps the chosen release view when an app locks orientation, freezes it duri
   expect(onOrientationRequested).toHaveBeenCalledOnce();
   const chosen = state.views.at(-1)!.quaternion.clone();
   expect(chosen.angleTo(initial)).toBeGreaterThan(1);
-  viewer.setScreen({ ...screen }); // Native config confirms the sensor command, even if the app stays portrait.
+  viewer.setScreen({ ...screen });
   draw();
   expect(state.views.at(-1)!.quaternion.angleTo(chosen)).toBeLessThan(1e-6);
   expect(pending.size).toBe(0);
@@ -507,7 +507,7 @@ it("lets standalone rotation leave Laptop and Tent and stand a closed device upr
     });
     viewer.setHingePreview(null);
     draw();
-    viewer.cancelInput(); // Explicit toolbar rotation ends folding ownership.
+    viewer.cancelInput();
     viewer.setScreen({
       width: 1398,
       height: 2034,
@@ -557,7 +557,7 @@ it("snaps onto the opposite screen, requests native handoff once and retains the
   expect(onOrientationRequested).not.toHaveBeenCalled();
   expect(viewer.screenPoint(0.5, 0.5)).toBeNull();
   const chosen = state.views.at(-1)!.quaternion.clone();
-  viewer.setScreen({ ...inner, hingePose: null }); // Command acknowledgement precedes sensor readback.
+  viewer.setScreen({ ...inner, hingePose: null });
   draw();
   expect(state.views.at(-1)!.quaternion.angleTo(chosen)).toBeLessThan(1e-6);
   viewer.setScreen({ ...inner, width: 1398, height: 2034, screenId: 1 });
@@ -684,10 +684,10 @@ it.each(["left", "right"] as const)(
       viewer.setScreen(next);
       viewer.setHingePreview(null);
       draw();
-      viewer.setScreen({ ...next }); // Late native readback cannot change the view.
+      viewer.setScreen({ ...next });
       draw();
       expect(leaf.getWorldQuaternion(new Rotation()).angleTo(orientation)).toBeLessThan(1e-6);
-      expect(viewer.screenPoint(0.5, 0.5)).toBeNull(); // No fresh native frame yet.
+      expect(viewer.screenPoint(0.5, 0.5)).toBeNull();
       if (value === 0) {
         const cover = loaded.getObjectByName("cover-display") as Mesh;
         const center = cover.geometry.boundingBox!.getCenter(new Vector3());

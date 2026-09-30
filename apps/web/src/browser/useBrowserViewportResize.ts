@@ -185,9 +185,7 @@ export function useBrowserViewportResize(options: {
     });
     try {
       target.setPointerCapture(pointerId);
-    } catch {
-      // Window listeners below keep the drag functional when capture is unavailable.
-    }
+    } catch {}
 
     const sourceChanged = () => sourceViewportKeyRef.current !== sourceViewportKey;
     const move = (moveEvent: PointerEvent) => {
@@ -220,9 +218,7 @@ export function useBrowserViewportResize(options: {
       dragCleanupRef.current = null;
       try {
         target.releasePointerCapture(pointerId);
-      } catch {
-        // The browser may already have released capture on pointerup.
-      }
+      } catch {}
     }
     function finish(upEvent: PointerEvent) {
       if (upEvent.pointerId !== pointerId) return;

@@ -2,11 +2,6 @@ import type { MarkdownNode } from "react-native-nitro-markdown/headless";
 import { collectComposerInlineTokens } from "@t3tools/shared/composerInlineTokens";
 import { imageMimeType } from "@t3tools/shared/image";
 import { videoMimeType } from "@t3tools/shared/video";
-/**
- * Every accent shares a lightness so no kind reads heavier than another; only hue carries
- * identity. These are the sRGB form of the same OKLCH set web uses, so a chip looks the
- * same on every surface. See `composerInlineChip.ts`.
- */
 const CONTEXT_CHIP_PRESENTATIONS = {
   image: { accent: "#d55665", symbol: "photo" },
   video: { accent: "#d06217", symbol: "play.rectangle" },
@@ -20,10 +15,6 @@ const CONTEXT_CHIP_PRESENTATIONS = {
   skill: { accent: "#b261be", symbol: "cube" },
 } as const;
 
-/**
- * The size an attachment chip reports beside its name, matching web. Rendered as its own
- * smaller run, so it carries no separator. Only attachment-backed records have bytes.
- */
 export function composerChipSizeSuffix(record?: {
   readonly kind?: string;
   readonly sizeBytes?: number;
@@ -32,11 +23,6 @@ export function composerChipSizeSuffix(record?: {
   return typeof record.sizeBytes === "number" ? formatAttachmentSize(record.sizeBytes) : "";
 }
 
-/**
- * A pull request chip is coloured by what the pull request *is*, the way web colours it and
- * the way the forge itself does: green open, grey draft, purple merged, red closed. The glyph
- * stays the same across all four, as it does on web — state is carried by colour alone.
- */
 const PULL_REQUEST_CHIP_PRESENTATIONS = {
   open: { accent: "#009f6e", symbol: "git-pull-request" },
   draft: { accent: "#7f8793", symbol: "git-pull-request" },
@@ -64,9 +50,7 @@ export function contextChipPresentation(
       mimeType: record?.mimeType ?? "",
     })
       ? "video"
-      : // A picture chosen through the file picker is typed `file`, but it is still a
-        // picture: it reads as one to the user and should not wear the generic file chip.
-        kind === "file" &&
+      : kind === "file" &&
           imageMimeType({ name: record?.name ?? "", mimeType: record?.mimeType ?? "" }) !== null
         ? "image"
         : kind === "review-comment" && record?.sectionId?.startsWith("pull-request:")
@@ -92,7 +76,6 @@ import {
   parseComposerContextHref,
 } from "@t3tools/shared/composerContextReferences";
 
-/** Native selections count UTF-16 display units, including each inline image placeholder. */
 export function nativeMarkdownContextCopyRanges(
   runs: ReadonlyArray<{
     readonly run: {
@@ -389,7 +372,6 @@ function decorateMentionRuns(runs: ReadonlyArray<NativeMarkdownTextRun>) {
     let cursor = 0;
     for (const token of collectComposerInlineTokens(`${run.text} `)) {
       if (token.type !== "mention" || !token.source.startsWith("@")) continue;
-      // Sentence punctuation is not part of an unquoted file reference.
       const path = token.source.startsWith('@"')
         ? token.value
         : token.value.replace(/[.,;!?]+$/, "");
@@ -465,9 +447,6 @@ function appendNode(
     case "link": {
       const reference = parseComposerContextHref(node.href ?? "");
       if (reference) {
-        // Build the link in isolation: adjacent links with the same href and
-        // style would otherwise merge into one run, collapsing two chips and
-        // their copy ranges into a single reference with a combined label.
         const referenceRuns: NativeMarkdownTextRun[] = [];
         appendChildren(referenceRuns, node, {
           ...context,
@@ -862,12 +841,6 @@ function containsRichBlock(node: MarkdownNode): boolean {
   return (node.children ?? []).some(containsRichBlock);
 }
 
-/**
- * Sibling identity for React keys. A source offset survives appends while the
- * document streams; the child index is the fallback for offset-free nodes. The
- * two never share a namespace, so a positioned node cannot collide with an
- * offset-free sibling whose index happens to equal its offset.
- */
 export function nativeMarkdownNodePosition(node: MarkdownNode, index: number): string {
   return node.beg === undefined ? `index:${index}` : `offset:${node.beg}`;
 }

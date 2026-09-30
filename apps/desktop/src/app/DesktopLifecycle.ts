@@ -40,9 +40,7 @@ type DesktopLifecycleRegistrationServices =
   | DesktopLifecycleRuntimeServices
   | ElectronWindow.ElectronWindow;
 
-/**
- * @effect-expect-leaking DesktopEnvironment | DesktopShutdown | DesktopState | DesktopWindow | ElectronApp | ElectronTheme | ElectronWindow
- */
+/** @effect-expect-leaking DesktopEnvironment | DesktopShutdown | DesktopState | DesktopWindow | ElectronApp | ElectronTheme | ElectronWindow */
 export class DesktopLifecycle extends Context.Service<
   DesktopLifecycle,
   {
@@ -159,7 +157,7 @@ function quitFromSignal(
   );
 }
 
-/** @public Service construction is part of the canonical Effect module API. */
+/** @public */
 export const make = DesktopLifecycle.of({
   relaunch: Effect.fn("desktop.lifecycle.relaunch")(function* (reason) {
     const electronApp = yield* ElectronApp.ElectronApp;
@@ -204,14 +202,7 @@ export const make = DesktopLifecycle.of({
       );
     });
     yield* electronApp.onBeforeQuitForUpdate(() => {
-      // Electron's updater owns the remaining quit/install/relaunch sequence.
-      // Cancelling the following app "before-quit" event breaks that sequence,
-      // most visibly on macOS where the native updater performs the relaunch.
       updaterQuitAllowed = true;
-      // This event is synchronous and the updater's quit proceeds as soon as
-      // the listener returns, so a forked destroyAll would race the quit
-      // and windows could still be open when the process exits (visible on
-      // macOS). Destroy them inline.
       Effect.runSyncWith(context)(
         electronWindow.destroyAll.pipe(
           Effect.andThen(logLifecycleInfo("allowing updater-controlled quit")),

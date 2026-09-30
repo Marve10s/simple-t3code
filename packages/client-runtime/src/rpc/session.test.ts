@@ -526,7 +526,6 @@ describe("RpcSessionFactory", () => {
             Effect.forkChild,
           );
           yield* Deferred.await(started);
-          // A live end marker makes a missing or stale replay event fail without a timeout.
           const marker: ServerConfigStreamEventType = {
             version: 1,
             type: "keybindingsUpdated",

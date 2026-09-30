@@ -232,7 +232,6 @@ export interface OrchestrationIntegrationHarness {
 interface MakeOrchestrationIntegrationHarnessOptions {
   readonly provider?: ProviderDriverKind;
   readonly realCodex?: boolean;
-  /** Tracer for every fiber the harness runtime runs, including reactors. */
   readonly tracer?: Tracer.Tracer;
 }
 

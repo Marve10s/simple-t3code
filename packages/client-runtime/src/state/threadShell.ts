@@ -35,8 +35,6 @@ export function createEnvironmentThreadShellAtoms(input: {
     environmentId: EnvironmentId,
   ) => Atom.Atom<OrchestrationShellSnapshot | null>;
 }) {
-  // Point reads and aggregate lists share values without keeping an atom alive
-  // for every listed thread. Replaced source objects can be collected.
   const scopedThreads = new WeakMap<
     OrchestrationThreadShell,
     Map<EnvironmentId, EnvironmentThreadShell>

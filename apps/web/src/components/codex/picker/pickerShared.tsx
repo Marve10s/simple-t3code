@@ -34,7 +34,6 @@ export function ProviderGlyph({ entry }: { entry: ProviderInstanceEntry }) {
   );
 }
 
-/** Fast mode as one row with a switch; hidden for models without it. */
 export function FastModeRow({ traits }: { traits: CodexPickerTraitState }) {
   if (!traits.fastMode) return null;
   const fastMode = traits.fastMode;
@@ -51,7 +50,6 @@ export function FastModeRow({ traits }: { traits: CodexPickerTraitState }) {
   );
 }
 
-/** Effort choices with their one-line descriptions, the current one checked. */
 export function EffortList({
   traits,
   onPicked,
@@ -99,7 +97,6 @@ export function EffortList({
   );
 }
 
-/** Thinking, context window, agent and any other model option, compactly. */
 export function ExtraOptions({ traits }: { traits: CodexPickerTraitState }) {
   if (traits.extras.length === 0) return null;
   return (

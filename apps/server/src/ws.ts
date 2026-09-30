@@ -206,7 +206,6 @@ function unexpectedCompatibilityError(error: never): never {
   throw new Error(`Unhandled compatibility error: ${String(error)}`);
 }
 
-/** Preserve the setup runner's broader pre-refactor message normalization. */
 function legacySetupFailureDescription(cause: unknown): string {
   if (
     typeof cause === "object" &&
@@ -366,19 +365,9 @@ export function isThreadDetailEvent(event: OrchestrationEvent): event is Extract
 
 const PROVIDER_STATUS_DEBOUNCE_MS = 200;
 
-// When a resuming client's cursor is more than this many events behind the
-// current head, skip the per-event catch-up replay and send a fresh shell
-// snapshot instead. Replaying each intervening event costs a shell refetch;
-// past this gap a single O(active-threads) snapshot is cheaper and bounded.
-// Matches the event store's default page size (DEFAULT_READ_FROM_SEQUENCE_LIMIT).
 const SHELL_RESUME_MAX_GAP = 1_000;
 
-// Thread replay counts only this thread's rows. Busy or pruned unrelated
-// streams must not force a full thread snapshot.
 const THREAD_RESUME_MAX_EVENTS = 1_000;
-// Row count alone does not bound replay memory: a few events with large tool
-// payloads can decode to gigabytes. Before replaying, sum the serialized
-// payload bytes of the range in SQL and reset with a snapshot past this budget.
 const ORCHESTRATION_REPLAY_PAYLOAD_BUDGET_BYTES = 8 * 1024 * 1024;
 
 function toAuthAccessStreamEvent(
@@ -430,9 +419,6 @@ const MAX_CLIENT_APP_VERSION_LENGTH = 64;
 const MAX_CLIENT_BROWSER_LENGTH = 64;
 const MAX_CLIENT_DEVICE_MODEL_LENGTH = 80;
 
-// Optional client identity announced on the /ws upgrade URL next to wsTicket.
-// Lenient by design: absent or malformed values degrade to {} so a connection
-// never fails over attribution metadata.
 function readClientConnectionOrigin(
   request: HttpServerRequest.HttpServerRequest,
 ): OrchestrationClientOrigin {
@@ -450,8 +436,6 @@ function readClientConnectionOrigin(
   };
 }
 
-// Client telemetry stays in this socket's RPC layer. It must not become a
-// server-global "current client" because several client types can connect at once.
 function readClientAnalyticsProps(request: HttpServerRequest.HttpServerRequest) {
   const url = HttpServerRequest.toURL(request);
   if (Option.isNone(url)) {
@@ -508,7 +492,6 @@ const makeWsRpcLayer = (
       const crypto = yield* Crypto.Crypto;
       const sql = yield* SqlClient.SqlClient;
       const projectionSnapshotQuery = yield* ProjectionSnapshotQuery.ProjectionSnapshotQuery;
-      /** A reference's host-level link key; the project's own host where the ref names none. */
       const resolvePullRequestSyncKey = (reference: PullRequestRef) =>
         reference.host !== undefined && reference.repository.includes("/")
           ? Effect.succeed(pullRequestSyncKey(reference))
@@ -521,9 +504,6 @@ const makeWsRpcLayer = (
       const orchestrationEngine = yield* OrchestrationEngine.OrchestrationEngineService;
       const threadDeletionReactor = yield* ThreadDeletionReactor;
       const analytics = yield* AnalyticsService.AnalyticsService;
-      // Every command dispatched on this connection carries the connecting
-      // client's origin, including server-generated bootstrap sub-commands:
-      // the client's request caused them.
       const hasClientOrigin =
         clientOrigin.surface !== undefined || clientOrigin.appVersion !== undefined;
       const dispatchFromClient: OrchestrationEngine.OrchestrationEngineShape["dispatch"] = (
@@ -621,8 +601,6 @@ const makeWsRpcLayer = (
       const projectCloneTracker = yield* ProjectCloneTracker.ProjectCloneTracker;
       const repositoryIdentityResolver =
         yield* RepositoryIdentityResolver.RepositoryIdentityResolver;
-      // Clone hooks run on the tracker's fiber, outside any RPC, so the
-      // normalizer's services are captured here rather than inherited.
       const normalizerContext = yield* Effect.context<
         | FileSystem.FileSystem
         | Path.Path
@@ -785,11 +763,6 @@ const makeWsRpcLayer = (
           ),
         );
 
-      // The worktree setup's durable record: one activity per thread, upserted
-      // by a fixed id when the setup starts and again when it settles. Live
-      // progress keeps streaming from the tracker; this is what a reload or
-      // another client reads. Best effort: the thread may already be gone
-      // after a failed bootstrap.
       const recordWorktreeSetup = (snapshot: WorktreeSetupSnapshot) =>
         serverCommandId("worktree-setup-activity").pipe(
           Effect.flatMap((commandId) =>
@@ -834,7 +807,6 @@ const makeWsRpcLayer = (
             });
       };
 
-      // Shell updates refetch the aggregate. Message and tool bodies are not needed.
       const toShellEvent = ({
         type,
         aggregateKind,
@@ -878,11 +850,6 @@ const makeWsRpcLayer = (
         }
       };
 
-      // Coalescing makes each projection read represent every event for that
-      // aggregate in the current window. Retry a typed persistence failure once
-      // so a brief read failure cannot strand the shell at its previous state.
-      // If both attempts fail, log and drop the stream item; treating an error as
-      // a missing row would incorrectly remove a still-active aggregate.
       const retryShellProjectionRead = <A, E>(
         aggregateKind: "project" | "thread",
         aggregateId: string,
@@ -930,16 +897,6 @@ const makeWsRpcLayer = (
           ),
         );
 
-      // Refetch a thread's shell and emit an upsert if it is still active, or a
-      // `thread-removed` if the projection has no active row for it. Emitting a
-      // removal on a `none` (rather than dropping the event) is what keeps
-      // coalescing correct: when a burst collapses a `thread.deleted`/`archived`
-      // into a later refetchable event for the same thread, the refetch returns
-      // `none` for the now-inactive row and this still tells the sidebar to drop
-      // it. A `thread-removed` the client does not have is a harmless no-op. The
-      // projection commits in the same transaction before the event publishes,
-      // so a `none` reliably means the thread is deleted or archived, not
-      // not-yet-persisted.
       const threadUpsertOrRemove = (
         threadId: ThreadId,
         sequence: number,
@@ -969,18 +926,6 @@ const makeWsRpcLayer = (
           ),
         );
 
-      // Turn a batch of domain events into shell stream items, coalescing by
-      // aggregate first. `toShellStreamEvent` re-reads the *current* projected
-      // shell for an aggregate, so within a batch only the latest event per
-      // aggregate matters: a burst of streaming `thread.message-sent` deltas for
-      // one thread collapses into a single shell refetch, and an unrelated
-      // `thread.created` in the same batch is never stuck behind those DB reads.
-      //
-      // Input events arrive in ascending sequence; we keep the last (highest
-      // sequence) event per aggregate, then re-sort ascending before emitting so
-      // the client — which applies shell items strictly by increasing sequence
-      // and drops any `sequence <= snapshotSequence` — never skips a coalesced
-      // item. The refetch runs with bounded concurrency (order-preserving).
       const SHELL_REFETCH_CONCURRENCY = 8;
       const coalesceShellEvents = (
         events: ReadonlyArray<ShellEvent>,
@@ -1002,10 +947,6 @@ const makeWsRpcLayer = (
           return shellEvents.flatMap((option) => (Option.isSome(option) ? [option.value] : []));
         });
 
-      // Small time/size window over which to coalesce shell events. The window
-      // bounds the worst-case added latency for a brand-new thread to appear in
-      // the sidebar (imperceptible), while collapsing high-frequency streaming
-      // traffic so it can't serialize the shell stream behind per-event DB reads.
       const SHELL_COALESCE_WINDOW = Duration.millis(50);
       const SHELL_COALESCE_MAX_CHUNK = 512;
       const coalesceShellStream = <E, R>(
@@ -1022,9 +963,6 @@ const makeWsRpcLayer = (
         | { readonly kind: "event"; readonly event: ShellEvent }
         | { readonly kind: "synchronized" };
 
-      // A completion marker is queued alongside live event metadata so it cannot
-      // overtake an event still waiting in the coalescing window. Split each
-      // batch at markers and coalesce only the event segments on either side.
       const coalesceShellLiveInputs = (
         inputs: ReadonlyArray<ShellLiveInput>,
       ): Effect.Effect<ReadonlyArray<OrchestrationShellStreamItem>, never, never> =>
@@ -1047,18 +985,12 @@ const makeWsRpcLayer = (
           return output;
         });
 
-      // Project setting > environment setting; null when neither is set so
-      // the driver reads the freshly created checkout's own t3.json (the
-      // branch being checked out may declare something the project root does
-      // not). Settings that fail to load fall through the same way.
       const resolveBootstrapWorktreeSubmodules = Effect.fnUntraced(function* (input: {
         readonly threadId: ThreadId;
         readonly projectId: ProjectId | null;
       }) {
         const settings = yield* serverSettings.getSettings.pipe(Effect.orElseSucceed(() => null));
         if (!settings) return null;
-        // A worktree can also be prepared for an existing thread, whose
-        // project is only known through its shell.
         const resolvedProjectId =
           input.projectId ??
           (yield* projectionSnapshotQuery.getThreadShellById(input.threadId).pipe(
@@ -1086,11 +1018,8 @@ const makeWsRpcLayer = (
           let targetProjectId = bootstrap?.createThread?.projectId;
           let targetProjectCwd = bootstrap?.prepareWorktree?.projectCwd;
           let targetWorktreePath = bootstrap?.createThread?.worktreePath ?? null;
-          // The setup script's terminal, once started. Cancel closes only this
-          // one so terminals the user opened meanwhile survive.
           let setupTerminalId: string | null = null;
 
-          // Set once the checkout starts; see the session.set below.
           let preparingSessionSet = false;
           const markPreparingSessionFailed = (detail: string) =>
             Effect.gen(function* () {
@@ -1209,11 +1138,6 @@ const makeWsRpcLayer = (
           const threadId = command.threadId;
           const track = (effect: Effect.Effect<void>) => (tracked ? effect : Effect.void);
 
-          // Starts the setup script. For tracked bootstraps it returns the
-          // effect that waits for the script to exit and records the outcome
-          // on the card; whether the agent stage waits on it depends on the
-          // script's `async` flag. Returns null when nothing is left to await.
-          // Untracked callers keep the old fire-and-forget behavior.
           const runSetupProgram = () =>
             Effect.gen(function* () {
               if (!bootstrap?.runSetupScript || !targetWorktreePath) {
@@ -1297,13 +1221,6 @@ const makeWsRpcLayer = (
               if (!tracked || !setupResult?.completion) {
                 return null;
               }
-              // The setup script is best effort, like the untracked path: a
-              // failed install must not throw away the worktree the user just
-              // waited for. The card keeps the failed stage and its terminal.
-              // Forked right away so the terminal listener behind `completion`
-              // is always consumed, even when the turn dispatch fails before
-              // anyone would otherwise wait on it. The tracker update is a
-              // no-op once the snapshot has been dropped.
               const completionFiber = yield* setupResult.completion.pipe(
                 Effect.flatMap((completion) => {
                   if (completion.exitCode === 0) {
@@ -1337,8 +1254,6 @@ const makeWsRpcLayer = (
             let worktreeBaseRef = prepareWorktree?.baseBranch ?? null;
 
             if (prepareWorktree && shouldPrepareWorktree) {
-              // "Start from origin" is a stored default; repos without the
-              // requested remote branch fall back to the local base branch.
               const startFromOrigin =
                 prepareWorktree.startFromOrigin === true &&
                 (yield* gitWorkflow.remoteExists({
@@ -1407,8 +1322,6 @@ const makeWsRpcLayer = (
                     "A separate worktree requires a Git repository and a base branch with a commit.",
                 });
               }
-              // Not a git repo, or the base has no commit: the thread runs in
-              // the project checkout instead. The card says so and moves on.
               yield* track(
                 worktreeSetupTracker.update(threadId, (snapshot) => ({
                   ...snapshot,
@@ -1435,16 +1348,8 @@ const makeWsRpcLayer = (
                 worktreePath: bootstrap.createThread.worktreePath,
                 createdAt: bootstrap.createThread.createdAt,
               });
-              // The successful create is a fence in the engine command queue:
-              // every delete for the prior incarnation committed before it.
-              // Drain through that event before setup or turn start can own
-              // terminals and provider sessions under the reused thread id.
               createdThread = true;
               yield* threadDeletionReactor.drainThrough(created.sequence);
-              // Persist the send now rather than with the turn: the thread is
-              // real from here on, so any client (or a reload) sees the message
-              // while the worktree is still being prepared. The turn start
-              // later references this id instead of re-sending the text.
               yield* dispatchFromClient({
                 type: "thread.message.user.append",
                 commandId: yield* serverCommandId("bootstrap-thread-message"),
@@ -1467,12 +1372,6 @@ const makeWsRpcLayer = (
 
             if (prepareWorktree && shouldPrepareWorktree && worktreeBaseRef) {
               if (bootstrap?.createThread && createdThread) {
-                // The checkout and setup script can run for minutes before the
-                // turn starts, and the created thread carries no message or
-                // turn until then. Project a starting session now so every
-                // client lists the thread as working and a reopened thread
-                // knows to follow the setup stream. A failed or cancelled setup
-                // deletes the thread, so nothing lingers.
                 const preparingAt = yield* nowIso;
                 yield* dispatchFromClient({
                   type: "thread.session.set",
@@ -1509,8 +1408,6 @@ const makeWsRpcLayer = (
                 {
                   submodules,
                   progress: {
-                    // Git has registered the directory at this point, so a
-                    // cancel during the submodule step can still remove it.
                     onWorktreeClaimed: (path) =>
                       Effect.sync(() => {
                         targetWorktreePath = path;
@@ -1599,17 +1496,11 @@ const makeWsRpcLayer = (
             const pendingSetupScript = yield* runSetupProgram();
 
             yield* track(worktreeSetupTracker.stageStatus(threadId, "agent", "running"));
-            // Past this point a cancel would roll back a thread whose turn has
-            // started. Drop the cancel handle and make the handoff atomic.
             yield* track(worktreeSetupTracker.markUncancellable(threadId));
             const started = yield* Effect.uninterruptible(
               dispatchFromClient(finalTurnStartCommand),
             );
             yield* track(worktreeSetupTracker.stageStatus(threadId, "agent", "done"));
-            // An async setup script outlives the handoff: the snapshot stays
-            // running so the client keeps its row next to the agent's work,
-            // and settles when the script exits. The turn already started, so
-            // the wait cannot fail the dispatch.
             const settle = tracked
               ? worktreeSetupTracker
                   .finish(threadId, "done")
@@ -1642,9 +1533,6 @@ const makeWsRpcLayer = (
                     threadId,
                     detail: Cause.pretty(cleanupCause),
                   }).pipe(
-                    // The thread outlived its setup. Its preparing session
-                    // must not read as working forever, so record the failure
-                    // on it instead.
                     Effect.andThen(
                       preparingSessionSet
                         ? markPreparingSessionFailed(dispatchError.message).pipe(
@@ -1677,12 +1565,6 @@ const makeWsRpcLayer = (
             Effect.catchCause((cause) => {
               const dispatchError = toBootstrapDispatchCommandCauseError(cause);
               if (Cause.hasInterruptsOnly(cause)) {
-                // A user cancel interrupts the forked bootstrap fiber. The
-                // created thread is rolled back like any other failure so the
-                // draft returns to the composer. The setup terminal is closed
-                // first so a still-running script cannot hold files open in
-                // the worktree while git removes it. Closing kills the
-                // process asynchronously, so the removal retries briefly.
                 const closeSetupTerminal = setupTerminalId
                   ? terminalManager.close({
                       threadId,
@@ -1741,20 +1623,11 @@ const makeWsRpcLayer = (
                   ),
               ).pipe(Effect.andThen(cleanupAndFail(cause, dispatchError)));
             }),
-            // Cancellation must finish recording and rollback after the bootstrap is interrupted.
             Effect.uninterruptible,
           );
 
-          // The bootstrap outlives the connection that asked for it: a reload
-          // or a dropped socket must not abandon a half-made worktree, and
-          // the thread it created is already visible to every client. The
-          // RPC only waits on the detached fiber; a user cancel interrupts it
-          // through the tracker.
           const runBootstrap = tracked
             ? Effect.gen(function* () {
-                // Fork and register as one step: a detached fiber keeps going
-                // if the caller is interrupted, so it must never exist without
-                // the tracker entry that cancel and the stage updates key on.
                 const fiber = yield* Effect.uninterruptible(
                   Effect.gen(function* () {
                     const fiber = yield* Effect.forkDetach(settledBootstrapProgram);
@@ -1783,9 +1656,6 @@ const makeWsRpcLayer = (
             ? dispatchBootstrapTurnStart(normalizedCommand)
             : dispatchFromClient(normalizedCommand).pipe(
                 Effect.tap(({ sequence }) =>
-                  // Returning from thread.create is the handoff point at which
-                  // clients may start resources for the new incarnation. Use
-                  // its event sequence as the exact deletion-cleanup fence.
                   normalizedCommand.type === "thread.create"
                     ? threadDeletionReactor.drainThrough(sequence)
                     : Effect.void,
@@ -1804,8 +1674,6 @@ const makeWsRpcLayer = (
           );
       };
 
-      // Only clients that answer /usage-limits themselves see it in the catalogs;
-      // an older client would send the injected command to the provider.
       const loadServerConfig = (options: { readonly usageLimitsCommand: boolean }) =>
         Effect.gen(function* () {
           const keybindingsConfig = yield* keybindings.loadConfigState;
@@ -1836,8 +1704,6 @@ const makeWsRpcLayer = (
             issues: keybindingsConfig.issues,
             providers,
             availableEditors,
-            // Same discovery-with-timeout treatment as editors: a slow probe
-            // must not stall server.getConfig, so it degrades to no targets.
             remoteOpenTargets: yield* resolveAvailableEditorsForConfig(
               remoteOpenTargets.resolveTargets(),
             ),
@@ -1881,15 +1747,8 @@ const makeWsRpcLayer = (
             Effect.gen(function* () {
               yield* ProjectCloneTracker.rejectCommandsDuringClone(projectCloneTracker, command);
               const normalizedCommand = yield* normalizeDispatchCommand(command);
-              // Archive removes the thread from the client, so this transport
-              // closes its session and terminals after the command lands.
-              // Settlement cleanup is driven by thread.settled events in the
-              // provider reactor, including settlements that have no client.
               const archiveCommand =
                 normalizedCommand.type === "thread.archive" ? normalizedCommand : undefined;
-              // Best-effort on purpose: the user's archive must not
-              // fail because this cleanup read blipped, so a failed read
-              // logs and skips the stop instead of propagating.
               const shouldStopSessionAfterCommand = archiveCommand
                 ? yield* projectionSnapshotQuery.getThreadShellById(archiveCommand.threadId).pipe(
                     Effect.map(
@@ -1938,8 +1797,6 @@ const makeWsRpcLayer = (
                   );
                 }
 
-                // Archive removes the thread from view, so its user-opened
-                // terminal panes close with it.
                 yield* terminalManager.close({ threadId: archiveCommand.threadId }).pipe(
                   Effect.catch((error) =>
                     Effect.logWarning("failed to close thread terminals after archive", {
@@ -2014,17 +1871,6 @@ const makeWsRpcLayer = (
           observeRpcStreamEffect(
             ORCHESTRATION_WS_METHODS.subscribeShell,
             Effect.gen(function* () {
-              // Coalesce the live shell stream per aggregate over a small window
-              // so bursts of high-frequency events (streaming message deltas,
-              // activity appends) collapse into a single shell refetch and never
-              // serialize a brand-new thread's `thread.created` behind hundreds
-              // of per-event DB reads. See coalesceShellStream.
-              // Attach live delivery into a scope-bound buffer BEFORE loading any
-              // snapshot or draining catch-up, otherwise an event published while
-              // the snapshot query is in flight is lost (it is past the snapshot's
-              // sequence but the live subscription is not attached yet). Every
-              // path below emits from this same buffered live tail. Overlapping
-              // events are deduped by sequence on the client.
               const liveBudget = yield* makeLiveStreamBudget();
               const liveBuffer = yield* Queue.unbounded<
                 RetainedLiveItem<ShellLiveInput>,
@@ -2057,8 +1903,6 @@ const makeWsRpcLayer = (
                       Effect.uninterruptible,
                     ),
                   ),
-                  // Stop the PubSub consumer even if RPC delivery is waiting
-                  // for an ACK and never pulls the failed buffer again.
                   Effect.raceFirst(liveBudget.failed),
                   Effect.catchTags({ OrchestrationGetSnapshotError: () => Effect.void }),
                 ),
@@ -2089,9 +1933,6 @@ const makeWsRpcLayer = (
                 ),
               );
 
-              // Offer the completion marker into the same queue as live events.
-              // Anything buffered while snapshot/replay work was in flight is
-              // therefore delivered before the client is told it is synchronized.
               const synchronizedThenLive = liveBudget.deliver(
                 input.requestCompletionMarker === true
                   ? Stream.concat(
@@ -2108,22 +1949,10 @@ const makeWsRpcLayer = (
                   : bufferedLiveStream,
               );
 
-              // When the client already holds a shell snapshot (cached, or loaded
-              // over HTTP) it passes that snapshot's sequence, and we resume by
-              // replaying shell events after it instead of re-sending the whole
-              // projects/threads list over the socket. If the client is too far
-              // behind, we fall back to a fresh snapshot instead of an unbounded
-              // replay (see below).
               if (input.afterSequence !== undefined) {
                 const afterSequence = input.afterSequence;
                 const headSequence = yield* orchestrationEngine.latestSequence;
                 const replayGap = headSequence - afterSequence;
-                // Gap too large: replaying every intervening event (each a shell
-                // refetch) is far more expensive than a single O(active-threads)
-                // snapshot. A cursor ahead of this engine's authoritative state
-                // is also invalid, so reset it with a snapshot. Send the snapshot
-                // followed by the buffered live tail, exactly as the
-                // no-afterSequence path does.
                 if (
                   !(yield* canReplayPersistedRange(
                     afterSequence,
@@ -2138,10 +1967,6 @@ const makeWsRpcLayer = (
                   );
                 }
                 const catchUpStream = coalesceShellStream(
-                  // Replay only through the head captured above. Newer events
-                  // are already covered by the live subscription, so this bound
-                  // cannot chase a moving event-store head or grow the live
-                  // buffer indefinitely while waiting for an empty page.
                   orchestrationEngine.readEvents(afterSequence, replayGap),
                 ).pipe(
                   Stream.mapError(
@@ -2200,8 +2025,6 @@ const makeWsRpcLayer = (
                 })),
               );
 
-              // Attach live delivery before reading either replay or snapshot state.
-              // Otherwise an event published while the snapshot is loading is lost.
               const liveBuffer = yield* makeThreadLiveEventCoalescer();
               yield* Effect.forkScoped(
                 liveStream.pipe(
@@ -2214,22 +2037,6 @@ const makeWsRpcLayer = (
               const bufferedLiveStream = liveBuffer.stream;
               let replayOnMissingSnapshot: typeof bufferedLiveStream | undefined;
 
-              // When the client already loaded the snapshot over HTTP it passes
-              // that snapshot's sequence, and we resume the live subscription by
-              // replaying persisted events after it instead of re-sending the
-              // (potentially multi-KB) snapshot frame over the socket.
-              //
-              // The live PubSub subscription must be attached *before* draining
-              // the catch-up replay, otherwise events published during the replay
-              // window are dropped (they are past the persisted tail the replay
-              // read, but the live stream is not yet subscribed). So fork the
-              // live stream into a buffer bound to this stream's scope, then emit
-              // catch-up followed by the buffered/ongoing live events. Overlapping
-              // events are deduped by sequence on the client.
-              //
-              // Measure only this thread's rows. Global sequence gaps can
-              // contain unrelated or pruned streams. Keep an explicit upper
-              // bound so events after the captured head stay in the live tail.
               if (input.afterSequence !== undefined) {
                 const afterSequence = input.afterSequence;
                 const headSequence = yield* orchestrationEngine.latestSequence;
@@ -2290,17 +2097,11 @@ const makeWsRpcLayer = (
                   }
                   replayOnMissingSnapshot = replay;
                 }
-                // A recreated thread needs a fresh snapshot if it still exists.
-                // Oversized replays and invalid cursors also use the snapshot path.
               }
 
               const snapshot = yield* projectionSnapshotQuery
                 .getThreadDetailSnapshot(
                   input.threadId,
-                  // Windowing the fallback snapshot is opt-in per subscription:
-                  // clients that don't send turnLimit (including all
-                  // pre-pagination clients) get the full thread, since they
-                  // have no way to load older pages.
                   input.turnLimit === undefined ? undefined : { turnLimit: input.turnLimit },
                 )
                 .pipe(
@@ -2314,9 +2115,6 @@ const makeWsRpcLayer = (
                 );
 
               if (Option.isNone(snapshot)) {
-                // The recreated thread can already be deleted. Preserve the
-                // bounded replay and shell removal instead of retrying a
-                // snapshot that cannot exist. Oversized ranges still fail.
                 if (replayOnMissingSnapshot !== undefined) {
                   return replayOnMissingSnapshot;
                 }
@@ -2363,8 +2161,6 @@ const makeWsRpcLayer = (
           observeRpcEffect(
             WS_METHODS.serverRefreshProviders,
             Effect.gen(function* () {
-              // Only explicit catalog refreshes bypass T3's caches. Workspace
-              // discovery and background status checks retain their timers.
               if (input.refreshModels) {
                 yield* modelManifest.forceRefresh;
                 const instances = yield* providerInstances.listInstances;
@@ -2385,10 +2181,6 @@ const makeWsRpcLayer = (
                   { concurrency: "unbounded", discard: true },
                 );
               }
-              // An untargeted refresh is "re-read everything's status", which
-              // includes quota from configured usage-limit sources. Awaited,
-              // not forked: the RPC scope closes on return and would
-              // interrupt a fork before the hub answered.
               if (input.instanceId === undefined) {
                 yield* usageLimitSources.refresh;
               }
@@ -2459,7 +2251,6 @@ const makeWsRpcLayer = (
             Effect.gen(function* () {
               if ("sourceId" in input) return yield* usageLimitSources.consumeResetCredit(input);
               const instance = yield* providerInstances.getInstance(input.instanceId);
-              // A disabled instance must not spend anything on its account.
               if (instance === undefined || !instance.enabled) {
                 return yield* new ProviderSetupError({
                   instanceId: input.instanceId,
@@ -2927,19 +2718,19 @@ const makeWsRpcLayer = (
         [WS_METHODS.pullRequestsInvalidate]: (input) =>
           observeRpcEffect(
             WS_METHODS.pullRequestsInvalidate,
-            pullRequests.invalidate(input, { notifyReaders: true }).pipe(
-              // A reader asking for fresh host state also wants the thread badges it feeds to
-              // catch up, including a merged link the sweep would otherwise never revisit.
-              Effect.andThen(
-                input.reference === undefined || input.filesViewedOnly === true
-                  ? Effect.void
-                  : resolvePullRequestSyncKey(input.reference).pipe(
-                      Effect.flatMap((key) =>
-                        key === null ? Effect.void : pullRequestSync.requestSync(key),
+            pullRequests
+              .invalidate(input, { notifyReaders: true })
+              .pipe(
+                Effect.andThen(
+                  input.reference === undefined || input.filesViewedOnly === true
+                    ? Effect.void
+                    : resolvePullRequestSyncKey(input.reference).pipe(
+                        Effect.flatMap((key) =>
+                          key === null ? Effect.void : pullRequestSync.requestSync(key),
+                        ),
                       ),
-                    ),
+                ),
               ),
-            ),
             { "rpc.aggregate": "pull-requests" },
           ),
         [WS_METHODS.pullRequestsSubscribeRefreshes]: () =>
@@ -3009,10 +2800,6 @@ const makeWsRpcLayer = (
                   yield* recordClientCommandAnalytics(normalizedCommand);
                 }).pipe(Effect.provideContext(normalizerContext)),
               onCloned: (project) =>
-                // The project was created against an empty directory, so its
-                // cached identity is "not a repository" until this refresh.
-                // Re-emitting the project shell carries the new identity to
-                // every client without a round trip.
                 repositoryIdentityResolver.resolve(project.workspaceRoot, { refresh: true }).pipe(
                   Effect.andThen(
                     Effect.gen(function* () {
@@ -3053,9 +2840,6 @@ const makeWsRpcLayer = (
           observeRpcEffect(
             WS_METHODS.sourceControlPublishRepository,
             sourceControlRepositories.publishRepository(input).pipe(
-              // A new remote can change the cached identity. Only the `cwd` entry
-              // refreshes, so after a publish from a linked worktree the project
-              // root entry waits for its TTL.
               Effect.tap(() => repositoryIdentityResolver.resolve(input.cwd, { refresh: true })),
               Effect.tap(() => refreshGitStatus(input.cwd)),
             ),
@@ -3202,19 +2986,15 @@ const makeWsRpcLayer = (
             WS_METHODS.assetsCreateUrl,
             Effect.gen(function* () {
               const path = yield* Path.Path;
-              // An absolute media path can be linked from a thread on another environment.
               if (
                 input.resource._tag === "attachment" ||
                 input.resource._tag === "native-app-icon" ||
-                // GitHub media names the repository it authenticates through itself.
                 input.resource._tag === "github-media" ||
                 (input.resource._tag === "media-file" && path.isAbsolute(input.resource.path))
               ) {
                 return yield* issueAssetUrl({ resource: input.resource });
               }
               if (input.resource._tag === "draft-workspace-file") {
-                // A project draft names its workspace directly; there is no
-                // thread to resolve one from.
                 return yield* issueAssetUrl({
                   resource: input.resource,
                   workspaceRoot: input.resource.cwd,
@@ -3634,16 +3414,11 @@ const makeWsRpcLayer = (
                 })),
               );
               const providerStatuses = Stream.zipLatestWith(
-                // The registry stream carries changes only. Seed it with the current
-                // providers so a source refresh that lands before any provider change
-                // still pairs up and reaches the client.
                 Stream.concat(
                   Stream.fromEffect(providerRegistry.getProviders),
                   providerRegistry.streamChanges,
                 ),
                 usageLimitSources.streamChanges.pipe(
-                  // Quota updates already have their own stream. Republish the model
-                  // catalog only when the set of providers offered the command changes.
                   Stream.changesWith(
                     usageLimitsCommand ? sameUsageLimitCommandCoverage : () => true,
                   ),
@@ -3651,10 +3426,6 @@ const makeWsRpcLayer = (
                 (providers, sources) =>
                   usageLimitsCommand ? withUsageLimitsCommands(providers, sources) : providers,
               ).pipe(
-                // Both sides replay their current value, so the first pairing normally
-                // repeats the snapshot the client already holds. Compare against that
-                // snapshot rather than dropping blindly: a refresh that landed between
-                // the snapshot and the subscription still goes out.
                 (updates) => Stream.concat(Stream.make(config.providers), updates),
                 Stream.changesWith(
                   (previous, next) => JSON.stringify(previous) === JSON.stringify(next),
@@ -3667,13 +3438,6 @@ const makeWsRpcLayer = (
                 })),
                 Stream.debounce(Duration.millis(PROVIDER_STATUS_DEBOUNCE_MS)),
               );
-              // The only source of published themes: the stream emits the
-              // current set before any change, so the snapshot carrying it too
-              // would just send every client the same array twice per connect.
-              // Gated on the subscriber's capability flag because an
-              // already-shipped client decodes this stream against the old
-              // event union and its whole config subscription dies on an
-              // unknown member.
               const environmentThemeUpdates =
                 input.environmentThemes === true
                   ? environmentTheme.streamChanges.pipe(
@@ -3684,7 +3448,6 @@ const makeWsRpcLayer = (
                       })),
                     )
                   : Stream.empty;
-              // Same gate as themes: an older client dies on an unknown event.
               const usageLimitSourceUpdates =
                 input.usageLimitSources === true
                   ? usageLimitSources.streamChanges.pipe(
@@ -3875,8 +3638,6 @@ export const websocketRpcRouteLayer = Layer.unwrap(
               Layer.provide(AgentSessionScanner.layer),
               Layer.provide(ProviderMaintenanceRunner.layer),
               Layer.provide(Layer.succeed(ServerSelfUpdate.ServerSelfUpdate, serverSelfUpdate)),
-              // One server-lifetime service means clients share the same PR caches, and a WS
-              // mutation invalidates the HTTP diff cache that every client reads from.
               Layer.provide(Layer.succeed(PullRequestService.PullRequestService, pullRequests)),
               Layer.provide(
                 SourceControlDiscovery.layer.pipe(

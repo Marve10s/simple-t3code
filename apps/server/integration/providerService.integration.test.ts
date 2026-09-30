@@ -61,10 +61,6 @@ interface RecordedAnalyticsEvent {
   readonly properties: Readonly<Record<string, unknown>> | undefined;
 }
 
-/**
- * Analytics layer that keeps captured events in memory so tests can assert on
- * telemetry payloads. `AnalyticsService.layerTest` discards them.
- */
 const makeRecordingAnalytics = Effect.gen(function* () {
   const recorded = yield* Ref.make<ReadonlyArray<RecordedAnalyticsEvent>>([]);
   const layer = Layer.succeed(
@@ -358,8 +354,6 @@ it.live("reports runtime mode per turn and on mode transitions", () =>
         response: { events: codexTurnTextFixture },
       });
 
-      // Toggling the mode restarts the session, which is the only place the
-      // transition is observable.
       yield* startSession("full-access");
       yield* runTurn({
         provider,

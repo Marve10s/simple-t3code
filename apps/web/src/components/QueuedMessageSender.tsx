@@ -16,10 +16,6 @@ import { useEnvironment } from "../state/environments";
 import { hasServerAcknowledgedLocalDispatch, latestTurnStartFailureId } from "./ChatView.logic";
 import { sendQueuedMessage } from "./chat/sendQueuedMessage";
 
-/**
- * Sends queued messages when they are due, for every thread with a queue,
- * whether or not the thread is on screen. Mounted once at the root.
- */
 export function QueuedMessageSender() {
   const threadKeys = useQueuedMessageStore(
     useShallow((state) => Object.keys(state.queuesByThreadKey)),
@@ -27,11 +23,6 @@ export function QueuedMessageSender() {
   return threadKeys.map((threadKey) => <ThreadQueueSender key={threadKey} threadKey={threadKey} />);
 }
 
-/**
- * Watches one thread while it has queued messages. Reading the thread keeps
- * its detail subscribed, so tool boundaries and the end of the turn are
- * visible while the user is elsewhere.
- */
 function ThreadQueueSender({ threadKey }: { threadKey: string }) {
   const threadRef = useMemo(() => parseScopedThreadKey(threadKey), [threadKey]);
   const thread = useThread(threadRef);
@@ -52,9 +43,6 @@ function ThreadQueueSender({ threadKey }: { threadKey: string }) {
   const pendingRequests = useMemo(() => derivePendingRequests(activities ?? []), [activities]);
   const phase = derivePhase(thread?.session ?? null);
 
-  // A send that starts a new turn leaves the thread idle until the server
-  // picks it up. Hold the next message until then, as the composer does for
-  // its own sends.
   const lastDispatch = useQueuedMessageStore(
     (state) => state.lastDispatchByThreadKey[threadKey]?.thread ?? null,
   );
@@ -73,9 +61,6 @@ function ThreadQueueSender({ threadKey }: { threadKey: string }) {
       threadError: null,
     });
 
-  // Approvals and questions block the agent; a steer landing on top of them
-  // would answer nothing and confuse the turn, so the queue holds until the
-  // user resolves them.
   const blocked =
     threadRef === null ||
     thread === null ||

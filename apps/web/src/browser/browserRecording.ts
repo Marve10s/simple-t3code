@@ -114,9 +114,7 @@ type BrowserRecordingLifecycle =
     };
 
 interface ActiveRecording {
-  /** Desktop-scoped identity used by the native capture lease. */
   readonly tabId: string;
-  /** Server-local identity returned by preview automation tools. */
   readonly serverTabId: string;
   readonly threadRef: ScopedThreadRef | null;
   readonly chunks: Blob[];
@@ -165,8 +163,6 @@ const makeStartingBrowserRecordingLifecycle = (): StartingBrowserRecordingLifecy
     cancelledBeforeGrant: false,
     cancelledBeforeGrantSignal,
     cancelBeforeGrant: () => {
-      // Queue position is unknown during paint/settings warmup. Keep the stop request so a start
-      // that later turns out to be contended can still be cancelled before native capture.
       lifecycle.stopRequestedBeforeGrant = true;
       if (lifecycle.queuedForGrant && !lifecycle.grantStarted && !lifecycle.cancelledBeforeGrant) {
         lifecycle.cancelledBeforeGrant = true;
@@ -254,8 +250,6 @@ const preferredMimeTypes = [
 const createMediaRecorder = (stream: MediaStream): MediaRecorder => {
   const mimeType = preferredMimeTypes.find((candidate) => MediaRecorder.isTypeSupported(candidate));
   const settings = stream.getVideoTracks()[0]?.getSettings();
-  // Browser defaults under-budget native-resolution text and motion. Scale with captured pixels
-  // and frames, while bounding storage and encoder load for very large displays.
   const videoBitsPerSecond = Math.round(
     Math.min(
       50_000_000,
@@ -269,8 +263,6 @@ const createMediaRecorder = (stream: MediaStream): MediaRecorder => {
 };
 
 const captureTabMediaStream = (frameRate: number): Promise<MediaStream> =>
-  // The desktop main process routes this request to the tab that `startScreencast` armed, so the
-  // stream already arrives at that tab's native size and needs no source or dimension constraints.
   navigator.mediaDevices.getDisplayMedia({
     audio: false,
     video: { frameRate: { ideal: frameRate, max: frameRate } },
@@ -314,8 +306,6 @@ const prepareTabMediaCapture = (tabId: string, frameRate: number) => {
   const pending: PendingTabMediaCapture = {
     start: () => {
       try {
-        // Electron invokes this callback through executeJavaScript(..., true), so even automated
-        // and delayed queued starts satisfy getDisplayMedia's transient-activation requirement.
         resolveCapture(captureTabMediaStream(frameRate));
       } catch (cause) {
         rejectCapture(cause);
@@ -544,8 +534,6 @@ export async function startBrowserRecording(
     const frameRate = settings.browserRecordingFrameRate;
     await waitForBrowserRecordingPaint();
     const throwIfStartupCancelled = async (): Promise<void> => {
-      // Once a grant starts, a stop lets startup finish so the caller receives an artifact.
-      // Only a contended start can be cancelled before it reaches native capture.
       if (activeRecordings.get(tabId) === recording) return;
       try {
         await bridge.recording.stopScreencast(tabId);
@@ -561,8 +549,6 @@ export async function startBrowserRecording(
       }
       throw recordingStartupCancelledError(recording);
     };
-    // The desktop process exposes one display-media grant at a time. Keep only the
-    // arm-to-capture handoff exclusive; acquired streams can record concurrently.
     const grant = queueDisplayMediaGrant(async () => {
       if (startingLifecycle.cancelledBeforeGrant) {
         throw new BrowserRecordingStartCancelledError({ tabId });
@@ -715,7 +701,6 @@ const finalizeBrowserRecording = async (
       }
       recording.compositor?.dispose();
       recording.compositor = null;
-      // Encoding has flushed; release native capture before materializing and saving the file.
       stopMediaStream(recording.stream);
       recording.stream = null;
       const mimeType =
@@ -746,10 +731,6 @@ const finalizeBrowserRecording = async (
   }
 
   if (result._tag === "Failure" && isStartupWaitTimeout(result.error)) {
-    // Do not clear `active` yet. The renderer-side start promise can still
-    // resolve later, and its cancellation path will call `stopScreencast`.
-    // Keeping the slot reserved prevents a newer recording for this tab from
-    // being started and then accidentally stopped by the older late cleanup.
     throw result.error;
   }
 
@@ -839,7 +820,6 @@ export function stopBrowserRecording(
   return stopPromise;
 }
 
-/** Joins local stops and shares one upload among concurrent automation requests. */
 export async function stopBrowserRecordingForUpload(
   tabId: string,
   upload: (artifact: DesktopPreviewRecordingArtifact, blob: Blob) => Promise<string>,

@@ -20,7 +20,6 @@ function ResolvedFilePreview(props: {
     environmentId,
     "resource" in source ? source.resource : null,
   );
-  // Resolve once per presentation; background URL refreshes must not reopen the native viewer.
   const [uri, setUri] = useState<string | null>("uri" in source ? source.uri : null);
   const onRequestClose = useEffectEvent(props.onRequestClose);
   const onResolutionError = useEffectEvent((error: unknown, fallbackMessage: string) => {
@@ -32,8 +31,6 @@ function ResolvedFilePreview(props: {
   useEffect(() => {
     if (environmentId === null || uri !== null) return;
     let cancelled = false;
-    // A cached URL may have expired while the app was suspended. Await reauthorization
-    // before handing a URL to Quick Look or ACTION_VIEW, which retain that URL.
     void refreshAssetUrl()
       .then((url) => {
         if (cancelled) return;
@@ -87,7 +84,6 @@ function ResolvedFilePreview(props: {
 export function FilePreviewModal(props: {
   readonly source: FilePreviewSource | null;
   readonly onRequestClose: () => void;
-  /** Replaces the default alert when the platform cannot open the document. */
   readonly onOpenError?: (error: unknown) => void;
 }) {
   const isFocused = useIsFocused();

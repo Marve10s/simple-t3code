@@ -19,10 +19,6 @@ export function resolveMobileProjectGroupingSettings(
   };
 }
 
-/**
- * Dual-writes the legacy boolean for one release so an OTA rollback to an
- * older mobile bundle preserves the user's grouping choice.
- */
 export function mobileProjectGroupingModePatch(
   mode: SidebarProjectGroupingMode,
 ): Partial<Preferences> {

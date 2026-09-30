@@ -18,19 +18,12 @@ import * as DeviceService from "../../../device/DeviceService.ts";
 import * as McpInvocationContext from "../../McpInvocationContext.ts";
 import { DeviceScreenshotToolkit, DeviceStandardToolkit, DeviceToolkit } from "./tools.ts";
 
-/** The flags that pin every agent-device command to one device. */
 export function agentDeviceTargetArgs(device: DeviceSummary): ReadonlyArray<string> {
   return device.platform === "ios"
     ? ["--platform", "ios", "--udid", device.id]
     : ["--platform", "android", "--serial", device.id];
 }
 
-/**
- * Just-in-time guidance returned from `device_open`. This is the one place
- * the agent learns how to drive the device, so it lives with the tool result
- * rather than in the always-on prompt block; threads that never open a device
- * never pay for it.
- */
 export function agentDeviceQuickStart(
   device: DeviceSummary,
   targetArgs = agentDeviceTargetArgs(device),
@@ -157,7 +150,6 @@ const handlers = {
         });
       }
       const target = yield* pickDevice(state.devices, input);
-      // Resolve consent and agent connectivity before booting or registering a session.
       const agentArgs = yield* devices.agentTarget({
         threadId: scope.threadId,
         hostId: target.hostId,
@@ -243,7 +235,6 @@ const handlers = {
     }).pipe(Effect.mapError(toolError)),
 } satisfies Parameters<typeof DeviceToolkit.toLayer>[0];
 
-/** Width and height from the IHDR chunk; a PNG that lacks one reports 0×0. */
 export function pngDimensions(png: Uint8Array): { width: number; height: number } {
   if (png.length < 24) return { width: 0, height: 0 };
   const view = new DataView(png.buffer, png.byteOffset, png.byteLength);

@@ -29,7 +29,6 @@ it.each(["portrait", "landscape_left", "landscape_right", "portrait_upside_down"
     const { root, screen } = asset();
     const texture = new Texture();
     const original = screen.material;
-    // Optimization strips UVs from the placeholder material; the viewer generates framebuffer UVs.
     screen.geometry.deleteAttribute("uv");
     const phone = createImportedPhoneScene(root, texture, phoneDisplayLayout(null, 1206, 2622));
     const layout = phoneDisplayLayout({ width: 1206, height: 2622, orientation }, 1206, 2622);

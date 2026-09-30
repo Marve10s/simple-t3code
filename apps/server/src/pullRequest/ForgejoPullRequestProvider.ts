@@ -43,7 +43,6 @@ const CAPABILITIES: PullRequestCapabilities = {
   search: false,
   reactions: true,
   labels: true,
-  // Forgejo's public API has no thread replies/resolution or draft conversion endpoint.
   review: {
     inlineComment: true,
     reply: false,
@@ -59,7 +58,6 @@ const pullPath = (input: ProviderRepositoryRef & { readonly number: number }) =>
   `${repoPath(input)}/pulls/${input.number}`;
 const issuePath = (input: ProviderRepositoryRef & { readonly number: number }) =>
   `${repoPath(input)}/issues/${input.number}`;
-// Review IDs differ from the issue-comment IDs used by Forgejo's reactions API.
 const reviewCommentId = (review: typeof ForgejoReview.Type) =>
   /#issuecomment-([1-9]\d*)$/.exec(review.html_url ?? "")?.[1];
 
@@ -128,7 +126,6 @@ export const make = Effect.gen(function* () {
       more: rows.length > 0 && (links === undefined || /rel="?next"?/i.test(links)),
     };
   });
-  // Use a stable, small page size that also works with Forgejo's default maximum of 50.
   const page = Effect.fn("ForgejoPullRequestProvider.page")(function* <A>(
     input: ForgejoApiInput,
     schema: Schema.Codec<A, unknown, never, never>,
@@ -211,8 +208,6 @@ export const make = Effect.gen(function* () {
           ...input,
           path: `${repoPath(input)}/pulls?state=${state}&sort=recentupdate`,
         };
-        // Self-hosted servers may cap pages below 50. Establish their actual page size before
-        // translating the service's row offset into an API page number.
         const first = yield* readPage(query, Schema.NullOr(ForgejoPullRequest), 1);
         const pageSize = first.rows.length || 50;
         const firstIndex = Math.floor(offset / pageSize) + 1;
@@ -274,7 +269,6 @@ export const make = Effect.gen(function* () {
       function* (input) {
         const [comments, reviews, commits, reactions, viewer] = yield* Effect.all(
           [
-            // Issue comments ignore page/limit; fetch this unpaginated endpoint once.
             readArray({ ...input, path: `${issuePath(input)}/comments` }, ForgejoComment).pipe(
               Effect.map((items) => ({
                 items: items.slice(0, 500),

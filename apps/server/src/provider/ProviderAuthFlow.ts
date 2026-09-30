@@ -25,7 +25,6 @@ import type * as ProviderAuthService from "./Services/ProviderAuthService.ts";
 
 export interface ProviderAuthFlowContext {
   readonly flowId: string;
-  /** The lifetime timeout interrupts authenticate before publishing its expired result. */
   readonly expiresAt: number;
   readonly returnUrl?: string;
   readonly callbackMode?: "server" | "client";
@@ -58,7 +57,6 @@ interface Flow {
     | undefined;
 }
 
-/** Adapters do login and credential handling; this owns client consent and flow lifetime. */
 export const make = Effect.fn("ProviderAuthFlow.make")(function* (options: {
   readonly instanceId: ProviderInstanceId;
   readonly credentialBinding: NonNullable<
@@ -66,9 +64,7 @@ export const make = Effect.fn("ProviderAuthFlow.make")(function* (options: {
   >;
   readonly methods: Effect.Effect<ReadonlyArray<ProviderAuthMethod>, ProviderSetupError>;
   readonly defaultMethodId?: string;
-  /** Stored account profiles can change the advertised methods after auth/logout. */
   readonly refreshMethodsAfterAuth?: boolean;
-  /** Fail with ProviderSetupError containing safe text for the user, never native token data. */
   readonly authenticate: (
     methodId: string,
     context: ProviderAuthFlowContext,
@@ -127,7 +123,6 @@ export const make = Effect.fn("ProviderAuthFlow.make")(function* (options: {
     return active;
   });
 
-  // Method discovery does not start a sign-in flow.
   const refreshMethods = options.methods.pipe(
     Effect.flatMap((methods) =>
       SubscriptionRef.update(snapshot, (current) => ({
@@ -135,7 +130,6 @@ export const make = Effect.fn("ProviderAuthFlow.make")(function* (options: {
         state: { ...current.state, methods },
       })),
     ),
-    // Keep the last known methods when a refresh fails or is interrupted.
     Effect.catch((error) =>
       SubscriptionRef.update(snapshot, (current) => ({
         ...current,
@@ -519,8 +513,6 @@ export const make = Effect.fn("ProviderAuthFlow.make")(function* (options: {
       active = undefined;
       if (flow?.responseFiber) yield* Fiber.interrupt(flow.responseFiber);
       if (flow?.fiber) yield* Fiber.interrupt(flow.fiber);
-      // Settings edits rebuild instances; admitted sessions (including those of
-      // peers sharing this binding) end with their own scopes, not this one.
     }),
   );
   return controller;

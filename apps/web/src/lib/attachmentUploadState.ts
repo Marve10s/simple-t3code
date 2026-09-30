@@ -18,11 +18,6 @@ export type AttachmentUploadState =
       readonly status: "failed";
       readonly environmentId: EnvironmentId;
       readonly reason: string;
-      /**
-       * A pending upload the queue minted for this failed attempt. Retry and
-       * release delete it, so it must never carry a draft's persisted
-       * attachment id.
-       */
       readonly attachmentId?: string;
       readonly previous?: ReadyAttachmentUpload;
     };

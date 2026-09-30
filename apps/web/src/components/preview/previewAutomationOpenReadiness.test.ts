@@ -82,8 +82,6 @@ describe("preview automation open readiness", () => {
 
 describe("shouldOpenPreviewMiniPlayer with the floating-preview preference", () => {
   it("honours the preference when the agent said nothing either way", () => {
-    // `preview_open` no longer arrives with `open` pre-filled, so an agent
-    // that omitted it leaves the decision to the user's setting.
     expect(shouldOpenPreviewMiniPlayer({}, false)).toBe(false);
     expect(shouldOpenPreviewMiniPlayer({}, true)).toBe(true);
   });

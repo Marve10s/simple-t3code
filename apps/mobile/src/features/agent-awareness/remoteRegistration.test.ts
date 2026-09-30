@@ -106,8 +106,6 @@ vi.mock("./agentLiveActivity", () => ({
   startAgentLiveActivity: widgetMocks.start,
 }));
 
-// The state modules pull the whole connection stack (and native expo modules)
-// into the import graph; the arming gate only needs the configs map.
 vi.mock("../../state/atom-registry", () => ({
   appAtomRegistry: {
     get: () => environmentConfigsMock.configs,
@@ -603,10 +601,6 @@ describe("makeRelayDeviceRegistrationRequest", () => {
     setAgentAwarenessRelayTokenProvider(() => Promise.resolve("clerk-token-user-a"));
 
     return Effect.gen(function* () {
-      // Drive the registration directly so the assertion does not depend on the
-      // background queue draining; refreshAgentAwarenessRegistration swallows the
-      // error but must record the failed status so the settings toggles cannot
-      // read as enabled.
       yield* refreshAgentAwarenessRegistration();
       expect(getAgentAwarenessRegistrationStatus()).toBe("failed");
     }).pipe(Effect.provide(relayTestLayer));
@@ -640,8 +634,6 @@ describe("makeRelayDeviceRegistrationRequest", () => {
   });
 
   it.effect("resets a pending status to unknown when relay config is missing", () => {
-    // No relay url configured: registration can neither run nor ever succeed,
-    // so the status must not stick at "pending".
     setAgentAwarenessRelayTokenProvider(() => Promise.resolve("clerk-token-user-a"));
 
     return Effect.gen(function* () {
@@ -662,8 +654,6 @@ describe("makeRelayDeviceRegistrationRequest", () => {
       yield* runBackgroundOperations();
       expect(getAgentAwarenessRegistrationStatus()).toBe("registered");
 
-      // The relay still holds the accepted registration; a transient refresh
-      // failure must not flip the settings toggles off.
       vi.mocked(loadOrCreateAgentAwarenessDeviceId).mockRejectedValueOnce(
         new Error("transient failure"),
       );
@@ -686,8 +676,6 @@ describe("makeRelayDeviceRegistrationRequest", () => {
       expect(saveAgentAwarenessRegistrationRecord).toHaveBeenCalledTimes(1);
       expect(registrationRecordStore.current).not.toBeNull();
 
-      // Second attempt with an identical payload must skip the relay entirely,
-      // so no new registration record is written.
       vi.mocked(saveAgentAwarenessRegistrationRecord).mockClear();
       yield* refreshAgentAwarenessRegistration();
       expect(getAgentAwarenessRegistrationStatus()).toBe("registered");
@@ -696,10 +684,6 @@ describe("makeRelayDeviceRegistrationRequest", () => {
   });
 
   it.effect("dedupes rapid activity-token re-registrations within the replay window", () => {
-    // Fetch counts are unreliable here (the module-level relay layer captures
-    // the first test's fetch), so assert on the flow's own seams: a real
-    // registration attempt loads the device id, a deduped one short-circuits
-    // before it.
     const fetchMock = vi.fn((request: RequestInfo | URL) => {
       const url = request instanceof Request ? request.url : String(request);
       return Promise.resolve(
@@ -730,13 +714,9 @@ describe("makeRelayDeviceRegistrationRequest", () => {
     setAgentAwarenessRelayTokenProvider(() => Promise.resolve("clerk-token-user-a"));
 
     return Effect.gen(function* () {
-      // Drains the sign-in refresh, which registers the activity token.
       yield* runBackgroundOperations();
       expect(activity.getPushToken).toHaveBeenCalled();
 
-      // A burst refresh (foreground / connection update seconds later) must
-      // dedupe: it reads the token but never proceeds to a registration
-      // attempt (which would load the device id first).
       vi.mocked(loadOrCreateAgentAwarenessDeviceId).mockClear();
       yield* refreshActiveLiveActivityRemoteRegistration();
       expect(loadOrCreateAgentAwarenessDeviceId).not.toHaveBeenCalled();
@@ -935,8 +915,6 @@ describe("makeRelayDeviceRegistrationRequest", () => {
     await new Promise((resolve) => setTimeout(resolve, 0));
     expect(widgetMocks.start).toHaveBeenCalledTimes(1);
 
-    // An environment without the capability may run an older server that
-    // still publishes; only an explicit false skips the seed.
     widgetMocks.start.mockClear();
     vi.mocked(loadPreferences).mockResolvedValueOnce({
       liveActivitiesEnabled: true,
@@ -1028,7 +1006,6 @@ describe("makeRelayDeviceRegistrationRequest", () => {
     setAgentAwarenessRelayTokenProvider(() => Promise.resolve("clerk-token-user-a"), "user-a");
 
     return Effect.gen(function* () {
-      // Hermes' compiled error hashing reads the response's cookie getter.
       const httpResponse = HttpClientResponse.fromWeb(
         HttpClientRequest.post("https://relay.example.test/v1/mobile/devices"),
         rejectedResponse,

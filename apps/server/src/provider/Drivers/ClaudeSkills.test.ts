@@ -75,8 +75,6 @@ it.layer(NodeServices.layer)("discoverClaudeSkills", (it) => {
       const configDir = path.join(tempDir, "claude-home");
       const workspace = path.join(tempDir, "workspace");
 
-      // Verified against the CLI: `/review` here is answered with
-      // `Unknown command`, so offering it would dispatch a dead command.
       yield* writeSkill(
         path.join(workspace, ".agents", "skills"),
         "review",
@@ -164,15 +162,11 @@ it.layer(NodeServices.layer)("discoverClaudeSkills", (it) => {
 
       yield* writeSkill(skillsDir, "no-frontmatter", "# Just a heading\n");
       yield* writeSkill(skillsDir, "broken-yaml", "---\nname: [unclosed\n---\n");
-      // A stray file (not a directory with SKILL.md) must be skipped.
       yield* fs.makeDirectory(skillsDir, { recursive: true });
       yield* fs.writeFileString(path.join(skillsDir, "README.md"), "not a skill");
 
       const skills = yield* discoverClaudeSkills({ homePath: configDir }, undefined);
 
-      // A skill with no frontmatter falls back to its directory name; a skill
-      // whose frontmatter fails to parse is skipped entirely (Claude Code
-      // won't load it either).
       assert.deepEqual(
         skills.map((skill) => skill.name),
         ["no-frontmatter"],
@@ -203,8 +197,6 @@ it.layer(NodeServices.layer)("discoverClaudeSkills", (it) => {
         ["env-skill"],
       );
 
-      // An explicit homePath wins over the environment variable, matching
-      // makeClaudeEnvironment which overwrites CLAUDE_CONFIG_DIR for the CLI.
       const explicitHome = path.join(tempDir, "explicit-home");
       yield* writeSkill(
         path.join(explicitHome, "skills"),
@@ -229,8 +221,6 @@ it.layer(NodeServices.layer)("discoverClaudeSkills", (it) => {
       const workspace = path.join(tempDir, "workspace");
       yield* fs.makeDirectory(workspace, { recursive: true });
 
-      // The spawned CLI resolves a relative CLAUDE_CONFIG_DIR against its own
-      // cwd (the workspace), so discovery must do the same.
       yield* writeSkill(
         path.join(workspace, "relative-config", "skills"),
         "relative-skill",
@@ -394,8 +384,6 @@ it.layer(NodeServices.layer)("discoverClaudeSkills", (it) => {
           ["---", `name: ${name}`, "---", "", "# Body"].join("\n"),
         );
       }
-      // Verified against the CLI: with an unknown string or a boolean in the
-      // map, the valid "off" sibling is ignored too and every skill runs.
       yield* fs.writeFileString(
         path.join(configDir, "settings.json"),
         '{ "skillOverrides": { "unknown-mode": "some-future-mode", "boolean-false": false, "sibling-off": "off" } }',
@@ -433,12 +421,10 @@ it.layer(NodeServices.layer)("discoverClaudeSkills", (it) => {
       yield* fs.makeDirectory(path.join(repo, ".git"), { recursive: true });
       yield* fs.makeDirectory(path.join(repo, ".claude"), { recursive: true });
       yield* fs.makeDirectory(path.join(workspace, ".claude"), { recursive: true });
-      // The CLI ignores the root's plain settings.json from a nested cwd.
       yield* fs.writeFileString(
         path.join(repo, ".claude", "settings.json"),
         '{ "skillOverrides": { "cwd-off-root-on": "off" } }',
       );
-      // The root local file outranks the workspace local file, as in the CLI.
       yield* fs.writeFileString(
         path.join(repo, ".claude", "settings.local.json"),
         '{ "skillOverrides": { "root-off": "off", "root-off-cwd-on": "off", "cwd-off-root-on": "on" } }',
@@ -493,9 +479,6 @@ it.layer(NodeServices.layer)("discoverClaudeSkills", (it) => {
 
   it.effect("lets the administrator's managed policy outrank every other settings file", () =>
     Effect.gen(function* () {
-      // The function is pure on its `path` argument, so hand it the
-      // implementation matching each platform under test rather than the
-      // host's.
       const path = yield* Path.Path.pipe(Effect.provide(NodePath.layerPosix));
       const win32Path = yield* Path.Path.pipe(Effect.provide(NodePath.layerWin32));
 
@@ -523,8 +506,6 @@ it.layer(NodeServices.layer)("discoverClaudeSkills", (it) => {
         ["C:\\Users\\me\\.claude\\settings.json"],
       );
 
-      // Only the repository root's local file joins in, after the
-      // workspace's own local file so it wins.
       assert.deepEqual(
         skillOverrideSettingsPaths(
           path,
@@ -542,7 +523,6 @@ it.layer(NodeServices.layer)("discoverClaudeSkills", (it) => {
           "/etc/claude-code/managed-settings.json",
         ],
       );
-      // A workspace that is the root itself is not read twice.
       assert.deepEqual(
         skillOverrideSettingsPaths(path, "/home/.claude", "/repo", "linux", {}, "/repo"),
         [
@@ -596,8 +576,6 @@ it.layer(NodeServices.layer)("discoverClaudeSkills", (it) => {
 
       const skills = yield* discoverClaudeSkills({ homePath: configDir });
 
-      // The frontmatter name is not the command, so an override naming it is
-      // not the override Claude Code would apply either.
       assert.deepEqual(
         skills.map((skill) => [skill.name, skill.enabled]),
         [["probe-alias", true]],

@@ -131,7 +131,7 @@ const resolveBrowseTarget = Effect.fn("WorkspaceEntries.resolveBrowseTarget")(fu
   return path.resolve(expandHomePathWith(input.cwd, path), input.partialPath);
 });
 
-/** @public Service construction is part of the canonical Effect module API. */
+/** @public */
 export const make = Effect.gen(function* () {
   const path = yield* Path.Path;
   const workspacePaths = yield* WorkspacePaths.WorkspacePaths;
@@ -315,8 +315,6 @@ export const make = Effect.gen(function* () {
           },
           catch: toError,
         });
-        // Use stdin so large directories cannot exceed the command-line argument limit.
-        // Ignore classification is optional in non-git workspaces or when git is unavailable.
         const ignored = new Set<string>();
         for (let offset = 0; offset < entries.length; offset += 1000) {
           const chunk = entries.slice(offset, offset + 1000);

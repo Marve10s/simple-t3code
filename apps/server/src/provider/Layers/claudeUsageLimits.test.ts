@@ -16,8 +16,6 @@ describe("claudeUsageResponseToLimits", () => {
             five_hour: { utilization: 54, resets_at: "2026-07-18T14:39:00Z" },
             seven_day: { utilization: 18.4, resets_at: "2026-07-24T08:59:00+00:00" },
             seven_day_opus: { utilization: 3, resets_at: null },
-            // Newer CLIs add this on top of the typed keys; the pinned SDK
-            // typings do not know it yet.
             ...({
               model_scoped: [
                 { display_name: "Fable", utilization: 73, resets_at: "2026-07-24T08:59:00Z" },
@@ -151,7 +149,6 @@ describe("claudeRateLimitEventToUpdate", () => {
       rateLimitType: "seven_day_overage_included" as never,
       utilization: 0.4,
     } as const;
-    // No probe has named the bucket yet: guessing would open a stray row.
     expect(claudeRateLimitEventToUpdate(event, noNames)).toBeUndefined();
     expect(claudeRateLimitEventToUpdate(event, { overageIncluded: "Fable" })).toEqual({
       windows: [

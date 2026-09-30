@@ -18,7 +18,6 @@ export const LocalDeviceHostAddresses = Context.Reference<ReadonlySet<string>>(
   },
 );
 
-/** Resolve aliases on the owning environment without opening an SSH connection. */
 export const isLocalSshDeviceHost = Effect.fn("isLocalSshDeviceHost")(function* (
   host: SshDeviceHostConfig,
 ) {
@@ -36,7 +35,6 @@ export const isLocalSshDeviceHost = Effect.fn("isLocalSshDeviceHost")(function* 
       return [line.slice(0, separator), line.slice(separator + 1).trim()];
     }),
   );
-  // A local forwarded port or a proxy can lead to a different machine.
   if (
     config.get("port") !== "22" ||
     ["proxycommand", "proxyjump"].some((key) => config.has(key) && config.get(key) !== "none")

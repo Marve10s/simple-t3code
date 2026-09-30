@@ -30,10 +30,6 @@ const cookie = {
   sameSite: "lax" as const,
 };
 
-/**
- * Dies if the import reaches session work: every case here covers a request
- * that must be rejected before a cookie is read or written.
- */
 const rejectedBeforeSession = Layer.succeed(
   BrowserSession.BrowserSession,
   BrowserSession.BrowserSession.of({
@@ -45,10 +41,6 @@ const rejectedBeforeSession = Layer.succeed(
   }),
 );
 
-/**
- * Builds the service against a scratch home containing an installed, closed
- * copy of the source browser.
- */
 const withImporter = Effect.fnUntraced(function* () {
   const fileSystem = yield* FileSystem.FileSystem;
   const home = yield* fileSystem.makeTempDirectoryScoped({ prefix: "t3code-import-" });
@@ -60,8 +52,6 @@ const withImporter = Effect.fnUntraced(function* () {
   const root = helium.userDataDirectory(context);
   if (root === undefined) throw new Error("Helium has no macOS user-data directory");
   yield* fileSystem.makeDirectory(`${root}/Default`, { recursive: true });
-  // The cookie database is what marks a source as installed, so a fixture
-  // without one is reported as absent before any other check runs.
   yield* fileSystem.writeFileString(`${root}/Default/Cookies`, "db");
 
   const importer = yield* BrowserImport.BrowserImport.pipe(
@@ -84,8 +74,6 @@ describe("BrowserImport.importCookies", () => {
       const fileSystem = yield* FileSystem.FileSystem;
       const { importer, home } = yield* withImporter();
 
-      // A cookie database reachable on disk but outside the browser's
-      // user-data directory — the payoff a traversal would be after.
       yield* fileSystem.makeDirectory(`${home}/secrets`, { recursive: true });
       yield* fileSystem.writeFileString(`${home}/secrets/Cookies`, "not-a-db");
 
@@ -112,8 +100,6 @@ describe("BrowserImport.importCookies", () => {
       Effect.gen(function* () {
         const fileSystem = yield* FileSystem.FileSystem;
         const { importer, root } = yield* withImporter();
-        // The lock Chromium leaves while it is running, dangling target and
-        // all. This must stop the import before it ever asks the keychain.
         yield* fileSystem.symlink("host-that-does-not-exist-1234", `${root}/SingletonLock`);
 
         const error = yield* importer
@@ -155,7 +141,6 @@ describe("BrowserImport.writeCookies", () => {
         skipped: 1,
         skippedDomains: ["rejected.example"],
       });
-      // Nothing landed, so there is nothing to persist.
       assert.equal(flushes, 0);
     }),
   );
@@ -179,8 +164,6 @@ describe("BrowserImport.writeCookies", () => {
         { cookies: [cookie, cookie], undecryptable: 0, undecryptableHosts: [] },
       );
 
-      // One flush after every write, not one per cookie; the cookies are in
-      // the session either way, so a failed flush is not a failed import.
       assert.deepEqual(events, ["set", "set", "flush"]);
       assert.deepEqual(result, { imported: 2, skipped: 0, skippedDomains: [] });
     }),

@@ -3,15 +3,6 @@ import * as NodeFS from "node:fs";
 import * as NodePath from "node:path";
 import * as NodeSqlite from "node:sqlite";
 
-/**
- * SimpleT3Code keeps its own home (~/.simplet3) because two servers must never
- * share one event store. On first launch it inherits T3 Code's history with a
- * snapshot of ~/.t3/userdata; later T3 Code activity is not synced.
- *
- * VACUUM INTO reads a consistent snapshot even while T3 Code has the database
- * open, and the copy lands under a temporary name so an interrupted import
- * never leaves a half-written database behind.
- */
 export function importT3CodeHistory(input: {
   readonly homeDirectory: string;
   readonly stateDir: string;
@@ -37,9 +28,6 @@ export function importT3CodeHistory(input: {
   }
   NodeFS.renameSync(partialDatabase, targetDatabase);
 
-  // Message attachments and user preferences travel with the history. The
-  // environment identity and secrets stay per-app so both apps can run side
-  // by side as distinct environments.
   for (const file of ["settings.json", "keybindings.json"]) {
     const source = NodePath.join(sourceDir, file);
     const target = NodePath.join(input.stateDir, file);

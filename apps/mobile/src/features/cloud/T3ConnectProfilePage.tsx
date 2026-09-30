@@ -55,12 +55,6 @@ function confirmDeregister(environment: RelayClientEnvironmentRecord, onConfirm:
   showConfirmDialog({ title, message, confirmText: "Deregister", destructive: true, onConfirm });
 }
 
-/**
- * The "T3 Connect" custom page inside Clerk's native user profile: every
- * environment registered to the signed-in account, with account-level
- * deregistration. Mirrors the web UserButton page; connections on this device
- * are managed in Settings instead.
- */
 export function T3ConnectProfilePage() {
   const environmentsState = useManagedRelayEnvironments();
   const deregisterEnvironment = useAtomCommand(deregisterManagedRelayEnvironmentCommand, {
@@ -69,8 +63,6 @@ export function T3ConnectProfilePage() {
   const [deregisteringEnvironmentId, setDeregisteringEnvironmentId] =
     useState<EnvironmentId | null>(null);
   const mutationPendingRef = useRef(false);
-  // Deregistered rows stay in the cached list until the refresh lands, so hide
-  // them by the linkedAt they had. A re-link produces a new linkedAt and shows again.
   const [removedEnvironments, setRemovedEnvironments] = useState<{
     readonly accountId: string | null;
     readonly linkedAtById: ReadonlyMap<EnvironmentId, string>;
@@ -224,10 +216,6 @@ export function T3ConnectProfilePage() {
 const ENVIRONMENT_MENU_ACTIONS = [
   { id: "deregister", title: "Deregister", image: "trash", attributes: { destructive: true } },
 ] satisfies MenuAction[];
-
-// Layout primitives that mirror clerk-ios ClerkKitUI's profile rows so a custom
-// page reads as one of Clerk's own screens. System font on purpose: Clerk's
-// native views do not use the app's DM Sans.
 
 function ClerkSectionHeader(props: { readonly children: string }) {
   return (

@@ -32,7 +32,6 @@ function mediaFileName(source: MediaActionSource): string {
   );
 }
 
-/** Explicit byte operations get fresh capabilities without replacing a player's active source. */
 function useMediaActions(source: MediaActionSource) {
   const createAssetUrl = useAtomQueryRunner(assetEnvironment.createUrl, {
     reportFailure: false,
@@ -61,7 +60,6 @@ function useMediaActions(source: MediaActionSource) {
         "Image copying is unavailable. Use a secure browser connection or save the image.",
       );
     }
-    // Start the clipboard write in the user gesture; fetching/decoding may finish later.
     await navigator.clipboard.write([
       new ClipboardItem({ "image/png": actionUrl().then(readMediaPng) }),
     ]);
@@ -69,7 +67,6 @@ function useMediaActions(source: MediaActionSource) {
   return { save, copyImage };
 }
 
-/** Adds source-aware actions and a tooltip to the existing media element without a layout wrapper. */
 export function MediaActions({
   source,
   children,

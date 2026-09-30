@@ -1,6 +1,5 @@
 import type { EnvironmentId } from "@t3tools/contracts";
 
-/** Null follows all environments, including ones connected after the menu opened. */
 export function toggleUsageEnvironment(
   selected: ReadonlySet<EnvironmentId> | null,
   environments: readonly { readonly environmentId: EnvironmentId }[],

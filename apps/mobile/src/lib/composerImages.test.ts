@@ -237,8 +237,6 @@ describe("composerStripAttachments", () => {
 
   it("never shows a non-media file above the composer", async () => {
     const { composerStripAttachments } = await import("./composerImages");
-    // A document reads as its inline chip. A tile with a generic glyph says less than the
-    // chip does, so it is not a fallback worth having, chip present or not.
     expect(composerStripAttachments([doc] as never)).toEqual([]);
   });
 
@@ -252,7 +250,6 @@ describe("composerStripAttachments", () => {
 
   it("treats a picture picked through the document picker as media", async () => {
     const { composerStripAttachments } = await import("./composerImages");
-    // The document picker types every pick as a plain file; what it *is* decides the strip.
     const pickedImage = {
       id: "pick-1",
       type: "file" as const,
@@ -268,8 +265,6 @@ describe("composerStripAttachments", () => {
 describe("composerAttachmentInlineUri", () => {
   it("offers the inline bytes of a picture that owns no file", async () => {
     const { composerAttachmentInlineUri } = await import("./composerImages");
-    // The photo library and the clipboard both produce this shape. Its `attachmentId` is a
-    // local draft id, so a remote asset lookup for it can only fail.
     expect(
       composerAttachmentInlineUri({
         id: "img-1",

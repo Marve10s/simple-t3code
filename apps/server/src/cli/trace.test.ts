@@ -27,8 +27,6 @@ function browserSpan(name: string, status: { code: string; message?: string }) {
 }
 
 it("reports count, rate, percentiles, and exits per span name", () => {
-  // Ten `refresh` spans of 1..10 ms end over minutes 0..9, and one `probe`
-  // span ends at minute 10, so the recorded window is 10 minutes.
   const refreshes = Array.from({ length: 10 }, (_, index) =>
     span(
       "refresh",
@@ -74,7 +72,6 @@ it("drops spans that ended before the window and counts unreadable lines", () =>
     "",
     "{not json",
     JSON.stringify({ name: "no-duration" }),
-    // Ends past the largest Date, so the report could not print it.
     JSON.stringify({ name: "far-future", durationMs: 1, endTimeUnixNano: "9".repeat(22) }),
     span("recent", 4, 5 * MINUTE_MS),
   ].forEach(summarizer.addLine);

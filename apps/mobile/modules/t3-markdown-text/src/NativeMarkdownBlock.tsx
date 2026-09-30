@@ -19,7 +19,6 @@ import type {
 } from "./SelectableMarkdownText.types";
 import { useHighlightedCode, type HighlightedCode } from "./useHighlightedCode";
 
-/** Set by SelectableMarkdownText so images anywhere in the block tree can use it. */
 export const MarkdownImageRendererContext = createContext<MarkdownImageRenderer | null>(null);
 
 const MONO_FONT_FAMILY = Platform.select({
@@ -32,7 +31,6 @@ function nodeKey(node: MarkdownNode, index: number): string {
   return `${node.type}:${nativeMarkdownNodePosition(node, index)}`;
 }
 
-/** Code inside markdown scales with the base text size (12pt at the default 15pt body). */
 function codeBlockFontSize(textStyle: NativeMarkdownTextStyle): number {
   return Math.max(10, Math.round(textStyle.fontSize * 0.8));
 }
@@ -104,8 +102,6 @@ function HighlightedCodeText(props: {
   readonly highlighted: HighlightedCode | null;
   readonly textStyle: NativeMarkdownTextStyle;
 }) {
-  // The text root provides inherited styles through context. A new style object
-  // would rerender every token even when its completed line is unchanged.
   const fontSize = codeBlockFontSize(props.textStyle);
   const lineHeight = codeBlockLineHeight(props.textStyle);
   const style = useMemo(

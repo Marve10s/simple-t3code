@@ -70,8 +70,6 @@ import { createSwipeRowActivation } from "./swipe-row-activation";
 import { SwipeableScrollGateProvider, useSwipeableScrollGate } from "./thread-swipe-actions";
 import { useMaterialFabScroll } from "./MaterialFabScrollContext";
 
-/* ─── Types ──────────────────────────────────────────────────────────── */
-
 interface HomeScreenProps {
   readonly projects: ReadonlyArray<EnvironmentProject>;
   readonly threads: ReadonlyArray<EnvironmentThreadShell>;
@@ -95,7 +93,6 @@ interface HomeScreenProps {
   readonly onSelectThread: (thread: EnvironmentThreadShell) => void;
   readonly onArchiveThread: (thread: EnvironmentThreadShell) => void;
   readonly onDeleteThread: (thread: EnvironmentThreadShell) => void;
-  /** Resolves true iff the settle was dispatched and succeeded. */
   readonly onSettleThread: (thread: EnvironmentThreadShell) => Promise<boolean>;
   readonly onSnoozeThread: (
     thread: EnvironmentThreadShell,
@@ -121,34 +118,9 @@ interface HomeScreenProps {
   readonly onNewThreadInProject: (project: EnvironmentProject) => void;
 }
 
-/* ─── Layout constants ───────────────────────────────────────────────── */
-
-// v2 rows are mixed-height: settled slim rows run ~60dp, single-line cards
-// measured ~74dp on device (252px on the Pixel 10 Pro screenshot), two-line
-// cards ~94dp. The estimate seeds the recycler's initial container count,
-// `ceil((scrollLength + 2 * INITIAL_DRAW_DISTANCE) / estimate)` with the
-// initial draw distance capped at 50, so an estimate at or below the average
-// row height starts the pool at or above the item count for the short lists
-// that LegendList otherwise keeps pooling to exactly its item count — that is
-// what stopped the dev-mode "no unused container available" warning on the
-// seeded short-list device passes. It is a mitigation, not an elimination:
-// after first layout the full drawDistance applies, and a sudden expansion
-// past the pooled headroom (~25+ items appearing at once) still creates a
-// container on demand with the dev-only warning one pass ahead of the
-// measured-height pool expansion. The old tallest-card estimate (~92) fired
-// that warning on every ordinary shelf expand, so the average wins.
 const ESTIMATED_THREAD_LIST_V2_ROW_HEIGHT = 72;
-// Rows away from the viewport are cheap dormant frames (see
-// swipe-row-activation), so render further ahead: a fast fling then reaches
-// rows that are already built instead of rows still being rebuilt.
 const THREAD_LIST_V2_DRAW_DISTANCE = 1_000;
 const PRE_LIQUID_GLASS_BOTTOM_TOOLBAR_HEIGHT = 44;
-/**
- * Top spacing between the list and the Android custom header. The Android
- * header is rendered in-flow above this screen and
- * already consumes the top safe-area inset, so the list only needs breathing
- * room here.
- */
 
 function deriveEmptyState(props: {
   readonly catalogState: WorkspaceState;
@@ -221,8 +193,6 @@ function HomeTopContentSpacer() {
   return <View className="h-4" />;
 }
 
-/* ─── Main screen ────────────────────────────────────────────────────── */
-
 export function HomeScreen(props: HomeScreenProps) {
   const queuedThreadKeys = useQueuedThreadKeys();
   const openSwipeableRef = useRef<SwipeableMethods | null>(null);
@@ -290,8 +260,6 @@ export function HomeScreen(props: HomeScreenProps) {
     },
     [swipeRowActivation],
   );
-  // Status-bar, accessibility and programmatic scrolls never arm the scroll
-  // gate, so every scroll also activates the visible rows once it settles.
   const activationTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   useEffect(() => () => clearTimeout(activationTimerRef.current), []);
   const handleListScroll = useCallback(
@@ -397,11 +365,6 @@ export function HomeScreen(props: HomeScreenProps) {
           ),
     [v2ScopedProjectGroup],
   );
-  // Thread List v2 (beta): one flat list in creation order, no grouping.
-  // Settled threads collapse into a recency tail below the card block.
-  // Settled threads stay in the live shell stream (settled ≠ archived), so
-  // the partition works directly off live shells — no snapshot merging or
-  // optimistic holds.
   const handleSettleThread = props.onSettleThread;
   const handleSnoozeThread = useCallback(
     (thread: EnvironmentThreadShell, snoozedUntil: string) => {
@@ -451,8 +414,6 @@ export function HomeScreen(props: HomeScreenProps) {
   );
   const handleDeleteThread = props.onDeleteThread;
   const handleUnsettleThread = props.onUnsettleThread;
-  // The settled tail renders in pages; expansion resets when the filter
-  // context changes so environment/search flips never inherit a deep page.
   const [settledVisibleCount, setSettledVisibleCount] = useState(
     THREAD_LIST_V2_SETTLED_INITIAL_COUNT,
   );
@@ -473,22 +434,15 @@ export function HomeScreen(props: HomeScreenProps) {
     toggleSettledShelf,
     toggleSnoozedShelf,
   } = useThreadListV2ShelfPreferences();
-  // The queued-start and snooze helpers need a clock while the list stays open.
   const [nowMinute, setNowMinute] = useState(() => new Date().toISOString().slice(0, 16));
-  // Snooze wake times are second-precise; a counter bumped exactly at the
-  // next wake boundary re-runs the partition with a fresh clock so a woken
-  // thread reappears immediately instead of on the next minute tick.
   const [snoozeWakeTick, bumpSnoozeWakeTick] = useState(0);
   useFocusEffect(
     useCallback(() => {
-      // Refresh immediately on enable or focus because the previous value can be hours old.
       setNowMinute(new Date().toISOString().slice(0, 16));
       const id = setInterval(() => setNowMinute(new Date().toISOString().slice(0, 16)), 60_000);
       return () => clearInterval(id);
     }, []),
   );
-  // Threads on servers without the settlement capability never classify as
-  // settled (the user could neither un-settle nor pin them).
   const serverConfigs = useAtomValue(environmentServerConfigsAtom);
   const settlementEnvironmentIds = useMemo(() => {
     const supported = new Set<EnvironmentId>();
@@ -563,13 +517,8 @@ export function HomeScreen(props: HomeScreenProps) {
       ),
     [serverConfigs],
   );
-  // Reference-stable provider glyphs: a fresh object per render would break
-  // the memoized rows' props comparison on every parent render.
   const resolveProviderInstance = useThreadRowProviderInstanceResolver(serverConfigs);
   const pendingOrder = usePendingThreadOrder(nowMinute, snoozeWakeTick);
-  // Up/down menu availability for every card, computed once per section per
-  // rebuild (see computeThreadMoveAvailability): per-thread planner calls made
-  // list construction quadratic, and this list rebuilds on every minute tick.
   const threadMoveAvailability = useMemo(() => {
     const sectionAvailability = (section: "pinned" | "active") =>
       computeThreadMoveAvailability({
@@ -607,8 +556,6 @@ export function HomeScreen(props: HomeScreenProps) {
     snoozeWakeTick,
   ]);
   const threadListV2Layout = useMemo(() => {
-    // Settled threads are live shells; archived threads keep their original
-    // "hidden from lists" meaning.
     return buildThreadListV2Items({
       pendingOrder,
       threads: props.threads.filter((thread) => thread.archivedAt === null),
@@ -641,8 +588,6 @@ export function HomeScreen(props: HomeScreenProps) {
     matchedThreadKeys,
     v2ScopedProjectGroup,
   ]);
-  // Re-partition the moment the earliest snooze expires (clamped to the
-  // signed-32-bit setTimeout range; far-future wakes re-arm at the clamp).
   const nextSnoozeWakeAt = threadListV2Layout.nextSnoozeWakeAt;
   useEffect(() => {
     if (nextSnoozeWakeAt === null) return;
@@ -651,14 +596,7 @@ export function HomeScreen(props: HomeScreenProps) {
     const delayMs = Math.min(Math.max(0, wakeAtMs - Date.now()) + 50, 2_147_483_647);
     const id = setTimeout(() => bumpSnoozeWakeTick((tick) => tick + 1), delayMs);
     return () => clearTimeout(id);
-    // snoozeWakeTick must re-arm the timer even when nextSnoozeWakeAt is
-    // unchanged: after a clamped fire (wake beyond the 32-bit setTimeout
-    // range) the boundary string is identical and the chain would die.
   }, [nextSnoozeWakeAt, snoozeWakeTick]);
-  // Queued tasks are not thread shells, so the v2 partition never sees them;
-  // they are spliced in below the active block and stay visible and deletable
-  // while their environment is offline. Same environment scope and search
-  // filter as the list itself.
   const v2SearchQuery = props.searchQuery.trim().toLocaleLowerCase();
   const v2PendingTasks = useMemo(
     () =>
@@ -859,10 +797,6 @@ export function HomeScreen(props: HomeScreenProps) {
   );
   const v2KeyExtractor = useCallback((item: ThreadListV2ListItem) => item.key, []);
 
-  // FlatList/LegendList treat a changed extraData identity as "re-render every
-  // visible row", so an inline object literal would invalidate all rows on
-  // every HomeScreen render — and the minute clock must stay out of it for
-  // the same reason: the clock text is precomputed per item instead.
   const v2ExtraData = useMemo(
     () => ({
       projectByKey,
@@ -882,11 +816,6 @@ export function HomeScreen(props: HomeScreenProps) {
     ],
   );
 
-  /* Empty states */
-  // The signal must ignore the search/environment filters: an active query
-  // that matches nothing needs the in-list "No results" state, not the
-  // full-page "No threads yet". Settled threads are unarchived live shells,
-  // so the archived-at check already covers the settled shelf.
   const hasAnyThreads =
     props.threads.some((thread) => thread.archivedAt === null) || props.pendingTasks.length > 0;
   const selectedEnvironmentLabel =
@@ -894,9 +823,6 @@ export function HomeScreen(props: HomeScreenProps) {
       ? null
       : (props.savedConnectionsById[props.selectedEnvironmentId]?.environmentLabel ??
         "this environment");
-  // Connection state surfaces in the header title slot
-  // (WorkspaceConnectionTitle) — nothing renders inside the list, so
-  // reconnects never shift the rows.
   const emptyState = deriveEmptyState({
     catalogState: props.catalogState,
     projectCount: props.projects.length,
@@ -947,12 +873,8 @@ export function HomeScreen(props: HomeScreenProps) {
 
   const listHeader = Platform.OS === "ios" ? null : <HomeTopContentSpacer />;
 
-  // Project scoping lives in the header filter menu (no inline chip row on
-  // mobile — the menu is the one filter surface).
   const v2ListHeader = listHeader;
 
-  // Use the v2 project scope for its empty state. Snoozed threads need no
-  // special empty state: their shelf header is a list row even while collapsed.
   const v2ListEmpty =
     hasSearchQuery && threadSearch.isPending ? null : hasSearchQuery ? (
       <EmptyState
@@ -1002,9 +924,6 @@ export function HomeScreen(props: HomeScreenProps) {
             : "flex-1 bg-screen"
         }
       >
-        {/* Shared with the iPad sidebar: cells are reused across data
-            rebuilds and `itemsAreEqual` keeps a minute tick (or an unrelated
-            shell update) from re-rendering untouched rows. */}
         <SwipeableScrollGateProvider enabled={swipeEnabled} activation={swipeRowActivation}>
           <LegendList
             ref={listRef}

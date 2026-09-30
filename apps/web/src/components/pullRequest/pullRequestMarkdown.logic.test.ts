@@ -9,8 +9,6 @@ describe("pull request body segmentation", () => {
     ]);
   });
 
-  // GitHub writes a dropped image into the body as an `<img>` tag, so a bare attachment link on
-  // its own line is the shape it uses for a video — every one sampled in the wild was one.
   it("lifts a dropped video out and keeps the prose around it", () => {
     expect(
       splitPullRequestBody(

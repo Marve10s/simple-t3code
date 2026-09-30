@@ -22,7 +22,6 @@ export function usagePriceForm(model = "", price?: UsageModelPriceOverride): Usa
   };
 }
 
-/** Blank cache prices use the input rate; explicit zero means free. */
 export function parseUsagePriceForm(
   form: UsagePriceForm,
 ): { model: string; price: UsageModelPriceOverride } | null {

@@ -20,7 +20,6 @@ export type UsagePriceWriteResult =
   | { readonly status: "saved" }
   | { readonly status: "failed"; readonly error: string };
 
-/** Each destination settles independently; retry callers pass only the failed destinations. */
 export async function writeUsagePrices(input: {
   readonly targets: readonly UsagePriceTarget[];
   readonly changes: ReadonlyMap<EnvironmentId, readonly UsagePriceChange[]>;

@@ -53,7 +53,6 @@ export interface CodexReleaseAsset {
   readonly sha256: string;
   readonly archiveBytes: number;
 }
-// Official complete packages retain the code-mode, search, and resource companions.
 const RELEASES: Readonly<Record<string, CodexReleaseAsset>> = {
   "darwin-arm64": {
     version: "0.156.1",
@@ -335,9 +334,7 @@ export const makeCodexInstallation = Effect.fn("makeCodexInstallation")(function
         Effect.provideService(FileSystem.FileSystem, fs),
         Effect.provideService(Path.Path, path),
       );
-      // Keep launcher symlinks intact: version-manager shims dispatch by their invoked name.
       const realExecutablePath = yield* fs.realPath(executablePath);
-      // A PATH entry pointing into T3's download remains a managed installation.
       const realManaged = yield* fs.realPath(managedDirectory).pipe(Effect.option);
       if (
         realExecutablePath.startsWith(
@@ -368,7 +365,6 @@ export const makeCodexInstallation = Effect.fn("makeCodexInstallation")(function
             );
       localCache.set(executablePath, { fingerprint, executable });
       if (!executable) return null;
-      // Cache executable probes, but reclassify against the current manifest on every resolve.
       const advisory = yield* compatibility(executable.version);
       return advisory?.status === "supported" ? executable : null;
     },

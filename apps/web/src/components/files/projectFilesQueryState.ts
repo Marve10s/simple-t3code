@@ -20,7 +20,6 @@ const EMPTY_PROJECT_FILE_PATH = "";
 const EMPTY_PROJECT_FILE_QUERY_ATOM = Atom.make(
   AsyncResult.initial<ProjectReadFileResult, never>(false),
 ).pipe(Atom.withLabel("project-file-query:empty"));
-/** A pending in-app write to the file, overlaying the query until confirmed. */
 export function optimisticFileAtom(
   environmentId: EnvironmentId,
   cwd: string,
@@ -37,7 +36,6 @@ interface ProjectQueryState<A> {
 }
 
 interface ProjectFileQueryState extends ProjectQueryState<ProjectReadFileResult> {
-  /** The path exists but is not a regular file, typically a directory. */
   readonly isNotFile: boolean;
 }
 
@@ -162,14 +160,6 @@ export function useProjectEntriesQuery(
   };
 }
 
-/**
- * Backing query for the project file picker: a debounced, bounded, file-only
- * server search. An empty query is a valid request — the index answers it
- * with frecency-ordered files, so the picker's initial view is recent files
- * without transferring the full workspace listing. `matchedQuery` is the
- * query the returned entries were computed for, so the caller can highlight
- * against results instead of half-typed input.
- */
 export function useProjectFilePickerQuery(
   environmentId: EnvironmentId,
   cwd: string,
@@ -203,8 +193,6 @@ export function useProjectFileQuery(
   relativePath: string | null,
   enabled = true,
 ): ProjectFileQueryState {
-  // The caller decides what to read. A media path is not skipped here: a folder
-  // named `assets.png` is only knowable as a folder from the read failure.
   const atom = enabled
     ? getProjectFileQueryAtom(environmentId, cwd, relativePath)
     : EMPTY_PROJECT_FILE_QUERY_ATOM;

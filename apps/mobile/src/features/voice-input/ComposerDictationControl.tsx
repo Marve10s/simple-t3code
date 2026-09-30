@@ -42,7 +42,6 @@ const TOOLBAR_FLIP_TIMING = {
 const TOOLBAR_HALF_HEIGHT = 22;
 const TOOLBAR_PERSPECTIVE = 600;
 
-/** Moves each face around the same horizontal axis, keeping their edges together. */
 function toolbarFlip(fromDegrees: number, toDegrees: number): EntryExitAnimationFunction {
   return () => {
     "worklet";
@@ -93,7 +92,6 @@ const WAVEFORM_TIMING = {
   reduceMotion: ReduceMotion.System,
 } as const;
 
-/** Rotates the compact draft away without unmounting or resizing its native editor. */
 export function ComposerDictationDraftContent(props: {
   readonly children: ReactNode;
   readonly className?: string;
@@ -131,7 +129,6 @@ export function ComposerDictationDraftContent(props: {
   );
 }
 
-/** Flips the entire row while keeping the outgoing controls intact until it leaves. */
 export function ComposerDictationToolbar(props: {
   readonly children: ReactNode;
   readonly showsDictation: boolean;

@@ -50,8 +50,6 @@ const TAB_OPTIONS = [
   { value: "limits", label: "Limits" },
 ] as const satisfies readonly { value: UsageTab; label: string }[];
 
-// Labels are abbreviated to share a row with the metric toggle; screen
-// readers get the full phrase.
 const WINDOW_OPTIONS = [
   { value: 1, label: "24h", accessibilityLabel: "Past 24 hours" },
   { value: 7, label: "7d", accessibilityLabel: "Past 7 days" },
@@ -67,16 +65,10 @@ const METRIC_OPTIONS = [
 const CHART_HEIGHT = 180;
 const CURSOR_KEYCHAIN_COPY = "Requires access to your Cursor login in macOS Keychain.";
 
-/**
- * Two tabs over one screen. Usage is the transcript-derived spend for a
- * period; Limits is the live subscription quota, which has no period. Both
- * pull to refresh, each refreshing its own data.
- */
 export function UsageRouteScreen() {
   const route = useRoute<RouteProp<{ Usage: { tab?: string } | undefined }, "Usage">>();
   const navigation = useNavigation();
   const insets = useSafeAreaInsets();
-  // Preserve the Limits default while honoring explicit widget/navigation links.
   const [selection, setSelection] = useState(() => ({
     params: route.params,
     tab: (route.params?.tab === "usage" ? "usage" : "limits") as UsageTab,
@@ -300,8 +292,6 @@ export function UsageRouteScreen() {
             />
           ) : (
             <>
-              {/* Period and metric together: neither applies to Limits, and
-                both change every number below, so they share one bar. */}
               <View className="gap-3 ios:flex-row ios:items-center">
                 <SegmentedControl
                   options={WINDOW_OPTIONS}
@@ -475,7 +465,6 @@ function CursorEnableLimits({
   );
 }
 
-/** Headline figure, the animated daily chart, and its legend, in one card. */
 function ChartCard(props: {
   readonly merged: MergedUsage;
   readonly days: readonly string[];
@@ -559,8 +548,6 @@ function ProviderSection(props: {
   const colors = useProviderColors();
   if (merged.providers.length === 0 && props.cursorAccessEnvironments.length === 0) return null;
 
-  // Ranked by whatever the toggle is showing, so the rows always descend.
-  // .sort() on a copy, not .toSorted(): Hermes doesn't ship the ES2023 method.
   const ordered = [...merged.providers].sort((a, b) =>
     metric === "cost" ? b.costUsd - a.costUsd : b.totalTokens - a.totalTokens,
   );
@@ -741,11 +728,6 @@ function ModelsSection(props: { readonly merged: MergedUsage }) {
   );
 }
 
-/**
- * Says plainly when the totals are incomplete: an environment still answering,
- * one that failed, or one whose transcripts another environment already
- * reported.
- */
 function isUsageLoading(environment: EnvironmentUsageStatus) {
   return environment.isPending || (environment.summary === null && environment.error === null);
 }

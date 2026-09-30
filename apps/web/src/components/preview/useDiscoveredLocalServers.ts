@@ -8,10 +8,6 @@ import { useDiscoveredPortsState } from "~/portDiscoveryState";
 
 export interface PreviewableServer extends DiscoveredLocalServer {
   source: "scanner" | "configured";
-  /**
-   * Pre-resolution loopback url. `url` is the resolved navigation target
-   * (volatile on a remote environment); history must key off this instead.
-   */
   requestedUrl: string;
 }
 
@@ -20,10 +16,6 @@ interface UseDiscoveredLocalServersInput {
   configuredUrls?: ReadonlyArray<string> | undefined;
 }
 
-/**
- * Enrich the environment-level live server snapshot with matching configured
- * URLs and return a stable sorted list.
- */
 export function useDiscoveredLocalServers(
   input: UseDiscoveredLocalServersInput,
 ): ReadonlyArray<PreviewableServer> {

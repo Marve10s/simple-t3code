@@ -489,7 +489,6 @@ export default function DiffPanel({
             filePath: resolveFileDiffPath(fileDiff),
             fileKey,
             fileVersion,
-            // Header-only placeholders use the viewer's collapsed geometry until their patch arrives.
             collapsed:
               collapsedDiffFileKeys.has(fileKey) ||
               fileDiff.cacheKey?.endsWith(":pending") === true,
@@ -646,9 +645,6 @@ export default function DiffPanel({
     if (!routeThreadRef) return;
     useDiffPanelStore.getState().selectBranchBaseRef(routeThreadRef, baseRef);
   };
-  // The scope menu has two radio groups: the top-level one treats the latest
-  // turn as "latest", while the turn sub-menu keys every turn by id so the
-  // latest turn is also marked there.
   const selectedTurnValue = selectedTurn ? `turn:${selectedTurn.turnId}` : "";
   const selectedScopeValue =
     selectedTurnId === null
@@ -1030,8 +1026,6 @@ export default function DiffPanel({
                     const composedPath = event.nativeEvent.composedPath?.() ?? [];
                     for (const node of composedPath) {
                       if (!(node instanceof HTMLElement)) continue;
-                      // Header controls keep their own actions. In particular, the chevron must
-                      // not also trigger the row handler or the two toggles cancel each other.
                       if (node instanceof HTMLButtonElement || node instanceof HTMLAnchorElement) {
                         return;
                       }
@@ -1041,7 +1035,6 @@ export default function DiffPanel({
                         node instanceof HTMLElement && node.hasAttribute("data-title"),
                     );
                     const filePath = title?.textContent;
-                    // The filename remains the explicit "open in editor" affordance.
                     if (filePath) {
                       openDiffFile(filePath);
                       return;

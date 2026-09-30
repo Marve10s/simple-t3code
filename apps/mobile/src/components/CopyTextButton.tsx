@@ -39,7 +39,6 @@ export const CopyTextButton = memo(function CopyTextButton(props: {
         try {
           if (props.onCopy) await props.onCopy();
           else if (!(await tryCopyTextWithHaptic(props.text))) {
-            // A refused clipboard write is the common failure, and silence reads as success.
             Alert.alert("Could not copy", "Try again.");
             return;
           }

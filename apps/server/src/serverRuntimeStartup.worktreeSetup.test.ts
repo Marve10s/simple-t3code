@@ -144,8 +144,6 @@ it.effect(
       const payload = yield* Schema.decodeUnknownEffect(WorktreeSetupSnapshot)(
         command.activity.payload,
       );
-      // The turn is live; only the background script was lost. Nothing asks the
-      // user to resend, and the setup reads as done with a failed script stage.
       assert.equal(payload.phase, "done");
       assert.isNull(payload.error);
       assert.deepEqual(

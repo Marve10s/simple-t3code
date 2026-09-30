@@ -112,7 +112,6 @@ export const makeDiscovery = Effect.gen(function* () {
                   }),
         },
       });
-      // A configured fj account owns its requests, including authentication errors.
       if (fj.status === "available" && (login || Result.isFailure(credentials))) {
         if (login && fj.auth.status === "authenticated" && cli.getAccount) {
           const account = yield* cli.getAccount({ cwd, baseUrl: login.url }).pipe(Effect.result);
@@ -323,7 +322,6 @@ export const make = Effect.gen(function* () {
         const repo = yield* cli.resolveRepository(input);
         const pull = yield* getPull(input);
         if (repo.command === "fj") {
-          // fj checkout cannot target a repository outside the local remotes.
           const urls = yield* request(
             { ...input, path: repositoryPath(repo.repository) },
             RepositorySchema,
@@ -373,8 +371,6 @@ export const make = Effect.gen(function* () {
             ],
           });
         if (input.force) {
-          // tea leaves an existing PR branch at its old tip. Keep dirty files safe
-          // while bringing the selected branch to the PR revision we fetched.
           yield* process.run({
             operation: "ForgejoSourceControlProvider.checkoutChangeRequest",
             command: "git",

@@ -28,7 +28,6 @@ import { useProjects, useServerConfigs } from "~/state/entities";
 import { threadEnvironment } from "~/state/threads";
 import { useAtomCommand } from "~/state/use-atom-command";
 
-/** Routes link actions through the command advertised by this environment. */
 export function usePullRequestLinking(environmentId: EnvironmentId | null | undefined) {
   const configs = useServerConfigs();
   const projects = useProjects();

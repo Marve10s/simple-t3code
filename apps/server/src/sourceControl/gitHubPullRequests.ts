@@ -35,9 +35,6 @@ const GitHubPullRequestSchema = Schema.Struct({
   mergedAt: Schema.optional(Schema.NullOr(Schema.String)),
   updatedAt: Schema.optional(Schema.OptionFromNullOr(Schema.DateTimeUtcFromString)),
   isCrossRepository: Schema.optional(Schema.Boolean),
-  // gh < 2.47 exports headRepository as {id, name} only; nameWithOwner was
-  // added later. Both fields stay optional so a version-drifted gh CLI can
-  // never fail the decode and silently drop the PR from the list.
   headRepository: Schema.optional(
     Schema.NullOr(
       Schema.Struct({

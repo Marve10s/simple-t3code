@@ -1,11 +1,3 @@
-/**
- * ProjectionPendingApprovalRepository - Repository interface for pending approvals.
- *
- * Owns persistence operations for projected approval requests awaiting user
- * decisions.
- *
- * @module ProjectionPendingApprovalRepository
- */
 import {
   ApprovalRequestId,
   IsoDateTime,
@@ -42,51 +34,28 @@ export const GetProjectionPendingApprovalInput = Schema.Struct({
 });
 export type GetProjectionPendingApprovalInput = typeof GetProjectionPendingApprovalInput.Type;
 
-/**
- * ProjectionPendingApprovalRepositoryShape - Service API for pending approvals.
- */
 export interface ProjectionPendingApprovalRepositoryShape {
-  /**
-   * Insert or replace a projected pending approval row.
-   *
-   * Upserts by `requestId`.
-   */
   readonly upsert: (
     row: ProjectionPendingApproval,
   ) => Effect.Effect<void, ProjectionRepositoryError>;
 
-  /**
-   * List pending approvals for a thread.
-   *
-   * Returned in ascending creation order.
-   */
   readonly listByThreadId: (
     input: ListProjectionPendingApprovalsInput,
   ) => Effect.Effect<ReadonlyArray<ProjectionPendingApproval>, ProjectionRepositoryError>;
 
-  /** Count pending approvals without loading resolved request history. */
   readonly countPendingByThreadId: (
     input: ListProjectionPendingApprovalsInput,
   ) => Effect.Effect<number, ProjectionRepositoryError>;
 
-  /**
-   * Read a pending approval row by request id.
-   */
   readonly getByRequestId: (
     input: GetProjectionPendingApprovalInput,
   ) => Effect.Effect<Option.Option<ProjectionPendingApproval>, ProjectionRepositoryError>;
 
-  /**
-   * Delete every pending approval row for a thread.
-   */
   readonly deleteByThreadId: (
     input: ListProjectionPendingApprovalsInput,
   ) => Effect.Effect<void, ProjectionRepositoryError>;
 }
 
-/**
- * ProjectionPendingApprovalRepository - Service tag for pending approval persistence.
- */
 export class ProjectionPendingApprovalRepository extends Context.Service<
   ProjectionPendingApprovalRepository,
   ProjectionPendingApprovalRepositoryShape

@@ -101,7 +101,6 @@ it.layer(TestLayer, { excludeTestServices: true })("WorkspaceFileSystemLive", (i
       }),
     );
 
-    // Needs mkfifo; Windows has no FIFOs to reject.
     it.effect.skipIf(HostProcessPlatform.defaultValue() === "win32")(
       "rejects a FIFO without blocking on open",
       () =>

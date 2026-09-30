@@ -42,8 +42,6 @@ export function acquireDesktopTab(tabId: string): AcquiredDesktopTab {
     ({
       references: 0,
       closeTimer: null,
-      // Zoom/appearance defaults travel with creation so the guest never
-      // paints a frame at 100%/system before the preference is applied.
       ready: enqueueDesktopTabOperation(tabId, async () =>
         previewBridge?.createTab(tabId, browserDefaultTabState(await resolveBrowserDefaults())),
       ),

@@ -151,8 +151,6 @@ projectionSnapshotLayer("ProjectionSnapshotQuery", (it) => {
         )
       `;
 
-      // A merged link plus a newer open one: the multi-link projection must
-      // resolve to the open pull request, not the stale JSON column below.
       yield* sql`
         INSERT INTO projection_thread_pull_requests (
           thread_id,
@@ -653,8 +651,6 @@ projectionSnapshotLayer("ProjectionSnapshotQuery", (it) => {
         snapshot.threads[0]?.linkedPullRequest,
       );
 
-      // Without link rows the legacy field is omitted, whatever the old JSON
-      // column still holds.
       yield* sql`DELETE FROM projection_thread_pull_requests`;
       const unlinkedShell = yield* snapshotQuery.getThreadShellById(ThreadId.make("thread-1"));
       assert.equal(unlinkedShell._tag, "Some");
@@ -1197,8 +1193,6 @@ projectionSnapshotLayer("ProjectionSnapshotQuery", (it) => {
           (${ORCHESTRATION_PROJECTOR_NAMES.checkpoints}, 4, '2026-04-06T00:00:07.000Z')
       `;
 
-      // Settled ≠ archived: the thread must appear in the LIVE shell
-      // snapshot, carrying its settlement fields through the row aliases.
       const shellSnapshot = yield* snapshotQuery.getShellSnapshot();
       assert.deepEqual(
         shellSnapshot.threads.map((thread) => thread.id),
@@ -1207,7 +1201,6 @@ projectionSnapshotLayer("ProjectionSnapshotQuery", (it) => {
       assert.equal(shellSnapshot.threads[0]?.settledOverride, "settled");
       assert.equal(shellSnapshot.threads[0]?.settledAt, "2026-04-06T00:00:04.000Z");
 
-      // And the full command read model carries them too.
       const readModel = yield* snapshotQuery.getCommandReadModel();
       const thread = readModel.threads.find(
         (candidate) => candidate.id === ThreadId.make("thread-settled"),
@@ -1385,7 +1378,6 @@ projectionSnapshotLayer("ProjectionSnapshotQuery", (it) => {
           )
       `;
 
-      // Bytes, not code points: the 4-byte emoji row is {"output":"😀"}, 17 bytes.
       const stats = yield* snapshotQuery.getEventReplayStats({
         fromSequenceExclusive: 1,
         toSequenceInclusive: 4,
@@ -2497,25 +2489,11 @@ it.effect(
 );
 
 projectionSnapshotLayer("ProjectionSnapshotQuery windowed thread detail", (it) => {
-  // A thread shaped like real fan-out usage: user turns interleaved with
-  // subagent turns (no user pending message), plus a turnless straggler user
-  // message and a turnless activity anchored between turns.
-  //
-  //   row  turn      pending msg        anchor (requested_at)
-  //   1    turn-1    user-msg-1         T00
-  //   2    turn-2    (subagent)         T01
-  //   3    turn-3    (subagent)         T02
-  //   4    turn-4    user-msg-4         T03
-  //   5    turn-5    user-msg-5         T04
-  //
-  // Straggler user message at T03.5 (turn_id NULL, not any pending_message_id)
-  // and a turnless activity at T03.6 — both belong to the page containing T03+.
   const seedFanOutThread = Effect.fnUntraced(function* (options?: {
     readonly importedMessageCount?: number;
   }) {
     const sql = yield* SqlClient.SqlClient;
 
-    // Tests in this block share one in-memory database; reset before seeding.
     yield* sql`DELETE FROM projection_projects`;
     yield* sql`DELETE FROM projection_threads`;
     yield* sql`DELETE FROM projection_turns`;
@@ -2597,8 +2575,6 @@ projectionSnapshotLayer("ProjectionSnapshotQuery windowed thread detail", (it) =
       `;
     }
 
-    // Straggler user message sent while turn-4 ran: turn_id NULL and not any
-    // turn's pending_message_id.
     yield* sql`
       INSERT INTO projection_thread_messages (
         message_id, thread_id, turn_id, role, text, is_streaming, created_at, updated_at
@@ -2606,7 +2582,6 @@ projectionSnapshotLayer("ProjectionSnapshotQuery windowed thread detail", (it) =
       VALUES ('user-msg-straggler', 'thread-w', NULL, 'user', 'while you are at it',
         0, '2026-03-01T00:03:30.000Z', '2026-03-01T00:03:30.000Z')
     `;
-    // Turnless activity in the same time range.
     yield* sql`
       INSERT INTO projection_thread_activities (
         activity_id, thread_id, turn_id, tone, kind, summary, payload_json, created_at
@@ -2650,10 +2625,6 @@ projectionSnapshotLayer("ProjectionSnapshotQuery windowed thread detail", (it) =
       yield* seedFanOutThread();
       const snapshotQuery = yield* ProjectionSnapshotQuery;
 
-      // turnLimit 2 walks back: turn-5 (user), turn-4 (user) -> window is
-      // rows 4..5. Subagent turns 2-3 are older than the 2nd user turn and
-      // stay out; the straggler message and turnless activity (T03.5/T03.6,
-      // after turn-4's anchor) ride along.
       const snapshot = yield* snapshotQuery.getThreadDetailSnapshot(threadW, { turnLimit: 2 });
       assert.equal(snapshot._tag, "Some");
       if (snapshot._tag === "Some") {
@@ -2681,8 +2652,6 @@ projectionSnapshotLayer("ProjectionSnapshotQuery windowed thread detail", (it) =
       yield* seedFanOutThread();
       const snapshotQuery = yield* ProjectionSnapshotQuery;
 
-      // turnLimit 3 reaches user turn-1, dragging subagent turns 2-3 along:
-      // the full thread, so no further pages.
       const snapshot = yield* snapshotQuery.getThreadDetailSnapshot(threadW, { turnLimit: 3 });
       assert.equal(snapshot._tag, "Some");
       if (snapshot._tag === "Some") {
@@ -2696,10 +2665,6 @@ projectionSnapshotLayer("ProjectionSnapshotQuery windowed thread detail", (it) =
 
   it.effect("cursors survive a projection rewrite that reassigns turn row ids", () =>
     Effect.gen(function* () {
-      // The revert projector (and any projection rebuild) deletes and
-      // re-upserts projection_turns, assigning fresh autoincrement row ids.
-      // The keyset cursor is derived from event content, so a page cursor
-      // minted before the rewrite must keep working after it.
       yield* seedFanOutThread();
       const sql = yield* SqlClient.SqlClient;
       const snapshotQuery = yield* ProjectionSnapshotQuery;
@@ -2711,8 +2676,6 @@ projectionSnapshotLayer("ProjectionSnapshotQuery windowed thread detail", (it) =
       assert.notEqual(cursor, null);
       if (cursor === null || cursor === undefined) return;
 
-      // Simulate the rewrite: delete and re-insert every turn row with the
-      // same content, which reassigns all row ids.
       const turnRows = yield* sql`
         SELECT thread_id, turn_id, pending_message_id, state, requested_at, started_at,
           completed_at, checkpoint_files_json
@@ -2738,7 +2701,6 @@ projectionSnapshotLayer("ProjectionSnapshotQuery windowed thread detail", (it) =
       });
       assert.equal(olderPage._tag, "Some");
       if (olderPage._tag === "Some") {
-        // Identical older slice to what the pre-rewrite cursor would return.
         assert.deepEqual(messageIds(olderPage.value), [
           "turn-1-reply",
           "turn-2-reply",
@@ -2763,8 +2725,6 @@ projectionSnapshotLayer("ProjectionSnapshotQuery windowed thread detail", (it) =
       assert.notEqual(cursor, undefined);
       if (cursor === null || cursor === undefined) return;
 
-      // Older page: user turn-1 plus subagent turns 2-3 riding along. Disjoint
-      // from the first page: no turn-4/5 rows, no straggler.
       const olderPage = yield* snapshotQuery.getThreadDetailSnapshot(threadW, {
         turnLimit: 1,
         beforeCursor: cursor,
@@ -2880,8 +2840,6 @@ projectionSnapshotLayer("ProjectionSnapshotQuery windowed thread detail", (it) =
       yield* seedFanOutThread();
       const snapshotQuery = yield* ProjectionSnapshotQuery;
 
-      // Page repeatedly with turnLimit 1 and assert the union of all pages is
-      // exactly the full thread with no duplicates (disjointness + coverage).
       const seenMessages: string[] = [];
       const seenActivities: string[] = [];
       let cursor: string | undefined;
@@ -3622,7 +3580,6 @@ it.effect("reads one sweep thread and its projects like the shell snapshot", () 
     }
 
     const full = yield* query.getShellSnapshot();
-    // The seeded fields must reach the snapshot, or the parity check is empty.
     const linked = full.threads.find((thread) => thread.id === ThreadId.make("t-linked"));
     assert.strictEqual(full.snapshotSequence, 9);
     assert.strictEqual(linked?.linkedPullRequest?.number, 7);
@@ -3631,7 +3588,6 @@ it.effect("reads one sweep thread and its projects like the shell snapshot", () 
 
     for (const [threadId, projectIds] of [
       [ThreadId.make("t-linked"), [asProjectId("p1")]],
-      // Settlement also needs the project that the saved branch PR names.
       [ThreadId.make("t-branch"), [asProjectId("p1"), asProjectId("p2")]],
     ] as const) {
       assert.deepStrictEqual(yield* readSweepSnapshot(query, threadId), {
@@ -3676,9 +3632,6 @@ it.effect("reads a full sweep from unsettled threads and every project", () => {
           NULL, '2026-09-01T00:00:00Z', '2026-09-01T00:00:00Z', NULL, NULL, NULL),
         ('t-settled', 'p3', 'Settled', '{"provider":"codex","model":"gpt-5"}', 'full-access', 'default', NULL, 'turn-settled', '2026-09-01T00:00:00Z', '2026-09-01T00:00:00Z', NULL, 'settled', '2026-09-03T00:00:00Z'),
         ('t-archived', 'p4', 'Archived', '{"provider":"codex","model":"gpt-5"}', 'full-access', 'default', NULL, NULL, '2026-09-01T00:00:00Z', '2026-09-01T00:00:00Z', '2026-09-04T00:00:00Z', NULL, NULL)`;
-    // The open and the settled thread both have a row in each joined table. The
-    // settled thread's turn and session are the newest rows, so updatedAt shows
-    // whether those two reads skip it.
     yield* sql`INSERT INTO projection_thread_pull_requests (thread_id, host, repository, number, url, source, linked_at)
       VALUES ('t-open', 'github.com', 'acme/web', 7, 'https://github.com/acme/web/pull/7', 'agent', '2026-09-02T00:00:00Z'),
         ('t-settled', 'github.com', 'acme/web', 9, 'https://github.com/acme/web/pull/9', 'agent', '2026-09-02T00:00:00Z')`;
@@ -3690,7 +3643,6 @@ it.effect("reads a full sweep from unsettled threads and every project", () => {
         ('t-settled', 'stopped', 'codex', NULL, NULL, '2026-09-10T00:00:00Z')`;
 
     const full = yield* query.getShellSnapshot();
-    // The settled thread's rows must reach the full read, or skipping them proves nothing.
     const settled = full.threads.find((thread) => thread.id === ThreadId.make("t-settled"));
     assert.strictEqual(settled?.pullRequests[0]?.number, 9);
     assert.strictEqual(settled?.latestTurn?.turnId, asTurnId("turn-settled"));
@@ -3708,12 +3660,8 @@ it.effect("reads a full sweep from unsettled threads and every project", () => {
       sweep.threads.map((thread) => thread.id),
       ["t-branch", "t-open", "t-resumed"],
     );
-    // Like the full read, the sweep resolves every project, so it keeps the
-    // repository identity cache warm for client connects.
     assert.deepStrictEqual(sweep.projects, full.projects);
     assert.deepStrictEqual(resolved.toSorted(), ["/four", "/one", "/three", "/two"]);
-    // A settled thread's link that no longer decodes breaks the full read, but
-    // not the sweep, which never reads it.
     yield* sql`UPDATE projection_thread_pull_requests SET snapshot_json = 'invalid-json' WHERE thread_id = 't-settled'`;
     assert.strictEqual((yield* Effect.exit(query.getShellSnapshot()))._tag, "Failure");
     const unsettled = yield* query.getShellSnapshot({ unsettledOnly: true });

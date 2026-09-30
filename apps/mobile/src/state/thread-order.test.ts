@@ -29,14 +29,12 @@ vi.mock("./use-thread-outbox", async () => {
   return { queuedThreadKeysAtom: Atom.make(new Set<string>()).pipe(Atom.keepAlive) };
 });
 
-// The mocked shell source is writable so tests can deliver canonical upserts.
 const shellsAtom = environmentThreadShells.threadShellsAtom as Atom.Writable<
   readonly EnvironmentThreadShell[],
   readonly EnvironmentThreadShell[]
 >;
 
 function fixture() {
-  // Only section membership and order fields are read by this coordinator.
   const rows = ["a", "b"].map(
     (id, index) =>
       ({

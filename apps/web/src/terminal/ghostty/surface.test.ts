@@ -42,8 +42,6 @@ vi.mock("./vendor/ghostty-write-pty.wasm?url&no-inline", async () => ({
 describe("GhosttyTerminalSurface visibility", () => {
   const surfaces = new Set<GhosttyTerminalSurface>();
 
-  // Keep the real surface, renderer, and WASM core. Only browser layout and
-  // scheduling are replaced so tests can count work while the terminal is hidden.
   function createHarness() {
     vi.useFakeTimers();
     const frames = new Map<number, FrameRequestCallback>();
@@ -298,8 +296,6 @@ describe("GhosttyTerminalSurface visibility", () => {
     expect(harness.onData.mock.calls.at(-1)?.[0]).toBe("hello");
     expect(surface.getSelection()).toBe("hello");
 
-    // Without a selection there is no primary buffer to paste; the clipboard
-    // holds what the user copied and must not be substituted.
     surface.clearSelection();
     harness.pointer("pointerdown", 5, 4, false, 1);
     expect(readText).not.toHaveBeenCalled();
@@ -524,9 +520,6 @@ describe("shouldBlinkTerminalCursor", () => {
   });
 
   it("holds the cursor steady when blinking would be unwanted", () => {
-    // Unfocused surfaces draw a steady hollow cursor, DECSCUSR steady styles and
-    // DEC mode 12 turn blinking off, a hidden cursor has nothing to toggle, and
-    // reduced-motion readers get no permanently animating element.
     expect(shouldBlinkTerminalCursor({ ...blinking, focused: false })).toBe(false);
     expect(shouldBlinkTerminalCursor({ ...blinking, cursorBlinking: false })).toBe(false);
     expect(shouldBlinkTerminalCursor({ ...blinking, cursorVisible: false })).toBe(false);
@@ -596,17 +589,12 @@ describe("terminalLinkAtPositionWithRange", () => {
       isWrapContinuation,
       wrapsToNext,
     });
-    // The head of the wrapped line scrolled above the viewport.
     const headCut = [row("ple.com/missing", true), row("head", true)];
     expect(terminalLinkAtPositionWithRange(headCut, 0, 4)).toBeNull();
-    // The bottom row soft-wraps on below the viewport.
     const tailCut = [row("https://t3.codes", false, true)];
     expect(terminalLinkAtPositionWithRange(tailCut, 0, 8)).toBeNull();
-    // A partial bottom row is provably complete and still resolves.
     const complete = [row("https://t3.codes", false), row("", false)];
     expect(terminalLinkAtPositionWithRange(complete, 0, 8)?.text).toBe("https://t3.codes");
-    // A wide grapheme earlier in the row must not break truncation detection:
-    // the soft-wrap flag decides, not string-length-versus-cell-count.
     const wideFull: GhosttyRow = {
       cells: [
         { ...cell("🙂"), wide: 1 },
@@ -618,7 +606,6 @@ describe("terminalLinkAtPositionWithRange", () => {
       wrapsToNext: true,
     };
     expect(terminalLinkAtPositionWithRange([wideFull], 0, 8)).toBeNull();
-    // Unwritten trailing cells prove the bottom row is complete.
     const unwrittenTail: GhosttyRow = {
       cells: [
         ...Array.from("https://t3.codes", (character) => cell(character)),
@@ -686,9 +673,6 @@ describe("applyTerminalCopyEvent", () => {
   });
 
   it("leaves the writeText fallback alive when clipboardData is missing", () => {
-    // Electron's edit-menu Copy often delivers a copy event with no
-    // clipboardData. Claiming that event used to skip writeText and copy the
-    // empty IME textarea, which is the blank clipboard users paste.
     expect(applyTerminalCopyEvent("ls -la", null)).toEqual({
       preventDefault: false,
       claimWriteFallback: false,
@@ -908,9 +892,6 @@ describe("terminal font resolution", () => {
   });
 
   it("ignores proportional families the cell grid cannot lay out", () => {
-    // jsdom has no canvas metrics, so the probe answers "monospace" and the
-    // family is kept; the guard is exercised in the browser instead. Assert the
-    // shape stays intact so a rejected face still yields a usable stack.
     const stack = terminalFontFamily("Helvetica Neue");
     expect(stack.endsWith("monospace")).toBe(true);
   });
@@ -939,17 +920,12 @@ describe("terminalContentOriginY", () => {
   });
 
   it("pins the grid to the bottom by moving the sub-row slack above row 0", () => {
-    // 100px mount, 4px padding, 5 rows of 16px: 92 - 80 = 12px slack on top.
     expect(terminalContentOriginY(100, 4, 5, 16, true)).toBe(16);
-    // Exact fit keeps the origin at the padding.
     expect(terminalContentOriginY(88, 4, 5, 16, true)).toBe(4);
-    // A mount smaller than the grid never pushes the origin above the padding.
     expect(terminalContentOriginY(80, 4, 5, 16, true)).toBe(4);
   });
 
   it("keeps the prompt stationary while a drag crosses row boundaries", () => {
-    // Growing the mount pixel by pixel: the bottom edge (origin + rows*cell)
-    // tracks the mount bottom exactly until a new row fits.
     for (let height = 88; height < 104; height += 1) {
       const rows = Math.max(1, Math.floor((height - 8) / 16));
       const origin = terminalContentOriginY(height, 4, rows, 16, true);

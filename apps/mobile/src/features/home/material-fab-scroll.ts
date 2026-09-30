@@ -3,7 +3,6 @@ export interface MaterialFabScrollState {
   readonly expanded: boolean;
 }
 
-/** Ignore small direction changes and overscroll; always show the label at the top. */
 export function updateMaterialFabScroll(
   state: MaterialFabScrollState,
   offset: number,

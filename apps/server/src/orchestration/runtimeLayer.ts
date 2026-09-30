@@ -21,10 +21,6 @@ const OrchestrationInfrastructureLayerLive = Layer.mergeAll(
   OrchestrationProjectionSnapshotQueryLive,
   OrchestrationEventInfrastructureLayerLive,
   OrchestrationProjectionPipelineLayerLive,
-  // Shared background-liveness and plan-progress registries: written by
-  // runtime ingestion, read by the snapshot query. provideMerge feeds the
-  // same instance to the snapshot query here and re-exports it for runtime
-  // ingestion.
 ).pipe(
   Layer.provideMerge(ThreadBackgroundLiveness.layer),
   Layer.provideMerge(ThreadPlanProgress.layer),

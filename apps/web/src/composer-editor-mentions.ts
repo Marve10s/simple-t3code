@@ -81,7 +81,6 @@ export function collectComposerPromptInlineTokens(text: string) {
   const references = collectComposerContextReferences(text);
   if (citations.length === 0 && references.length === 0) return tokens;
 
-  // An unfinished @ mention can otherwise consume the start of a link label.
   const links = [
     ...citations.map((match) => ({ ...match, type: "citation" as const })),
     ...references.map((match) => ({ ...match, type: "context-reference" as const })),

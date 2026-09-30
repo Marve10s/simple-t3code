@@ -94,7 +94,6 @@ it.layer(NodeServices.layer)("RepositoryIdentityResolverLive", (it) => {
       const resolver = yield* RepositoryIdentityResolver.RepositoryIdentityResolver;
       const first = yield* resolver.resolve("/repo/packages/web");
       rootPath = "/repo/packages/web";
-      // Longer than the one-minute cadence of the background sweeps.
       yield* TestClock.adjust(Duration.minutes(10));
       const second = yield* resolver.resolve("/repo/packages/web");
 
@@ -186,8 +185,6 @@ it.layer(NodeServices.layer)("RepositoryIdentityResolverLive", (it) => {
 
       const resolver = yield* RepositoryIdentityResolver.RepositoryIdentityResolver;
       const identity = yield* resolver.resolve(cwd);
-      // Native realpath, since git reports the long form of a directory the
-      // temp dir may name by its 8.3 short form on Windows.
       const resolvedIdentityRoot =
         identity?.rootPath === undefined ? "" : NodeFS.realpathSync.native(identity.rootPath);
       const resolvedCwd = NodeFS.realpathSync.native(cwd);

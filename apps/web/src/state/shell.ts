@@ -40,8 +40,6 @@ export const allEnvironmentShellsBootstrappedAtom = Atom.make((get) => {
     if (connectionProjectionPhase(connection) !== "disconnected") {
       return false;
     }
-    // A retrying environment is only transiently disconnected; give it its
-    // first retries before letting the landing settle without its snapshot.
     if (connection.phase === "backoff" && connection.desired && connection.attempt <= 2) {
       return false;
     }
@@ -49,7 +47,6 @@ export const allEnvironmentShellsBootstrappedAtom = Atom.make((get) => {
   return true;
 }).pipe(Atom.withLabel("web-all-environment-shells-bootstrapped"));
 
-/** Cached or missing snapshots cannot establish that a saved project no longer exists. */
 export function createAllEnvironmentProjectSnapshotsReadyAtom(input: {
   readonly catalogValueAtom: Atom.Atom<EnvironmentCatalogState>;
   readonly shellStateValueAtom: (environmentId: EnvironmentId) => Atom.Atom<EnvironmentShellState>;
@@ -57,8 +54,6 @@ export function createAllEnvironmentProjectSnapshotsReadyAtom(input: {
 }) {
   return Atom.make((get) => {
     const catalog = get(input.catalogValueAtom);
-    // The persisted catalog can emit before platform discovery registers the
-    // primary environment. Neither that gap nor an empty catalog proves absence.
     if (!catalog.isReady || catalog.entries.size === 0) return false;
     if (
       input.requiresPrimaryEnvironment &&

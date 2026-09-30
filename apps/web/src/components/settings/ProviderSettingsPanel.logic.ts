@@ -60,35 +60,13 @@ export function resolveSelectedProviderEnvironmentId(
 
 export type ProviderEnvironmentAccess =
   | { readonly kind: "editable" }
-  /** `reason` distinguishes waiting on the device from waiting on permissions. */
   | { readonly kind: "loading"; readonly reason: "config" | "permissions" }
   | { readonly kind: "read-only" }
   | { readonly kind: "unavailable" }
   | { readonly kind: "error" };
 
-/**
- * Whether the session may change provider configuration on an environment.
- * `pending` means the answer is still unknown, which must not be presented as
- * editable: rendering controls we already know might be rejected only turns a
- * permission problem into a failed write.
- */
 export type ProviderOperateAccess = "granted" | "denied" | "pending";
 
-/**
- * Resolve operate access from an environment's `/api/auth/session` answer.
- *
- * Cached session data wins over an in-flight revalidation. The session atoms
- * are SWR-backed, so they report `isPending` on every background refresh;
- * treating that as unknown would flip a working panel back to loading and
- * discard in-progress edits.
- *
- * `missingScopesAccess` decides the case where the session resolved but did
- * not report scopes: the primary serves the web app itself so its server
- * always reports them (absence means denial), while a remote device may run an
- * older server version that predates scope reporting, where denial would lock
- * out a legitimate session. The environment RPC layer stays authoritative
- * either way.
- */
 function resolveSessionOperateAccess(input: {
   readonly session: Pick<AuthSessionState, "authenticated" | "scopes"> | null;
   readonly isPending: boolean;
@@ -99,9 +77,6 @@ function resolveSessionOperateAccess(input: {
     if (input.isPending) {
       return "pending";
     }
-    // A failed session fetch is a transport problem, not a permission
-    // decision — locking the panel read-only would misreport it. Stay
-    // optimistic; the environment RPC layer still rejects unauthorized writes.
     return input.hasError ? "granted" : "denied";
   }
   if (!input.session.authenticated) {
@@ -113,7 +88,6 @@ function resolveSessionOperateAccess(input: {
   return input.session.scopes.includes(AuthOrchestrationOperateScope) ? "granted" : "denied";
 }
 
-/** Operate access for the primary environment's own browser session. */
 export function resolvePrimaryOperateAccess(input: {
   readonly isPrimary: boolean;
   readonly hasDesktopBridge: boolean;
@@ -132,10 +106,6 @@ export function resolvePrimaryOperateAccess(input: {
   });
 }
 
-/**
- * Operate access for a non-primary environment, derived from the scopes its
- * `/api/auth/session` endpoint reports for this client's credential.
- */
 export function resolveRemoteOperateAccess(input: {
   readonly session: Pick<AuthSessionState, "authenticated" | "scopes"> | null;
   readonly isPending: boolean;

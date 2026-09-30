@@ -187,8 +187,6 @@ layer("OrchestrationEventStore", (it) => {
         messageEvent(ThreadId.make("pruned-thread"), "pruned-event"),
       );
       const second = yield* store.append(messageEvent(threadId, "scoped-second"));
-      // The same stream ID in a different aggregate is not part of this thread.
-      // Its invalid JSON must never reach the event decoder.
       yield* sql`
         INSERT INTO orchestration_events (
           event_id, aggregate_kind, stream_id, stream_version, event_type, occurred_at,
@@ -344,7 +342,6 @@ for (const reader of ["all", "aggregate"] as const) {
         Effect.sync(() => {
           assert.equal(event.sequence, count + 1);
           if (count % 500 === 0) {
-            // Count live page markers after full GC, without timing or heap-size thresholds.
             Object.assign(event, { replayPage: new ReplayPage() });
             assert.isAtMost(NodeV8.queryObjects(ReplayPage, { format: "count" }), 1);
           }

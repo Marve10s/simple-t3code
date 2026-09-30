@@ -17,9 +17,6 @@ import { Button } from "./ui/button";
 import { toastManager } from "./ui/toast";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "./ui/tooltip";
 
-// The wire "installing" stage is a sub-second launcher handoff, so the UI
-// folds it into the download phase; everything after the handoff is the
-// restart the user is actually waiting through.
 const UPDATE_STAGE_LABELS: Record<ServerUpdateStage, string> = {
   downloading: "Downloading…",
   installing: "Downloading…",
@@ -47,7 +44,6 @@ export interface ServerUpdateTarget {
 
 type UpdateButtonProps = Pick<ComponentProps<typeof Button>, "variant" | "size" | "className"> & {
   readonly label?: string;
-  /** "icon" renders a compact icon button with the label in a tooltip. */
   readonly appearance?: "button" | "icon";
 };
 
@@ -91,7 +87,6 @@ function useServerUpdate() {
   };
 }
 
-/** Updates eligible machines independently; manual paths remain in the machine list. */
 export function ServerUpdatesAction({
   targets,
   label = "Update all",
@@ -146,12 +141,6 @@ export function ServerUpdatesAction({
   );
 }
 
-/**
- * One-row status for an in-flight server update: "Downloading…" then
- * "Restarting…". The update is a wait, not a warning: a single pulsing dot
- * and label, no step rail, no versions. Failure turns the row red with the
- * rollback reason.
- */
 export function ServerUpdateProgress({
   state,
 }: {
@@ -179,11 +168,6 @@ export function ServerUpdateProgress({
   );
 }
 
-/**
- * Offers the update path advertised by a version-skewed server. Self-updates
- * delegate their full lifecycle to client-runtime so this component can
- * unmount during reconnect without losing operation state.
- */
 export function ServerUpdateAction({
   environmentId,
   serverLabel,
@@ -226,9 +210,6 @@ export function ServerUpdateAction({
       return;
     }
     if (isDesktopAppUpdate) {
-      // No themed host mounted (undefined) means proceed: the click itself
-      // was the request. This is the only confirmation in the flow; the
-      // remote machine installs without asking anyone there.
       const confirmed =
         (await requestConfirmDialog(
           `Update the T3 Code desktop app that runs the ${serverLabel}? It will close and relaunch on that machine.`,

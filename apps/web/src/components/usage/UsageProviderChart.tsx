@@ -30,7 +30,6 @@ interface UsageProviderChartProps {
   readonly timeZone: string;
 }
 
-/** One day's per-provider values, shared by the paths and the hover readout. */
 export interface DayColumn {
   readonly bands: readonly {
     readonly provider: UsageProviderKind;
@@ -69,7 +68,6 @@ export function buildPeriodColumns(
   });
 }
 
-/** Shape-preserving cubic tangents that cannot overshoot spiky usage data. */
 function monotoneTangents(points: readonly Point[]): readonly number[] {
   const count = points.length;
   if (count < 2) return [0];
@@ -147,14 +145,6 @@ function curvePath(segments: readonly CurveSegment[]): string {
   return path;
 }
 
-/**
- * Builds a scale whose maximum is a readable 1/2/5 x 10^n step at or above the
- * peak.
- *
- * Rounding the maximum *up* is the point: stopping at the last step below the
- * peak leaves the tallest day drawn past the top of the plot, where it is
- * clipped.
- */
 export function niceScale(peak: number, count: number): { max: number; ticks: readonly number[] } {
   if (peak <= 0) return { max: 0, ticks: [0] };
 
@@ -205,17 +195,12 @@ export function UsageProviderChart({
     }
 
     const columns = buildPeriodColumns(periods, byPeriod, metric);
-    // The scale tops out at the largest single provider-period, not the sum:
-    // layered series each measure from zero, so a combined peak would leave
-    // the plot permanently half empty.
     const peak = columns.reduce(
       (max, column) => column.bands.reduce((inner, band) => Math.max(inner, band.value), max),
       0,
     );
     const { max, ticks: tickValues } = niceScale(peak, TICK_COUNT);
     const step = periods.length === 1 ? 0 : VIEW_WIDTH / (periods.length - 1);
-    // Leave room above the top gridline so the constant-width stroke is not
-    // clipped when a series reaches the peak.
     const toY = (value: number) =>
       max === 0 ? VIEW_HEIGHT : VIEW_HEIGHT - (value / max) * (VIEW_HEIGHT - PLOT_TOP);
 
@@ -237,7 +222,6 @@ export function UsageProviderChart({
       };
     });
 
-    // Paint the heavier series first so the lighter one is not buried.
     return {
       paths: built.toSorted((a, b) => b.total - a.total),
       series: columns,
@@ -317,7 +301,6 @@ export function UsageProviderChart({
   return (
     <div className="flex flex-col gap-1">
       <div className="flex gap-2">
-        {/* Axis labels sit outside the plot so they stay aligned to gridlines. */}
         <div className="relative h-56 w-14 shrink-0">
           {ticks.map((tick) => (
             <span
@@ -363,7 +346,6 @@ export function UsageProviderChart({
               );
             })}
 
-            {/* Fills first, then every stroke, so no series covers another's line. */}
             {paths.map(({ provider, area }) => (
               <path
                 key={provider}

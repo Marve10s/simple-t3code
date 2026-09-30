@@ -62,7 +62,6 @@ interface PointerGesture {
 interface Props {
   readonly threadRef: ScopedThreadRef;
   readonly miniPlayer: PreviewMiniPlayerState;
-  /** The docked composer overlay; null while the composer floats mid-screen. */
   readonly composerOverlayElement: HTMLElement | null;
 }
 
@@ -81,11 +80,6 @@ const sameLayout = (a: Layout, b: Layout) =>
       a.obstacles.composer.right === b.obstacles.composer.right &&
       a.obstacles.composer.height === b.obstacles.composer.height));
 
-/**
- * Measures the chat column and the composer in the column's coordinates. The
- * composer's columns come from its centered stack, not the full-width overlay,
- * so the margins beside it stay open to the player.
- */
 function measureLayout(container: HTMLElement, composerOverlay: HTMLElement | null): Layout {
   const containerRect = container.getBoundingClientRect();
   const stackRect = composerOverlay
@@ -109,7 +103,6 @@ function measureLayout(container: HTMLElement, composerOverlay: HTMLElement | nu
 
 const frameCornerRadius = () => PREVIEW_MINI_PLAYER_CORNER_RADIUS;
 
-// Invisible grab zones straddling each edge; the cursor is the only affordance.
 const RESIZE_HANDLES: ReadonlyArray<{
   readonly direction: BrowserViewportResizeDirection;
   readonly className: string;
@@ -124,7 +117,6 @@ const RESIZE_HANDLES: ReadonlyArray<{
   { direction: "southeast", className: "-bottom-2 -right-2 size-4 cursor-nwse-resize" },
 ];
 
-/** Floats the thread's browser tab or device stream over chat. */
 export function ThreadPreviewMiniPlayer({ threadRef, miniPlayer, composerOverlayElement }: Props) {
   const { source } = miniPlayer;
   return source.kind === "browser" ? (
@@ -289,7 +281,6 @@ function DeviceMiniPlayer({
       cornerRadius={cornerRadius}
     >
       {() => (
-        // The stream is DOM, so it takes the band the browser's native webview would.
         <div
           className="pointer-events-auto absolute inset-0 overflow-hidden rounded-[inherit]"
           style={{ zIndex: PREVIEW_MINI_PLAYER_WEBVIEW_Z_INDEX }}
@@ -310,11 +301,6 @@ function DeviceMiniPlayer({
   );
 }
 
-/**
- * The frame, drag/resize gestures, and hover pill shared by every floating
- * source. Native clipping and the DOM frame use the same radius so their
- * separately composited edges stay aligned.
- */
 function MiniPlayerShell({
   threadRef,
   miniPlayer,
@@ -335,7 +321,6 @@ function MiniPlayerShell({
   readonly onOpenInPanel: () => void;
   readonly pillActions?: ReactNode;
   readonly recording?: boolean;
-  /** The clip radius for a given frame; the pill stays inside the curve. */
   readonly cornerRadius?: (frame: PreviewMiniPlayerSize) => number;
   readonly children: (frame: PreviewMiniPlayerFrame) => ReactNode;
 }) {
@@ -356,14 +341,12 @@ function MiniPlayerShell({
     : null;
 
   const radius = frame ? cornerRadius(frame) : PREVIEW_MINI_PLAYER_CORNER_RADIUS;
-  // Inside a wide curve the default 8px inset would land on the clipped-away corner.
   const pillInset = Math.max(8, Math.round(radius * 0.55));
 
   const close = () => {
     usePreviewMiniPlayerStore.getState().close(threadRef);
   };
 
-  // The composer grows on its own (drafts, banners), so it is observed alongside the column.
   useLayoutEffect(() => {
     const element = containerRef.current;
     if (!element) return;

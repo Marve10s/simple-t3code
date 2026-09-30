@@ -1,20 +1,4 @@
 // @effect-diagnostics nodeBuiltinImport:off
-/**
- * Raw filesystem access for transcript scanning.
- *
- * Isolated here so the rest of the usage code stays on Effect's `FileSystem`.
- * The direct `node:fs` streaming is deliberate: a cold 30-day window is ~1.4 GB
- * across ~1,500 files, and buffer-level streaming is roughly an order of
- * magnitude cheaper than materialising each file. The equivalent Effect stream
- * pipeline is idiomatic but not fast enough to sit behind a page load.
- *
- * Transcripts are append-only, so a parse also reports the byte position it
- * stopped at. A later scan of the same file resumes from that position and
- * parses only the appended bytes, which is what keeps a warm scan cheap while a
- * session is actively writing a multi-hundred-megabyte rollout.
- *
- * @module usageTranscriptReader
- */
 import * as NodeFSP from "node:fs/promises";
 import * as NodePath from "node:path";
 import * as NodeStringDecoder from "node:string_decoder";
@@ -42,55 +26,27 @@ export interface TranscriptFile {
   readonly mtimeMs: number;
 }
 
-/**
- * Where a parse stopped, with enough state to continue from there.
- *
- * The guard hash fingerprints the bytes immediately before `resumeOffset`. A
- * resume only proceeds when those bytes still match: transcripts are
- * append-only by design, but a rotated or rewritten file silently mis-parsed
- * from the middle would corrupt usage totals. The window is a cheap tripwire
- * for those realistic failure shapes, all of which disturb the file's tail at
- * that exact offset; it deliberately does not hash the whole prefix, which
- * would cost the full re-read the resume exists to avoid.
- */
 export interface TranscriptParsePosition {
-  /** Byte offset just past the last newline-terminated line consumed. */
   readonly resumeOffset: number;
-  /** Length of the fingerprinted window ending at `resumeOffset`. */
   readonly guardLength: number;
-  /** FNV-1a hash of that window. */
   readonly guardHash: number;
-  /** Codex reducer state as of `resumeOffset`; `null` for stateless providers. */
   readonly codexState: CodexScanState | null;
 }
 
 export interface TranscriptParseResult {
-  /** Records from newline-terminated lines at or after the parse start. */
   readonly records: readonly UsageRecord[];
-  /**
-   * Records from a trailing segment the writer has not newline-terminated yet.
-   * Kept out of `records` because `position` deliberately excludes that
-   * segment: the next scan re-reads it once the writer finishes the line.
-   */
   readonly tailRecords: readonly UsageRecord[];
   readonly position: TranscriptParsePosition;
-  /** Whether the parse continued from `resumeFrom` rather than byte 0. */
   readonly resumed: boolean;
 }
 
-/** 64 bytes of JSONL tail is ample to distinguish a replaced file. */
 export const GUARD_LENGTH = 64;
-// Native parsing is faster for common 1–4 MiB context/tool records. Above
-// 8 MiB, project usage without allocating the whole record. This switches
-// readers; it never discards a record because of its size.
 const STREAMING_THRESHOLD_BYTES = 8 * 1024 * 1024;
 const NEWLINE = 0x0a;
 const CARRIAGE_RETURN = 0x0d;
 
 type SelectedFields = { readonly [key: string]: true | SelectedFields };
 
-// Keep the fields consumed by usageTranscripts, including reducer state and
-// dedupe/cost metadata. A selected subtree (usage) keeps future token fields.
 const USAGE_FIELDS: Record<"claude" | "codex" | "grok", SelectedFields> = {
   claude: {
     type: true,
@@ -145,17 +101,6 @@ function fnv1a(buffer: Buffer): number {
   return hash >>> 0;
 }
 
-/**
- * Lists `.jsonl` transcripts under `root` last modified at or after `sinceMs`.
- *
- * Errors on individual entries are swallowed: session files rotate and get
- * removed while the walk is in flight, and a partial listing is far better than
- * failing the page.
- *
- * `fileName` restricts the walk to a single basename (Grok's `updates.jsonl`).
- * Grok sessions also ship multi-megabyte `chat_history` and `events` logs that
- * never carry usage, so the basename filter keeps a cold scan off those files.
- */
 export async function listTranscriptFiles(
   root: string,
   sinceMs: number,
@@ -187,9 +132,7 @@ export async function listTranscriptFiles(
         if (stats.mtimeMs >= sinceMs) {
           found.push({ path: child, size: stats.size, mtimeMs: stats.mtimeMs });
         }
-      } catch {
-        // Vanished between readdir and stat.
-      }
+      } catch {}
     }
   };
 
@@ -197,13 +140,6 @@ export async function listTranscriptFiles(
   return found;
 }
 
-/**
- * Filesystem identity of a directory, as `device:inode`.
- *
- * Used to tell "two servers reading the same transcript directory" apart from
- * "two machines whose hostname and home path happen to match". Returns an empty
- * string when the directory cannot be stat'd.
- */
 export async function readDirectoryVolumeId(path: string): Promise<string> {
   try {
     const stats = await NodeFSP.stat(path);
@@ -232,23 +168,6 @@ async function guardMatches(
   }
 }
 
-/**
- * Streams one transcript and returns the usage records it contains, or `null`
- * when the file could not be read.
- *
- * The distinction matters to the caller's cache: a genuinely empty transcript
- * is a stable fact worth memoising, while a transient read failure memoised
- * under the same `(size, mtime)` key would silently drop that file's usage
- * until the file next changes.
- *
- * With `resumeFrom`, parsing continues from that position when its guard bytes
- * still match, so only appended lines are read; otherwise the whole file is
- * re-parsed from the start and `resumed` reports `false`.
- *
- * Codex carries the active model on `turn_context` lines that hold no usage of
- * their own, so those still have to pass through the reducer to keep model
- * attribution correct.
- */
 export async function readTranscriptRecords(
   filePath: string,
   provider: UsageProviderKind,
@@ -309,8 +228,6 @@ export async function readTranscriptRecords(
     };
 
     const records: UsageRecord[] = [];
-    // Byte offsets remain independent of UTF-8 decoding. Only complete lines
-    // commit the resume point; an unfinished tail is replayed on the next scan.
     let resumeOffset = start;
     let scanOffset = start;
     let pendingChunks: Buffer[] = [];
@@ -326,8 +243,6 @@ export async function readTranscriptRecords(
         return;
       }
       if (!streaming) {
-        // Usage has no import-history budget: retain all selected usage fields,
-        // regardless of the size of the surrounding unselected tool content.
         streaming = createTranscriptJsonReader(() => {}, selectPath, { maxDepth: Infinity });
         decoder = new NodeStringDecoder.StringDecoder("utf8");
         for (const pending of pendingChunks) streaming.write(decoder.write(pending));
@@ -374,8 +289,6 @@ export async function readTranscriptRecords(
           append(chunk.subarray(lineStart));
           break;
         }
-        // Most lines fit in the current chunk. Avoid buffering/streaming
-        // machinery on this hot path.
         if (!streaming && pendingBytes === 0) {
           parseLine(toLineString(chunk.subarray(lineStart, newlineIndex)), codexState, records);
         } else {

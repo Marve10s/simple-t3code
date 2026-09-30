@@ -101,21 +101,7 @@ export const getLocalEnvironmentBootstraps = DesktopIpc.makeSyncIpcMethod({
       const isPrimary = instance.id === PRIMARY_LOCAL_ENVIRONMENT_ID;
       const config = yield* instance.currentConfig;
       const snapshot = yield* instance.snapshot;
-      // A secondary backend (e.g. a parallel WSL backend) that hasn't produced
-      // a config yet (mid-registration, before its first start cycle) or that
-      // is retrying a *transient* preflight failure (WSL VM still booting, a
-      // not-yet-built linux server entry) is not listening on a port. We
-      // surface it as a *pending* bootstrap (null endpoints, no token) so the
-      // renderer can show a "Connecting…" indicator while it retries — null
-      // endpoints keep the renderer from dialing the dead port, avoiding the
-      // needless /api/auth/bootstrap/bearer error cycles a real endpoint would
-      // trigger.
       if (Option.isNone(config) || Option.isSome(config.value.preflightFailure)) {
-        // Skip the primary (same-origin, no "connecting" affordance) and skip a
-        // secondary whose preflight failed *fatally* (no node, wrong version,
-        // missing build tools): it has stopped retrying, so an indefinite
-        // "Connecting…" would be misleading — its error is surfaced by the
-        // WSL-state UI instead.
         const fatalPreflight =
           Option.isSome(config) &&
           Option.isSome(config.value.preflightFailure) &&
@@ -151,10 +137,6 @@ export const getLocalEnvironmentBootstraps = DesktopIpc.makeSyncIpcMethod({
   }),
 });
 
-// Pull the distro selection out of a backend instance id like
-// "wsl:ubuntu". Returns null for "wsl:default", which is the sentinel
-// for "track the user's WSL default distro" and maps to the
-// wslEnv-derived default at picker time.
 function extractWslDistroFromEnvironmentId(envId: string): string | null {
   if (!envId.startsWith(DesktopWslBackend.WSL_INSTANCE_ID_PREFIX)) {
     return null;
@@ -184,19 +166,9 @@ export const pickFolder = DesktopIpc.makeIpcMethod({
     const appSettings = yield* DesktopAppSettings.DesktopAppSettings;
     const wslEnvironment = yield* DesktopWslEnvironment.DesktopWslEnvironment;
     const settings = yield* appSettings.get;
-    // A picked path only means something to a backend on this machine.
     if (!settings.localEnvironmentEnabled) {
       return null;
     }
-    // Three picker modes:
-    //   - targetEnvironmentId omitted: default to the primary picker. Keeps
-    //     the historical behavior unchanged for users who never enabled the
-    //     WSL backend, and is what unfamiliar callers should get out of the
-    //     box.
-    //   - targetEnvironmentId starts with "wsl:": route to the WSL picker
-    //     using the distro encoded in the id (or the user's selected
-    //     wslDistro when the id is the "wsl:default" sentinel).
-    //   - anything else (incl. PRIMARY_LOCAL_ENVIRONMENT_ID): primary picker.
     const targetId = options?.targetEnvironmentId;
     const wslDistroFromTarget =
       targetId !== undefined && targetId.startsWith(DesktopWslBackend.WSL_INSTANCE_ID_PREFIX)
@@ -206,9 +178,6 @@ export const pickFolder = DesktopIpc.makeIpcMethod({
       targetId !== undefined &&
       targetId !== PRIMARY_LOCAL_ENVIRONMENT_ID &&
       targetId.startsWith(DesktopWslBackend.WSL_INSTANCE_ID_PREFIX);
-    // Fall back to the persisted wslDistro when the id is the
-    // "wsl:default" sentinel; the orchestrator uses the same fallback
-    // for the actual backend.
     const wslDistro = useWsl ? (wslDistroFromTarget ?? settings.wslDistro) : null;
     const defaultPath = useWsl
       ? Option.fromNullishOr(
@@ -373,8 +342,6 @@ export const pasteAsText = DesktopIpc.makeIpcMethod({
   }),
 });
 
-/** Theme files are a few KB; anything larger returns empty text and lets the
- *  renderer reject it by size without the contents ever crossing the bridge. */
 const PICKED_THEME_FILE_MAX_BYTES = 256 * 1024;
 
 export const pickThemeFiles = DesktopIpc.makeIpcMethod({
@@ -386,9 +353,6 @@ export const pickThemeFiles = DesktopIpc.makeIpcMethod({
     const electronWindow = yield* ElectronWindow.ElectronWindow;
     const fileSystem = yield* FileSystem.FileSystem;
     const path = yield* Path.Path;
-    // The VS Code extensions directory is the same dotfolder on Windows,
-    // macOS, and Linux; when it is missing the picker opens wherever the
-    // platform would by default.
     const extensionsDir = path.join(NodeOS.homedir(), ".vscode", "extensions");
     const defaultPath = yield* fileSystem
       .exists(extensionsDir)
@@ -412,10 +376,7 @@ export const pickThemeFiles = DesktopIpc.makeIpcMethod({
         }
         const text = yield* fileSystem.readFileString(filePath);
         return { name, size, text } satisfies PickedThemeFile;
-      }).pipe(
-        // An unreadable file degrades to an entry the renderer reports.
-        Effect.orElseSucceed((): PickedThemeFile => ({ name, size: 0, text: "" })),
-      );
+      }).pipe(Effect.orElseSucceed((): PickedThemeFile => ({ name, size: 0, text: "" })));
     });
   }),
 });

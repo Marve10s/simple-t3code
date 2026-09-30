@@ -76,7 +76,6 @@ describe("detectSourceControlProviderFromRemoteUrl", () => {
   });
 
   it("detects Azure DevOps SSH remotes", () => {
-    // The default Azure DevOps SSH clone URL uses the ssh.dev.azure.com host.
     expect(
       detectSourceControlProviderFromRemoteUrl("git@ssh.dev.azure.com:v3/org/project/repo")?.kind,
     ).toBe("azure-devops");
@@ -84,7 +83,6 @@ describe("detectSourceControlProviderFromRemoteUrl", () => {
       detectSourceControlProviderFromRemoteUrl("ssh://git@ssh.dev.azure.com:22/v3/org/project/repo")
         ?.kind,
     ).toBe("azure-devops");
-    // Legacy visualstudio.com SSH host stays classified too.
     expect(
       detectSourceControlProviderFromRemoteUrl("git@vs-ssh.visualstudio.com:v3/org/project/repo")
         ?.kind,
@@ -196,9 +194,6 @@ describe("isSshRemoteUrl", () => {
 });
 
 it("names an Azure DevOps repository by its own name, not its project path", () => {
-  // `az repos pr list --repository` takes a name and detects the organisation and project from
-  // the checkout; the recorded `org/project/_git/repo` path is refused, and the repository then
-  // reads as unavailable on the page.
   const selector = sourceControlRepositorySelector({
     provider: "azure-devops",
     displayName: "contoso/payments/_git/checkout",

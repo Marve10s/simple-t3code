@@ -14,8 +14,6 @@ export interface RetainedLiveItem<A> {
   readonly serializedBytes: number;
 }
 
-// Published events are immutable and shared across subscriptions. Measure each
-// object once without keeping the event or its serialized copy alive.
 const serializedSizes = new WeakMap<object, number>();
 
 function serializedSize(value: object): number {
@@ -28,7 +26,6 @@ function serializedSize(value: object): number {
   return bytes;
 }
 
-/** One budget covers one subscription and its delivery stream, including the batch waiting for an RPC ACK. */
 export const makeLiveStreamBudget = Effect.fn("makeLiveStreamBudget")(function* (limits?: {
   readonly maxItems?: number;
   readonly maxSerializedBytes?: number;
@@ -93,8 +90,6 @@ export const makeLiveStreamBudget = Effect.fn("makeLiveStreamBudget")(function* 
       return Effect.succeed(item);
     });
 
-  // Replace one coalescing batch atomically. Queued and coalesced payloads
-  // count against the same budget, and discarded updates release their charge.
   const replace = <A extends object>(
     previous: ReadonlyArray<RetainedLiveItem<unknown>>,
     values: ReadonlyArray<A>,
@@ -148,8 +143,6 @@ export const makeLiveStreamBudget = Effect.fn("makeLiveStreamBudget")(function* 
           Effect.catchTags({
             OrchestrationGetSnapshotError: (error) =>
               Effect.sync(() => {
-                // A grouped source can retain its own pending chunk. Close it
-                // and release the pull closure without waiting for an RPC ACK.
                 source.pull = Effect.interrupt;
               }).pipe(
                 Effect.andThen(Scope.close(sourceScope, Exit.fail(error))),
@@ -170,8 +163,6 @@ export const makeLiveStreamBudget = Effect.fn("makeLiveStreamBudget")(function* 
         );
         // @effect-diagnostics-next-line returnEffectInGen:off - Stream.fromPull needs the pull effect as its result.
         return Effect.gen(function* () {
-          // RpcServer requests the next batch only after the client ACKs this
-          // one. Removing items from a queue alone does not mean delivery ended.
           release(inFlight);
           inFlight = [];
           yield* check;

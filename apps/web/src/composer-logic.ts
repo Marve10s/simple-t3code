@@ -265,7 +265,6 @@ export function detectComposerTrigger(text: string, cursorInput: number): Compos
   };
 }
 
-/** Caret and trigger after replacing composer text and continuing at the end. */
 export function composerStateAtPromptEnd(text: string): {
   cursor: number;
   trigger: ComposerTrigger | null;

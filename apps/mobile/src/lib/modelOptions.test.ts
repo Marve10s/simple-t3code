@@ -193,7 +193,6 @@ describe("mobile model options", () => {
     expect(resolveSelectableModelSelection(config, disabled)).toBeNull();
     expect(resolveSelectableModelSelection(config, removed)).toBeNull();
     expect(isModelSelectionUnavailable(config, disabled)).toBe(false);
-    // An offline environment has no config to validate.
     expect(resolveSelectableModelSelection(null, disabled)).toBe(disabled);
   });
 
@@ -367,9 +366,7 @@ describe("mobile model options", () => {
     const legacy = { instanceId: ProviderInstanceId.make("codex"), model: "gpt-5.4" };
 
     expect(resolveDefaultableModelSelection(config, current)).toBe(current);
-    // A legacy last-used selection falls through to the provider default.
     expect(resolveDefaultableModelSelection(config, legacy)).toBeNull();
-    // Offline: nothing to validate against, selection passes through.
     expect(resolveDefaultableModelSelection(null, legacy)).toBe(legacy);
   });
 

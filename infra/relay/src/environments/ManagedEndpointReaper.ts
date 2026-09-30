@@ -11,8 +11,6 @@ import * as ManagedEndpointAllocations from "./ManagedEndpointAllocations.ts";
 import * as ManagedEndpointProvider from "./ManagedEndpointProvider.ts";
 
 export const MANAGED_ENDPOINT_GRACE_PERIOD_MINUTES = 5;
-// A tunnel that never connected is usually a link still being set up: a slow
-// cloudflared download or a user who walked away mid-pairing. Give it an hour.
 export const MANAGED_ENDPOINT_INACTIVE_GRACE_PERIOD_MINUTES = 60;
 export const MANAGED_ENDPOINT_SWEEP_PAGE_SIZE = 100;
 export const MANAGED_ENDPOINT_SWEEP_ATTEMPT_LIMIT = 100;
@@ -196,9 +194,6 @@ export const make = Effect.gen(function* () {
     }
 
     const collected = [...new Map(expired.map((entry) => [entry.tunnel.id, entry])).values()];
-    // Start each sweep one attempt budget further along so a run of
-    // candidates whose deletes keep failing cannot hold the budget forever
-    // and starve everything listed after them.
     const offset =
       collected.length === 0 ? 0 : (slot * MANAGED_ENDPOINT_SWEEP_ATTEMPT_LIMIT) % collected.length;
     const uniqueExpired = [...collected.slice(offset), ...collected.slice(0, offset)];
@@ -231,9 +226,6 @@ export const make = Effect.gen(function* () {
         continue;
       }
       if (allocation !== undefined && owner === undefined) continue;
-      // A tunnel with no allocation row cannot be claimed, so a relink that
-      // adopts it by name races any delete here. Count it and leave it for a
-      // manual sweep instead.
       if (owner === undefined) {
         skippedOrphan += 1;
         continue;
@@ -288,7 +280,6 @@ export const make = Effect.gen(function* () {
       truncated,
     };
   }).pipe(
-    // Dry-run rollout reads these counters from the exported span.
     Effect.tap((result) =>
       Effect.annotateCurrentSpan(
         Object.fromEntries(

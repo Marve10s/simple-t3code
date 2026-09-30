@@ -114,7 +114,6 @@ export interface WorkGroupScrollAnchor {
   readonly offset: number;
 }
 
-/** Restore a visible tool, including a position partway through its expanded output. */
 export function resolveWorkGroupScrollIndex(
   entries: ReadonlyArray<{ readonly id: string }>,
   anchor: WorkGroupScrollAnchor | undefined,
@@ -124,7 +123,6 @@ export function resolveWorkGroupScrollIndex(
   return index < 0 ? undefined : { index, viewOffset: -anchor.offset };
 }
 
-/** Only newly appended calls may follow the end, never status or output updates. */
 export function shouldFollowWorkGroupAppend(
   previous: ReadonlyArray<{ readonly id: string }>,
   entries: ReadonlyArray<{ readonly id: string }>,
@@ -145,13 +143,6 @@ export interface TimelineEndState {
   readonly scrollLength?: number;
 }
 
-/**
- * Follow re-arm band above the hard bottom. Strict on purpose: LegendList's
- * isNearEnd fires within half a viewport, which re-armed live-follow while the
- * user was reading history and yanked them back down on the next stream chunk.
- * A small pixel band (instead of the 1px isAtEnd epsilon alone) keeps re-arming
- * reliable while streaming content is still growing under the viewport.
- */
 const TIMELINE_FOLLOW_REARM_THRESHOLD_PX = 40;
 
 export function resolveTimelineIsAtEnd(state: TimelineEndState | undefined): boolean | undefined {
@@ -162,12 +153,6 @@ export function resolveTimelineIsAtEnd(state: TimelineEndState | undefined): boo
   if (contentLength === undefined || scroll === undefined || scrollLength === undefined) {
     return state.isAtEnd;
   }
-  // contentLength includes the composer inset spacer, but the composer hides
-  // the same amount of viewport, so the inset cancels: plain
-  // contentLength - scroll - scrollLength is the gap between the last real row
-  // and the visible edge above the composer. LegendList's own isAtEnd subtracts
-  // the inset and is true anywhere in the bottom composer-height band, so it is
-  // only a fallback here, never a short-circuit.
   return contentLength - scroll - scrollLength <= TIMELINE_FOLLOW_REARM_THRESHOLD_PX;
 }
 
@@ -221,7 +206,6 @@ export function resolveTimelineMinimapCurrentIndex(input: {
     const inView =
       item.top < input.scrollBottom && item.top + Math.max(1, item.height ?? 1) > input.scrollTop;
     if (inView) {
-      // The first visible marker is the turn at the reader's current position.
       return index;
     }
     if (item.top <= input.scrollTop) {
@@ -232,11 +216,6 @@ export function resolveTimelineMinimapCurrentIndex(input: {
   return precedingIndex;
 }
 
-/**
- * Side gutter between the viewport edge and the centered content column.
- * `contentWidth` is the rendered column width, which follows the Chat width
- * setting, so callers measure it rather than assume a fixed maximum.
- */
 function resolveTimelineSideGutter(viewportWidth: number, contentWidth: number): number {
   if (!Number.isFinite(viewportWidth) || viewportWidth <= 0 || !Number.isFinite(contentWidth)) {
     return 0;
@@ -257,13 +236,6 @@ const TIMELINE_MINIMAP_HIT_STRIP_LEFT = 12;
 const TIMELINE_MINIMAP_HIT_STRIP_MAX_WIDTH = 40;
 const TIMELINE_MINIMAP_EXPANDED_HIT_STRIP_WIDTH = "22rem";
 
-/**
- * The minimap overlays the viewport's left edge while the content column is
- * centered, so the side gutter between them shrinks under browser zoom, a
- * narrow pane, or a wider Chat width setting. A fixed-width hover strip would then sit on top of the message
- * text and swallow its pointer events. Cap the strip's width so it never
- * extends past the gutter into the content column; 0 disables the strip.
- */
 export function resolveTimelineMinimapHitStripWidth(
   viewportWidth: number,
   contentWidth: number,
@@ -278,24 +250,12 @@ export function resolveTimelineMinimapHitStripWidth(
   );
 }
 
-// The prev/next buttons are centered 4px into the strip and 20px wide, so
-// their hitbox reaches 14px past the strip's left edge.
 const TIMELINE_MINIMAP_NAVIGATION_REACH = 14;
 
-/**
- * The prev/next buttons hang outside the strip's height, so the strip's own
- * width cap does not cover them. Keep them inert to the pointer unless the
- * gutter can hold them; keyboard focus still reaches them.
- */
 export function resolveTimelineMinimapNavigationInteractive(collapsedWidth: number): boolean {
   return collapsedWidth >= TIMELINE_MINIMAP_NAVIGATION_REACH;
 }
 
-/**
- * Once the preview is open, keep the full preview and the space leading to it
- * interactive. The collapsed strip remains gutter-capped so it cannot block
- * selecting message text.
- */
 export function resolveTimelineMinimapInteractiveWidth(
   collapsedWidth: number,
   expanded: boolean,
@@ -446,11 +406,6 @@ export type MessagesTimelineRow =
       id: string;
       createdAt: string | null;
       snapshot: WorktreeSetupSnapshot;
-      /**
-       * The agent's turn is live and owns the "Working for" header, so the
-       * card drops its own header and settle-time actions. The stage list
-       * stays put so nothing jumps when the handoff happens.
-       */
       embedded: boolean;
     }
   | {
@@ -458,7 +413,6 @@ export type MessagesTimelineRow =
       id: string;
       createdAt: string;
       queuedMessage: QueuedComposerMessage;
-      /** Oldest queued message, the one the next boundary sends. */
       isNext: boolean;
     };
 
@@ -561,14 +515,6 @@ interface TurnFold {
   label: string;
 }
 
-/**
- * The session's running turn is authoritative when latestTurn briefly lags or
- * regresses behind it. Otherwise, the latest turn counts as unsettled while it
- * is still running (or has not recorded a completion). This is deliberately
- * keyed on turn lifecycle rather than transient working state: right after the
- * user sends a message, the previous turn is still the "active" one until the
- * server creates the new turn, and folding must not flicker through that window.
- */
 export function deriveUnsettledTurnId(
   latestTurn: TimelineLatestTurn | null,
   runningTurnId: TurnId | null,
@@ -601,12 +547,6 @@ function timelineEntryTurnId(entry: TimelineEntry): TurnId | null {
   return entry.kind === "work" ? (entry.entry.turnId ?? null) : null;
 }
 
-/**
- * A promptless provider restart replaces the native turn without adding a
- * user message. Keep every provider turn since the latest user message in one
- * visual response until the replacement turn settles. A steer has its own
- * user message, so it naturally starts a new visual response.
- */
 function deriveActiveVisualResponseTurnIds(input: {
   timelineEntries: ReadonlyArray<TimelineEntry>;
   unsettledTurnId: TurnId | null;
@@ -640,11 +580,6 @@ export function workEntryIsActiveTurnActivity(entry: WorkLogEntry): boolean {
   );
 }
 
-/**
- * Settled turns fold activity before their terminal assistant message behind
- * a "Worked for ..." row. A single ordinary activity after that message joins
- * the fold, while larger groups and failures stay visible as a trailing summary.
- */
 function deriveTurnFolds(input: {
   timelineEntries: ReadonlyArray<TimelineEntry>;
   terminalAssistantMessageIds: ReadonlySet<string>;
@@ -655,12 +590,6 @@ function deriveTurnFolds(input: {
     entries: Array<TimelineEntry>;
     terminalEntry: Extract<TimelineEntry, { kind: "message" }> | null;
     hasStreamingMessage: boolean;
-    /**
-     * The user message that kicked the turn off. Entry timestamps alone
-     * undercount the duration (the first entry appears only once the
-     * provider starts producing output), and a turn cut short by a steer may
-     * hold a single instantaneous commentary message.
-     */
     startBoundary: string | null;
   }
   const groupsByTurnId = new Map<TurnId, TurnGroup>();
@@ -671,10 +600,6 @@ function deriveTurnFolds(input: {
       pendingUserBoundary = entry.message.createdAt;
       continue;
     }
-    // Thinking is work, so it folds with the rest of it. A provider that
-    // interleaves a block with every tool call would otherwise leave dozens of
-    // "Thought" rows standing beside the "Worked for ..." summary.
-    // Nothing folds while the turn is live, which is when traces are watched.
     const turnId =
       entry.kind === "message" &&
       (entry.message.role === "assistant" || entry.message.role === "reasoning")
@@ -691,9 +616,6 @@ function deriveTurnFolds(input: {
         entries: [],
         terminalEntry: null,
         hasStreamingMessage: false,
-        // Each user boundary starts at most one turn; a second turn after the
-        // same user message (e.g. a steer-superseded continuation) falls back
-        // to its own first entry.
         startBoundary: pendingUserBoundary,
       };
       pendingUserBoundary = null;
@@ -704,9 +626,6 @@ function deriveTurnFolds(input: {
       if (input.terminalAssistantMessageIds.has(entry.message.id)) {
         group.terminalEntry = entry;
       }
-      // A live turn is already excluded above, so only an answer still being
-      // written may hold a fold open. A thinking block stranded by a crashed
-      // provider keeps its streaming flag forever and must not.
       if (entry.message.streaming && entry.message.role !== "reasoning") {
         group.hasStreamingMessage = true;
       }
@@ -725,10 +644,6 @@ function deriveTurnFolds(input: {
     const terminalEntryIndex = group.terminalEntry
       ? group.entries.findIndex((entry) => entry.id === group.terminalEntry?.id)
       : group.entries.length;
-    // Thinking blocks do not count toward "one trailing activity": a block can
-    // follow the answer, and it must not stop that lone tool call from folding
-    // the way it did before traces existed. Loop-invariant, so it is counted
-    // once: a long turn re-derives these rows on every work-log change.
     const trailingEntryCount = group.entries.filter(
       (candidate, candidateIndex) =>
         candidateIndex > terminalEntryIndex &&
@@ -744,8 +659,6 @@ function deriveTurnFolds(input: {
         trailingEntryCount === 1 &&
         entry.kind === "work" &&
         !workEntryDisplayIndicatesToolFailure(entry.entry);
-      // A thinking block after the answer folds with its turn rather than
-      // trailing under it, which is what mobile already does.
       const isReasoning = entry.kind === "message" && entry.message.role === "reasoning";
       if (
         !isCompaction &&
@@ -755,7 +668,6 @@ function deriveTurnFolds(input: {
       ) {
         continue;
       }
-      // User input and subagent batches stay visible after their turn settles.
       if (
         entry.kind === "work" &&
         (entry.entry.questionAnswer !== undefined || entry.entry.agentSpawn !== undefined)
@@ -767,10 +679,6 @@ function deriveTurnFolds(input: {
     if (hiddenEntryIds.size === 0) {
       continue;
     }
-    // A lone compaction row stays visible on its own; it only folds away as
-    // part of a turn that already folds other work. Thinking is the same: a
-    // question answered by thought alone keeps its "Thought" row
-    // rather than collapsing behind a "Worked for ..." that hides nothing else.
     const hidesFoldableWork = group.entries.some(
       (entry) =>
         hiddenEntryIds.has(entry.id) &&
@@ -790,8 +698,6 @@ function deriveTurnFolds(input: {
 
     const isLatestInterruptedTurn =
       input.latestTurn?.turnId === turnId && input.latestTurn.state === "interrupted";
-    // A turn cut short by a steer leaves trailing work entries behind its
-    // terminal message — take whichever ended last.
     const lastEntryEnd =
       lastEntry.kind === "message" ? lastEntry.message.updatedAt : lastEntry.createdAt;
     const elapsedMs =
@@ -824,11 +730,6 @@ function deriveTurnFolds(input: {
   return foldsByAnchorEntryId;
 }
 
-/**
- * When a settled turn ends with tool calls after its terminal text, treat the
- * text and tools as one visual response. The message metadata becomes the
- * footer for the whole block instead of separating the prose from the tools.
- */
 function attachTrailingToolGroupsToAssistant(
   rows: ReadonlyArray<MessagesTimelineRow>,
 ): MessagesTimelineRow[] {
@@ -856,8 +757,6 @@ function attachTrailingToolGroupsToAssistant(
       if (!candidate) {
         break;
       }
-      // A thinking block can follow the answer (the next one starts before its
-      // tool call); it is not another message in the conversation.
       if (candidate.kind === "message" && candidate.message.role === "reasoning") {
         continue;
       }
@@ -920,7 +819,6 @@ function attachTrailingToolGroupsToAssistant(
   return result;
 }
 
-/** Match each user message to the next assistant checkpoint. */
 function buildRevertTurnCountByUserMessageId(input: {
   supportsConversationRollback: boolean;
   timelineEntries: ReadonlyArray<TimelineEntry>;
@@ -969,11 +867,8 @@ export function deriveMessagesTimelineRows(input: {
   activeTurnStartedAt: string | null;
   turnDiffSummaries: ReadonlyArray<TurnDiffSummary>;
   supportsConversationRollback: boolean;
-  /** Task ids of subagents still working, used by the active tool indicator. */
   liveAgentTaskIds?: ReadonlySet<string> | undefined;
-  /** Live bootstrap progress. Renders a stage card under the first user message. */
   worktreeSetup?: WorktreeSetupSnapshot | null;
-  /** Messages sent during the running turn, rendered after the live rows. */
   queuedMessages?: ReadonlyArray<QueuedComposerMessage>;
 }): MessagesTimelineRow[] {
   const turnDiffSummaryByAssistantMessageId = new Map<MessageId, TurnDiffSummary>();
@@ -1383,9 +1278,6 @@ export function deriveMessagesTimelineRows(input: {
     const durationStart =
       durationStartByMessageId.get(timelineEntry.message.id) ?? timelineEntry.message.createdAt;
 
-    // While the turn is still running, the latest assistant message is only
-    // provisionally terminal — withhold the metadata row until the turn
-    // settles so commentary doesn't flash timestamps mid-work.
     const showAssistantMeta =
       timelineEntry.message.role === "assistant" &&
       terminalAssistantMessageIds.has(timelineEntry.message.id) &&
@@ -1411,14 +1303,6 @@ export function deriveMessagesTimelineRows(input: {
     });
   }
 
-  // Until the agent's turn is live, the setup card sits under the send with
-  // the working header above it (the header reads "Setting up worktree…" and
-  // later swaps its text in place, so nothing moves at the handoff). "Live"
-  // means the turn is in the timeline, not just that the server dispatched
-  // it: the card must not vanish in the gap between. Once the turn is live
-  // the stage list leaves the timeline; a script that is still running is
-  // surfaced by the working header itself. A failed or cancelled setup stays
-  // under the send so its outcome and actions remain reachable.
   const setupHandedOff =
     input.worktreeSetup !== null &&
     input.worktreeSetup !== undefined &&
@@ -1436,9 +1320,6 @@ export function deriveMessagesTimelineRows(input: {
     const firstUserRowIndex = nextRows.findIndex(
       (row) => row.kind === "message" && row.message.role === "user",
     );
-    // While the setup runs, the working header leads the card in the same
-    // slot it keeps once the agent's own turn takes over. The main pass may
-    // already have placed that header (a bootstrap counts as working).
     const workingRowIndex = setupRunning ? nextRows.findIndex((row) => row.kind === "working") : -1;
     if (workingRowIndex >= 0) {
       nextRows.splice(workingRowIndex + 1, 0, setupRow);
@@ -1460,8 +1341,6 @@ export function deriveMessagesTimelineRows(input: {
       );
     }
   }
-  // A running setup owns the working slot above its card and shows no
-  // activity row of its own; every other state gets the usual tail.
   const hasWorkingRow = nextRows.some((row) => row.kind === "working");
   if (input.isWorking && !hasWorkingRow && activeTurnHeaderIndex === input.timelineEntries.length) {
     appendWorkingRow();
@@ -1561,7 +1440,6 @@ function replaceStreamingMessageRows(
   });
 }
 
-/** Keep one projection per timeline. Reuse rows only when streaming content changes. */
 export function deriveMessagesTimelineRowsWithState(
   input: MessagesTimelineRowsInput,
   previous: MessagesTimelineRowsProjection | null = null,
@@ -1594,7 +1472,6 @@ export function computeStableMessagesTimelineRows(
   return anyChanged ? { byId: next, result } : previous;
 }
 
-/** Shallow field comparison per row variant — avoids deep equality cost. */
 function isRowUnchanged(a: MessagesTimelineRow, b: MessagesTimelineRow): boolean {
   if (a.kind !== b.kind || a.id !== b.id) return false;
 

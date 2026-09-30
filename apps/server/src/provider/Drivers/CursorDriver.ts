@@ -1,16 +1,3 @@
-/**
- * CursorDriver — `ProviderDriver` for the Cursor Agent (`cursor-agent`) runtime.
- *
- * Cursor exposes an ACP-based CLI. Model catalog and capability refreshes
- * happen during the managed provider status check via Cursor's
- * `list_available_models` extension method.
- *
- * Text generation is supported via the ACP runtime — `makeCursorTextGeneration`
- * drives `runtime.prompt` with a structured-output schema and collects the
- * agent's `agent_message_chunk` stream into a single JSON blob.
- *
- * @module provider/Drivers/CursorDriver
- */
 import { CursorSettings, ProviderDriverKind } from "@t3tools/contracts";
 import * as Crypto from "effect/Crypto";
 import * as Effect from "effect/Effect";
@@ -59,8 +46,6 @@ import { discoverCursorSkills, probeCursorSkills } from "./CursorSkills.ts";
 const decodeCursorSettings = Schema.decodeSync(CursorSettings);
 
 const DRIVER_KIND = ProviderDriverKind.make("cursor");
-// cursor-agent updates itself, so the resolved executable is its own updater.
-// No executable means nothing to update, not "whatever is on PATH".
 const UPDATE: ProviderMaintenanceCapabilitiesResolver = {
   resolve: (context) =>
     Effect.succeed(
@@ -177,8 +162,6 @@ export const CursorDriver: ProviderDriver<CursorSettings, CursorDriverEnv> = {
         initialSnapshot: (settings) =>
           buildInitialCursorProviderSnapshot(settings.provider).pipe(Effect.map(stampIdentity)),
         checkProvider,
-        // Model catalog and capabilities come exclusively from Cursor's
-        // list_available_models extension method during provider checks.
         enrichSnapshot: ({ settings, snapshot: currentSnapshot, publishSnapshot }) =>
           resolveMaintenance().pipe(
             Effect.flatMap((maintenanceCapabilities) =>

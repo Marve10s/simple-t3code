@@ -27,14 +27,12 @@ const PILL_CLASS =
 
 const EMPTY_PENDING: ReadonlyMap<PullRequestReactionContent, boolean> = new Map();
 
-/** What the host last said, so a press in flight is forgotten the moment the real counts land. */
 function reactionsSignature(reactions: ReadonlyArray<PullRequestReaction>): string {
   return reactions
     .map((reaction) => `${reaction.content}:${reaction.count}:${reaction.viewerHasReacted ? 1 : 0}`)
     .join(" ");
 }
 
-/** Reaction counts and an always-visible picker, routed to the supplied host subject. */
 export function PullRequestReactionBar({
   reactions,
   canReact,
@@ -46,7 +44,6 @@ export function PullRequestReactionBar({
 }: {
   readonly reactions: ReadonlyArray<PullRequestReaction>;
   readonly canReact: boolean;
-  /** Absent reacts to the change request itself, which is where its description's reactions live. */
   readonly subjectId?: string | undefined;
   readonly environmentId: EnvironmentId;
   readonly reference: PullRequestRef;

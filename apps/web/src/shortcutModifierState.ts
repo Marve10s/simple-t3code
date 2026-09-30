@@ -32,8 +32,6 @@ export function useShortcutModifierState(): ShortcutModifierState {
 
   useEffect(() => {
     const updateState = (next: ShortcutModifierState) => {
-      // Even a no-op state dispatch can cost work in the sidebar's large tree.
-      // Ordinary typing must return before dispatching a React update.
       if (areShortcutModifierStatesEqual(stateRef.current, next)) return;
       stateRef.current = next;
       setState(next);
@@ -41,11 +39,6 @@ export function useShortcutModifierState(): ShortcutModifierState {
     const onKeyboardEvent = (event: KeyboardEvent) => {
       updateState(shortcutModifierStateAfterKeyboardEvent(stateRef.current, event));
     };
-    // Dictation tools (Wispr Flow) paste with a synthetic ⌘V whose Meta keyup
-    // never reaches the page, so the tracked state stays "⌘ held" forever and
-    // the thread jump hints stick on screen. A paste is never jump intent, so
-    // treat it like a blur and reset. A physically held modifier re-registers
-    // on the next real key event.
     const onResetEvent = () => {
       updateState(EMPTY_SHORTCUT_MODIFIER_STATE);
     };
@@ -95,12 +88,6 @@ export function shortcutModifierStateAfterKeyboardEvent(
       [normalizedModifierKey]: event.type === "keydown",
     };
   } else {
-    // Flags on non-modifier keys may only clear a bit, never set one. After a
-    // dictation tool's synthetic ⌘V (Wispr Flow), the browser can keep
-    // reporting metaKey=true on real key events (Enter to submit) until the
-    // user physically taps ⌘. Trusting that flag would mark ⌘ as held and
-    // stick the thread jump hints. Setting a bit requires a real modifier
-    // keydown, handled above.
     nextState = {
       metaKey: currentState.metaKey && event.metaKey,
       ctrlKey: currentState.ctrlKey && event.ctrlKey,

@@ -47,7 +47,6 @@ export function handleSidebarUpdateReleaseNotesPopoverOpenChange(
   _open: boolean,
   details: Pick<SidebarUpdatePopoverChangeDetails, "reason" | "cancel">,
 ): void {
-  // The trigger is the update action, so its presses must not also toggle the Popover.
   if (details.reason === "trigger-press") details.cancel();
 }
 
@@ -57,7 +56,6 @@ export function openSidebarUpdateReleaseNotesPopoverOnForwardTab(
   triggerId: string,
 ): void {
   if (event.key !== "Tab" || event.shiftKey) return;
-  // Hover-open popovers do not manage focus. Promote this one before native Tab runs.
   flushSync(() => handle.open(triggerId));
 }
 

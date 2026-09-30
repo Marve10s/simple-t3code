@@ -17,7 +17,6 @@ import * as HttpClientResponse from "effect/unstable/http/HttpClientResponse";
 
 import * as CliTokenManager from "./CliTokenManager.ts";
 
-// pk_test_<base64 of "clerk.example.test$">
 const TEST_ENV = {
   T3CODE_CLERK_PUBLISHABLE_KEY: "pk_test_Y2xlcmsuZXhhbXBsZS50ZXN0JA==",
   T3CODE_CLERK_CLI_OAUTH_CLIENT_ID: "oauth_client_test",
@@ -29,8 +28,6 @@ interface RecordedTokenRequest {
   readonly params: URLSearchParams;
 }
 
-// A JWT whose payload claims { email: "theo@example.test" } (signature is not
-// verified — the CLI only reads the claim to display the connected account).
 const TestIdTokenHeaderJson = Schema.fromJsonString(Schema.Struct({ alg: Schema.Literal("none") }));
 const TestIdTokenPayloadJson = Schema.fromJsonString(Schema.Struct({ email: Schema.String }));
 const encodeTestIdTokenHeader = Schema.encodeSync(TestIdTokenHeaderJson);
@@ -114,7 +111,6 @@ it.effect("finishes normally when the browser callback wins", () =>
 
 interface DeviceFlowServer {
   readonly requests: Array<RecordedTokenRequest>;
-  /** Token endpoint replies, consumed in order; the last one repeats. */
   readonly tokenReplies: Array<{ readonly status: number; readonly body: string }>;
 }
 
@@ -230,7 +226,6 @@ it.layer(NodeServices.layer)("CliTokenManager.deviceAuthorizationLogin", (it) =>
       assert.lengthOf(tokenRequests(server.requests), 0);
       yield* TestClock.adjust(Duration.seconds(1));
       assert.lengthOf(tokenRequests(server.requests), 1);
-      // slow_down widens the 5s interval to 10s.
       yield* TestClock.adjust(Duration.seconds(9));
       assert.lengthOf(tokenRequests(server.requests), 1);
       yield* TestClock.adjust(Duration.seconds(1));
@@ -254,7 +249,6 @@ it.layer(NodeServices.layer)("CliTokenManager.deviceAuthorizationLogin", (it) =>
 
       yield* TestClock.adjust(Duration.seconds(5));
       assert.lengthOf(tokenRequests(server.requests), 1);
-      // The 5xx widens the 5s interval to 10s before the retry.
       yield* TestClock.adjust(Duration.seconds(9));
       assert.lengthOf(tokenRequests(server.requests), 1);
       yield* TestClock.adjust(Duration.seconds(1));

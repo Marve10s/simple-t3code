@@ -62,9 +62,6 @@ type AppUpdateYmlConfig = typeof AppUpdateYmlConfig.Type;
 
 const UpdateInfo = Schema.Struct({
   version: Schema.String,
-  // Left unvalidated on purpose: a malformed release-notes payload must never
-  // fail the decode and block the update state transition. The shape is
-  // validated defensively in normalizeDesktopUpdateReleaseNotes.
   releaseNotes: Schema.optional(Schema.Unknown),
 });
 
@@ -161,12 +158,8 @@ export class DesktopUpdates extends Context.Service<
   DesktopUpdates,
   {
     readonly getState: Effect.Effect<DesktopUpdateState>;
-    /** True while a check, download, install, or channel change holds the
-        updater's single action reservation. */
     readonly isActionActive: Effect.Effect<boolean>;
-    /** True only while an install owns the updater action reservation. */
     readonly isInstallActive: Effect.Effect<boolean>;
-    /** Current state plus a stream of every later state change. */
     readonly subscribe: Effect.Effect<
       {
         readonly latest: DesktopUpdateState;
@@ -273,7 +266,7 @@ function isArm64HostRunningIntelBuild(runtimeInfo: DesktopRuntimeInfo): boolean 
   return runtimeInfo.hostArch === "arm64" && runtimeInfo.appArch === "x64";
 }
 
-/** @public Service construction is part of the canonical Effect module API. */
+/** @public */
 export const make = Effect.gen(function* () {
   const config = yield* DesktopConfig.DesktopConfig;
   const pool = yield* DesktopBackendPool.DesktopBackendPool;
@@ -298,8 +291,6 @@ export const make = Effect.gen(function* () {
   );
 
   const stateChanges = yield* PubSub.sliding<DesktopUpdateState>(16);
-  // Makes ref writes + publishes atomic against subscribe, so a snapshot
-  // never overlaps with the first change a subscriber receives.
   const stateMutex = yield* Semaphore.make(1);
 
   const emitState = Ref.get(updateStateRef).pipe(
@@ -333,8 +324,6 @@ export const make = Effect.gen(function* () {
     ),
   );
 
-  // The .deb carries electron-builder's resources/package-type marker.
-  // electron-updater reads the same file and installs updates with dpkg.
   const isDebPackage =
     environment.platform === "linux" && environment.isPackaged
       ? yield* fileSystem
@@ -516,9 +505,6 @@ export const make = Effect.gen(function* () {
     );
   }).pipe(Effect.withSpan("desktop.updates.downloadAvailableUpdate"));
 
-  // Tells the primary backend that the coming stop is an update restart, so it
-  // keeps its managed tunnel for the backend the updated app starts. Best
-  // effort: without the marker the backend only re-provisions its tunnel.
   const updateRestartMarkerDir = environment.path.join(environment.baseDir, "runtime");
   const updateRestartMarkerPath = environment.path.join(
     updateRestartMarkerDir,
@@ -533,8 +519,6 @@ export const make = Effect.gen(function* () {
       ),
     );
 
-  // A failed or interrupted install brings no updated backend, so a later
-  // quit must release the tunnel.
   const removeUpdateRestartMarker = fileSystem
     .remove(updateRestartMarkerPath, { force: true })
     .pipe(Effect.ignore);
@@ -630,13 +614,6 @@ export const make = Effect.gen(function* () {
 
         return yield* Effect.gen(function* () {
           yield* writeUpdateRestartMarker;
-          // Stop every backend in the pool, not just the primary. With
-          // parallel WSL + Windows backends, leaving the WSL instance up
-          // means quitAndInstall's app.quit() exits before the pool's
-          // scope cascade has a chance to run its stop finalizer, so the
-          // WSL child gets hard-killed by the OS instead of receiving
-          // SIGTERM + grace. Stops run concurrently with the same 5s
-          // budget the primary had on its own.
           const instances = yield* pool.list;
           yield* Effect.forEach(
             instances,

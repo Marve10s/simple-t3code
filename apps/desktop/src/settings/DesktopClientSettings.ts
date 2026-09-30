@@ -19,7 +19,6 @@ const decodeClientSettingsDocument = Schema.decodeEffect(
 const decodeClientSettingsValue = Schema.decodeUnknownEffect(ClientSettingsSchema);
 const decodeClientSettingsJson = Effect.fnUntraced(function* (raw: string) {
   const document = yield* decodeClientSettingsDocument(raw);
-  // Select the shape before validation so invalid legacy settings cannot become defaults.
   return yield* decodeClientSettingsValue(
     Object.hasOwn(document, "settings") ? document.settings : document,
   );

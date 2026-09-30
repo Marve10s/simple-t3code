@@ -8,7 +8,6 @@ interface ResizeSession {
   cleanup?: () => void;
 }
 
-/** Shared pointer lifecycle for side panels, including interrupted and sub-frame drags. */
 export function useResizeDrag<T extends HTMLElement>(
   start: (event: PointerEvent<T>) => ResizeSession | null,
   resetKey?: string,
@@ -38,15 +37,12 @@ export function useResizeDrag<T extends HTMLElement>(
       if (!active) return;
       if (active.frame !== null) cancelAnimationFrame(active.frame);
       if (commit) flush();
-      // Release can synchronously dispatch lostpointercapture.
       drag.current = null;
       try {
         if (active.target.hasPointerCapture(active.pointerId)) {
           active.target.releasePointerCapture(active.pointerId);
         }
-      } catch {
-        // Capture may already have been released by the browser.
-      }
+      } catch {}
       document.body.style.removeProperty("cursor");
       document.body.style.removeProperty("user-select");
       active.session.cleanup?.();

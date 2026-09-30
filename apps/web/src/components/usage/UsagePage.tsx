@@ -168,8 +168,6 @@ export function UsagePage() {
         : enumerateHourStarts(window.sinceTime, window.untilTime),
     [window.sinceTime, window.untilTime],
   );
-  // Newest first: the window can run 90 periods, so the interesting end
-  // belongs at the top of the table.
   const breakdownPeriods = useMemo<readonly (DailyTotals | HourlyTotals)[]>(
     () => (isPast24Hours ? merged.hourly : merged.daily).toReversed(),
     [isPast24Hours, merged.daily, merged.hourly],
@@ -346,8 +344,6 @@ export function UsagePage() {
             </Toggle>
           ))}
         </ToggleGroup>
-        {/* The period does not apply to Limits, so it stays in place but
-            disabled; unmounting it shifted the metric toggle ~300px. */}
         <ToggleGroup
           aria-label="Usage period"
           variant="segmented"
@@ -907,7 +903,6 @@ function CursorEnableLimits({
   );
 }
 
-/** Brand mark for the harness a row belongs to. */
 function ProviderMark({
   provider,
   className,
@@ -928,10 +923,6 @@ function Metric({ label, value }: { readonly label: string; readonly value: stri
   );
 }
 
-/**
- * Explains failed or incompatible environments and deduplicated transcripts.
- * Shown inside the environment filter so arriving results do not move the page.
- */
 function UsageCoverageNotice({
   environments,
   duplicateSources,
@@ -973,7 +964,6 @@ function UsageCoverageNotice({
   );
 }
 
-/** Environment selection and scan progress share a permanent header control. */
 function UsageEnvironmentFilter({
   environments,
   selectedEnvironments,
@@ -1127,11 +1117,6 @@ function UsageEnvironmentFilter({
   );
 }
 
-/**
- * Stand-in with the loaded page's shape, using the shared `Skeleton` bars so it
- * breathes with the same `animate-skeleton` pulse as every other loading state.
- * Replaced by results as soon as the first environment answers.
- */
 function UsageSkeleton() {
   return (
     <>

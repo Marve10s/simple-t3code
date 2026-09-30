@@ -137,14 +137,14 @@ it("switches to fixed authenticated feeds while retaining one HID socket, routes
     JSON.parse(new TextDecoder().decode(ws.send.mock.lastCall?.[0].subarray(1))).orientation;
   client.rotate();
   expect(requestedOrientation()).toBe("landscape_left");
-  config(3); // An orientation-locked app keeps its framebuffer orientation after the sensor rotates.
+  config(3);
   expect(onDuoControl.mock.lastCall?.[0].error).toBeNull();
   client.rotate();
   expect(requestedOrientation()).toBe("portrait_upside_down");
   config(3, "portrait_upside_down");
   client.rotate();
   expect(requestedOrientation()).toBe("landscape_right");
-  config(3); // An external native orientation change becomes authoritative again.
+  config(3);
   client.rotate();
   expect(requestedOrientation()).toBe("landscape_left");
   config(3, "landscape_left");
@@ -154,7 +154,7 @@ it("switches to fixed authenticated feeds while retaining one HID socket, routes
   const before = ws.send.mock.calls.length;
   client.controlDuo({ control: "orientation", value: "portrait" });
   expect(ws.send.mock.calls.length).toBe(before);
-  config(3, "landscape_left"); // The angle's config precedes its receipt; it cannot acknowledge a queued rotation.
+  config(3, "landscape_left");
   const reply = new TextEncoder().encode(
     JSON.stringify({ requestId: angleRequest.requestId, ok: true }),
   );
@@ -229,7 +229,7 @@ it("switches to fixed authenticated feeds while retaining one HID socket, routes
   expect(Decoder.instances[3]!.state).toBe("configured");
   config(1, "portrait", true);
   client.setDuoPanels({ cover: { present: cover }, inner: { present: inner } });
-  expect(feeds).toHaveLength(5); // One active feed replaces the two fixed feeds.
+  expect(feeds).toHaveLength(5);
   expect(feeds[4]!.url).not.toContain("/panel/");
   expect(new URL(feeds[4]!.url).searchParams.get("hostId")).toBe("remote");
   ready = waitDecoders(5);
@@ -240,20 +240,20 @@ it("switches to fixed authenticated feeds while retaining one HID socket, routes
   outputs[4]!(primary);
   expect(present).toHaveBeenCalledTimes(painted + 1);
   expect(present.mock.lastCall?.[0]).toBe(primary);
-  expect(cover).toHaveBeenCalledOnce(); // The main sink owns primary texture delivery.
+  expect(cover).toHaveBeenCalledOnce();
   config(3, "portrait", true);
   expect(feeds[4]!.signal.aborted).toBe(true);
   expect(feeds).toHaveLength(6);
   ready = waitDecoders(6);
   feeds[5]!.controller.enqueue(description);
   await ready;
-  outputs[4]!(primary); // The old elected display cannot paint after handoff.
+  outputs[4]!(primary);
   expect(present).toHaveBeenCalledTimes(painted + 1);
   outputs[5]!(frame);
   expect(present).toHaveBeenCalledTimes(painted + 2);
   expect(present.mock.lastCall?.[0]).toBe(frame);
   config(3, "portrait", true);
-  expect(feeds).toHaveLength(6); // Duplicate native readback does not reconnect.
+  expect(feeds).toHaveLength(6);
   supported = false;
   client.setDuoPanels(null);
   client.setDuoPanels({ cover: { present: cover }, inner: { present: inner } });

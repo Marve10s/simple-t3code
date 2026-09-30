@@ -152,9 +152,6 @@ export function requireThreadAbsent(input: {
   readonly command: OrchestrationCommand;
   readonly threadId: ThreadId;
 }): Effect.Effect<void, OrchestrationCommandInvariantError> {
-  // Thread deletion is a soft delete and a draft keeps its client-minted id
-  // across retries, so only a live row blocks creation. Projectors reset the
-  // thread's rows when the id is created again.
   const existing = findThreadById(input.readModel, input.threadId);
   if (existing === undefined || existing.deletedAt !== null) {
     return Effect.void;

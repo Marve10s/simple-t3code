@@ -1,5 +1,4 @@
 const maxLineLength = 4096;
-// Cursor also uses RetriableError for agent-loop failures; preserve those diagnostics.
 const transportError =
   /^Error: (?:RetriableError: (?!\[internal\]).+|ConnectError: \[(?:unavailable|aborted|deadline_exceeded)\].*)$/;
 const serverError = "Something went wrong communicating with the server. Please try again.";
@@ -15,14 +14,11 @@ function consumeLine(state: ReplyState, line: string) {
   if (transportError.test(text) || text === serverError) {
     state.failure = text;
   } else if (text.trim() !== "" && !(state.failure && /^\s+at\s/.test(text))) {
-    // An explanation or code sample can quote the same diagnostic. Only
-    // classify an assistant item consisting entirely of a transport dump.
     state.disqualified = true;
     state.failure = undefined;
   }
 }
 
-/** Tracks a standalone Cursor diagnostic without retaining an entire streamed answer. */
 export class CursorTransportFailure {
   private state: ReplyState = { disqualified: false, failure: undefined };
   private line = "";

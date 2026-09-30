@@ -124,7 +124,6 @@ describe("usage pricing", () => {
     expect(cacheSavingsUsd(table, record("claude-opus-5-5", null, true))).toBeCloseTo(
       2 * cacheSavingsUsd(table, record("claude-opus-5-5")),
     );
-    // No published fast tier, and custom prices, both stay at the standard rate.
     expect(cost("claude-fable-5-1", true)).toBe(cost("claude-fable-5-1", false));
     expect(cost("claude-opus-5-5", true, overrides)).toBe(
       cost("claude-opus-5-5", false, overrides),

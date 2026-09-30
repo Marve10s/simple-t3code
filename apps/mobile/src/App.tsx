@@ -30,13 +30,10 @@ if (process.env.EXPO_PUBLIC_SHOWCASE === "1") {
   prepareNativeShowcaseCapture();
 }
 
-void SplashScreen.preventAutoHideAsync().catch(() => {
-  // The native module can be unavailable in non-native test environments.
-});
+void SplashScreen.preventAutoHideAsync().catch(() => {});
 
 const appLinking = {
   prefixes: [Linking.createURL("/"), "t3code://", "t3code-dev://", "t3code-preview://"],
-  // Keep the compact thread list available beneath a directly opened thread.
   config: { initialRouteName: "Home" },
   filter: shouldHandleAppLink,
 };
@@ -80,11 +77,6 @@ function AppContent() {
               barStyle={themeAppearance === "dark" ? "light-content" : "dark-content"}
               translucent
             />
-            {/* The navigation theme drives the NATIVE header appearance: native-stack
-                forwards `dark` as the nav bar's overrideUserInterfaceStyle. Without
-                this, React Navigation defaults to its light theme and every native
-                header (glass buttons, title, materials) is forced light even when
-                the system is in dark mode. */}
             <View style={{ flex: 1 }}>
               <IncomingShareProvider>
                 <Navigation linking={appLinking} theme={navigationTheme} />
@@ -92,8 +84,6 @@ function AppContent() {
               <ConfirmDialogHost />
               <ThreadArrangementHost />
             </View>
-            {/* Anchored-menu overlays render here — in-window, so the
-                keyboard stays up while a dropdown is open. */}
             <OverlayPortalHost />
           </SafeAreaProvider>
         </KeyboardProvider>

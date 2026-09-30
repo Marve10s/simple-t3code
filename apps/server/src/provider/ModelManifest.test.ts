@@ -20,14 +20,6 @@ import {
   encodeManifestCache,
 } from "./ModelManifest.ts";
 
-/**
- * Test policy: this file covers manifest machinery, not manifest contents.
- * Do not add assertions for real model slugs, names, status, aliases, or
- * profiles when editing model-manifest.json. Add tests only when fetch/cache
- * behavior or the provider-neutral resolver semantics change, and use
- * synthetic models for resolver coverage.
- */
-
 const CODEX = ProviderDriverKind.make("codex");
 const model = (overrides: Partial<ServerProviderModel>): ServerProviderModel => ({
   slug: "gpt-test",
@@ -59,10 +51,8 @@ describe("classifyModels", () => {
     };
     const models = [
       model({ slug: "current-a" }),
-      // Stale flag from a previous classification pass must be cleared.
       model({ slug: "current-b", isLegacy: true }),
       model({ slug: "old-model" }),
-      // Custom models are user-defined and never reclassified.
       model({ slug: "my-own-model", isCustom: true }),
     ];
     assert.deepStrictEqual(
@@ -114,7 +104,6 @@ describe("applyManifestDefault", () => {
       model({ slug: "gemini-old" }),
       model({ slug: "gemini-new", isDefault: true, aliases: ["antigravity-default"] }),
     ]);
-    // The account does not offer the manifest default: keep the runtime's choice.
     assert.deepStrictEqual(
       applyManifestDefault(models.slice(0, 1), manifest, driver),
       models.slice(0, 1),
@@ -218,7 +207,6 @@ describe("resolveProviderCatalog", () => {
   });
 });
 
-// Remote fixtures date after the bundle so a fetch still outranks it.
 const REMOTE_UPDATED_AT = "2099-01-01T00:00:00Z";
 
 const REMOTE_MANIFEST: ModelManifestData = {
@@ -426,8 +414,6 @@ describe("ModelManifest service", () => {
       const refreshed = yield* service.refresh;
       assert.deepStrictEqual(refreshed, REMOTE_MANIFEST);
 
-      // A fresh service instance sees the disk cache without another fetch:
-      // its HTTP layer is still stubbed, but `current` never fetches at all.
       const rebooted = yield* make;
       assert.deepStrictEqual(yield* rebooted.current, REMOTE_MANIFEST);
     }).pipe(
@@ -513,9 +499,6 @@ describe("ModelManifest service", () => {
       const path = yield* Path.Path;
       const config = yield* ServerConfig.ServerConfig;
       const cachePath = path.join(config.stateDir, "model-manifest.json");
-      // A cache of the manifest as it was before the release edited it. The
-      // fetch time is irrelevant: the remote may be unreachable now, so
-      // `current` must already prefer the bundle.
       const { updatedAt: _undated, ...undatedManifest } = REMOTE_MANIFEST;
       for (const stale of [
         undatedManifest,
@@ -529,7 +512,6 @@ describe("ModelManifest service", () => {
         assert.deepStrictEqual(yield* service.current, BUNDLED_MODEL_MANIFEST);
       }
 
-      // A cache of a newer edit still outranks the bundle.
       yield* fs.writeFileString(
         cachePath,
         yield* encodeManifestCache({ fetchedAtMs: 0, manifest: REMOTE_MANIFEST }),

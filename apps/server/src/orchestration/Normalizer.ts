@@ -160,7 +160,6 @@ export const normalizeDispatchCommand = (command: ClientOrchestrationCommand) =>
     }
     const claimedAttachmentPaths: string[] = [];
     const attachmentsWithDecodedSizes = [...attachments];
-    // Context records bind to attachments by the id the client knew; they follow the rename.
     const finalAttachmentIdByClientId = new Map<string, string>();
     const normalizedAttachments = yield* Effect.forEach(
       attachments,
@@ -208,10 +207,6 @@ export const normalizeDispatchCommand = (command: ClientOrchestrationCommand) =>
               });
             }
 
-            // Keep the pending copy until the turn succeeds. A failed thread
-            // bootstrap can then retry with a fresh thread id. A copy, not a
-            // hard link: an agent editing the delivered file in place must not
-            // mutate the retry source.
             yield* fileSystem.copyFile(claim.currentPath, claim.finalPath).pipe(
               Effect.mapError(
                 (cause) =>

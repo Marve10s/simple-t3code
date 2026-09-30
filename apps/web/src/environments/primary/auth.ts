@@ -166,9 +166,6 @@ export function takePairingTokenFromUrl(): string | null {
 }
 
 function getDesktopBootstrapCredential(): string | null {
-  // Both backends share the same bootstrap token (DesktopBackendConfiguration
-  // mints one tokenRef and feeds it to both resolvers), so picking the
-  // primary entry is fine even when the WSL backend is also registered.
   const bootstraps = window.desktopBridge?.getLocalEnvironmentBootstraps() ?? [];
   const primary = bootstraps.find((entry) => entry.id === PRIMARY_LOCAL_ENVIRONMENT_ID);
   return typeof primary?.bootstrapToken === "string" && primary.bootstrapToken.length > 0

@@ -42,7 +42,6 @@ type SessionSetupResult = Pick<
   "configOptions" | "models"
 >;
 
-/** Keep the native model IDs, including model-specific thinking levels. */
 export function buildAntigravityModelsFromSession(
   setup: SessionSetupResult,
 ): ReadonlyArray<ServerProviderModel> {
@@ -124,11 +123,9 @@ interface AntigravityProviderOptions {
   >;
   readonly supportsTextGeneration: Effect.Effect<boolean>;
   readonly maintenanceCapabilities?: ProviderMaintenanceCapabilities;
-  /** Auth type and label published once a session authenticates. */
   readonly auth?: { readonly type: string; readonly label: string };
 }
 
-/** Health uses initialize only. Session callbacks supply account-specific metadata. */
 export const makeAntigravityProvider = Effect.fn("makeAntigravityProvider")(function* (
   settings: AntigravitySettings,
   options: AntigravityProviderOptions,
@@ -144,8 +141,6 @@ export const makeAntigravityProvider = Effect.fn("makeAntigravityProvider")(func
         installed: false,
         version: null,
         status: "warning",
-        // The configured method rides along so the registry can tell a saved
-        // account for this method from one left by a previous configuration.
         auth: { status: "unknown", ...(options.auth ? { type: options.auth.type } : {}) },
         message: settings.enabled
           ? "Checking Antigravity availability."
@@ -161,9 +156,6 @@ export const makeAntigravityProvider = Effect.fn("makeAntigravityProvider")(func
     draft: initialDraft,
     authRevision: 0,
   });
-  // Skills the driver discovered on disk per workspace. Session callbacks
-  // rewrite the workspace entry with native commands and must keep these, or
-  // the registry drops the suggestions and never re-reads the workspace.
   const discoveredSkills = new Map<string, ServerProvider["skills"]>();
   const getSnapshot = SubscriptionRef.get(metadata).pipe(
     Effect.flatMap((state) => options.stampIdentity(state.draft)),

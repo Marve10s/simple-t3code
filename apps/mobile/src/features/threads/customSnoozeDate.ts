@@ -1,4 +1,3 @@
-/** Compose calendars exchange calendar days at UTC midnight, not local instants. */
 export function snoozeDateToPickerDate(date: Date): string {
   return new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate())).toISOString();
 }

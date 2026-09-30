@@ -180,6 +180,11 @@ This checkout is SimpleT3Code, a personal fork of T3 Code restyled after the Cod
 - Restyle upstream components from `simple-codex.css`, keyed on upstream `data-slot` attributes or our own `data-codex-part` attributes. The lint rule rejects class names Tailwind does not know, so fork hooks use `data-codex-part`, not classes. Keep the CSS unlayered so it wins over Tailwind utilities.
 - Store fork-only preferences in local storage under `simplet3code:` keys (see `codexView.ts`, `codexAnimations.ts`, `codexBackgrounds.ts`) rather than adding fields to upstream settings contracts.
 
+### No comments
+
+- The codebase carries no comments. The only exceptions are ones a tool acts on: lint and type-checker directives (`oxlint-`, `eslint-`, `@ts-expect-error`, `@effect-diagnostics`), bundler and test-runner hints (`@vite-ignore`, `@__PURE__`, `@vitest-environment`), triple-slash references, licence blocks, JSDoc types in plain JavaScript files, and doc tags tools read (`@effect-*`, `@public`, `@internal`, `@deprecated`, shrunk to the bare tag). This overrides the upstream guidance above about explaining code in comments.
+- Do not write new comments. After merging upstream, run `pnpm strip-comments --write`, then `vp fmt` on the changed files, and type-check before committing. Without `--write` the script only reports what it would remove.
+
 ### Identity and data
 
 - The desktop app is `SimpleT3Code` (`com.marve10s.simplet3code`) with the URL scheme `simplet3code`. It stores data in `~/.simplet3` and its Electron profile in `~/Library/Application Support/simplet3code`, and has no update feed, so it can never update itself into upstream T3 Code.

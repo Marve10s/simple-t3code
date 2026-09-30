@@ -5,7 +5,6 @@ import { build } from "vite-plus";
 
 const mobileRoot = NodePath.resolve(NodePath.dirname(NodeURL.fileURLToPath(import.meta.url)), "..");
 
-/** Metro embeds the shared browser transport as a small script in the native WebView. */
 export async function generateDeviceStreamScript() {
   const result = await build({
     configFile: false,

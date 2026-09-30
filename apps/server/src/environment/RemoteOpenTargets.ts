@@ -1,13 +1,3 @@
-/**
- * RemoteOpenTargets - resolves the SSH hostnames this environment advertises
- * for remote open-in-editor deep links (`vscode://vscode-remote/ssh-remote+…`).
- *
- * The server can only check itself: sshd listening locally, tailscaled
- * reporting a MagicDNS name, and the machine hostname for mDNS. Whether a
- * given name resolves from the viewer's machine is inherently client-side.
- * Targets are ordered most-reachable first (tailnet name works from anywhere
- * on the tailnet; `<hostname>.local` only on the same LAN).
- */
 import { type RemoteOpenTarget } from "@t3tools/contracts";
 import { HostProcessHostname } from "@t3tools/shared/hostProcess";
 import * as NetService from "@t3tools/shared/Net";
@@ -26,15 +16,12 @@ export class RemoteOpenTargets extends Context.Service<
   }
 >()("t3/environment/RemoteOpenTargets") {}
 
-/** @public Service construction is part of the canonical Effect module API. */
+/** @public */
 export const make = Effect.gen(function* () {
   const spawner = yield* ChildProcessSpawner.ChildProcessSpawner;
   const net = yield* NetService.NetService;
 
   const resolveTargets = Effect.gen(function* () {
-    // No local sshd means no name can work; advertise nothing so clients
-    // render a clear "no SSH route" state instead of links that hang.
-    // Check both loopback families: sshd can be bound IPv6-only.
     const sshdListening = yield* Effect.zipWith(
       net.hasListenerOnHost(SSH_PORT, "127.0.0.1"),
       net.hasListenerOnHost(SSH_PORT, "::1"),
@@ -46,7 +33,6 @@ export const make = Effect.gen(function* () {
 
     const targets: Array<RemoteOpenTarget> = [];
 
-    // Tailscale absent or down is the common case, not an error.
     const magicDnsName = yield* readTailscaleStatus.pipe(
       Effect.map((status) => status.magicDnsName),
       Effect.orElseSucceed(() => null),
@@ -56,8 +42,6 @@ export const make = Effect.gen(function* () {
       targets.push({ kind: "tailscale", host: magicDnsName });
     }
 
-    // os.hostname() may already be an FQDN (macOS often reports
-    // "Name.local"); mDNS names are always `<first-label>.local`.
     const hostname = yield* HostProcessHostname;
     const shortHostname = hostname.split(".")[0]?.trim();
     if (shortHostname !== undefined && shortHostname.length > 0) {

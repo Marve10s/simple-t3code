@@ -144,7 +144,6 @@ it.effect("projects link, sync, and unlink onto the thread", () =>
     );
     expect(linked.threads[0]?.pullRequests).toEqual([link]);
     expect(linked.threads[0]?.updatedAt).toBe(LATER);
-    // The legacy field is derived from the array so old clients keep working.
     expect(linked.threads[0]?.linkedPullRequest).toEqual({
       projectId: PROJECT_ID,
       repository: "t3tools/t3code",
@@ -152,8 +151,6 @@ it.effect("projects link, sync, and unlink onto the thread", () =>
       url: "https://github.com/t3tools/t3code/pull/42",
     });
 
-    // A second link for the same key replaces in place (used for un-dismiss
-    // and stack tombstones), never duplicates.
     const relinked = yield* projectEvent(
       linked,
       makeEvent({
@@ -296,7 +293,6 @@ it.effect("mirrors legacy meta-updated links into pullRequests using the project
         stack: null,
       },
     ]);
-    // Two open links read as a stack; the derived field points at the top.
     expect(legacyLinked.threads[0]?.linkedPullRequest).toEqual({
       projectId: PROJECT_ID,
       repository: "t3tools/t3code",
@@ -304,7 +300,6 @@ it.effect("mirrors legacy meta-updated links into pullRequests using the project
       url: "https://github.com/t3tools/t3code/pull/42",
     });
 
-    // Null clears only the manual link; the agent's stays.
     const legacyCleared = yield* projectEvent(
       legacyLinked,
       makeEvent({

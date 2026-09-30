@@ -16,8 +16,6 @@ export type ProjectEntryKind = typeof ProjectEntryKind.Type;
 
 export const ProjectSearchEntriesInput = Schema.Struct({
   cwd: TrimmedNonEmptyString,
-  // An empty query is a bounded browse: the index returns frecency-ordered
-  // entries, which the file picker uses for its initial results.
   query: TrimmedString.check(Schema.isMaxLength(256)),
   limit: PositiveInt.check(Schema.isLessThanOrEqualTo(PROJECT_SEARCH_ENTRIES_MAX_LIMIT)),
   kind: Schema.optional(ProjectEntryKind),
@@ -40,8 +38,6 @@ export type ProjectSearchEntriesResult = typeof ProjectSearchEntriesResult.Type;
 
 export const ProjectSearchContentsInput = Schema.Struct({
   cwd: TrimmedNonEmptyString,
-  // Whitespace is significant in content queries (" foo", regex trailing
-  // spaces), so the query is deliberately not trimmed on the wire.
   query: Schema.String.check(Schema.isNonEmpty(), Schema.isMaxLength(256)),
   limit: PositiveInt.check(Schema.isLessThanOrEqualTo(PROJECT_SEARCH_CONTENTS_MAX_LIMIT)),
   caseSensitive: Schema.Boolean,
@@ -73,8 +69,6 @@ export type ProjectSearchContentsResult = typeof ProjectSearchContentsResult.Typ
 
 export const ProjectListEntriesInput = Schema.Struct({
   cwd: TrimmedNonEmptyString,
-  // Present for immediate filesystem children, including ignored entries; empty means root.
-  // Omitted preserves the indexed recursive listing used by older clients.
   directoryPath: Schema.optional(TrimmedString),
 });
 export type ProjectListEntriesInput = typeof ProjectListEntriesInput.Type;
@@ -124,8 +118,6 @@ export class ProjectSearchEntriesError extends Schema.TaggedError<ProjectSearchE
     cause: Schema.optional(Schema.Defect()),
   },
 ) {
-  // The structured fields are optional on the wire so newer peers can decode legacy message-only
-  // failures. New application code must provide them through this constructor.
   // @effect-diagnostics-next-line overriddenSchemaConstructor:off
   constructor(
     props: ProjectEntriesFailureContext & {
@@ -198,8 +190,6 @@ export class ProjectListEntriesError extends Schema.TaggedError<ProjectListEntri
 
 export const ProjectReadFileInput = Schema.Struct({
   cwd: TrimmedNonEmptyString,
-  // Workspace-relative, or an absolute host path for a file outside the
-  // workspace. Only workspace-relative paths can be written back.
   relativePath: TrimmedNonEmptyString.check(Schema.isMaxLength(PROJECT_READ_FILE_PATH_MAX_LENGTH)),
 });
 export type ProjectReadFileInput = typeof ProjectReadFileInput.Type;

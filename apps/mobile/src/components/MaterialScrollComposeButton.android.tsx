@@ -13,7 +13,6 @@ import { useAndroidControlSizing } from "./useAndroidControlSizing";
 import { useAppearancePreferences } from "../features/settings/appearance/AppearancePreferencesProvider";
 import { resolveScaledTextRole } from "../lib/appearancePreferences";
 
-/** Keep the animated width and icon positioning entirely inside Compose, not Yoga. */
 export function MaterialScrollComposeButton(props: {
   readonly expanded: boolean;
   readonly onPress: () => void;
@@ -23,7 +22,6 @@ export function MaterialScrollComposeButton(props: {
   const { appearance, themeAppearance, themeVariables: colors } = useAppearancePreferences();
   const typography = resolveScaledTextRole("footnote", appearance.baseFontSize);
   const { iconSize, fabSize } = useAndroidControlSizing();
-  // Scale the native 56dp minimum; keep text and icons at their requested sizes.
   const nativeSize = Math.max(56, fabSize);
   const scale = fabSize / nativeSize;
   const nativeIconSize = Math.round(iconSize / scale);
@@ -85,7 +83,6 @@ export function MaterialScrollComposeButton(props: {
           </Box>
         </Host>
       </View>
-      {/* The visual host is wider than the button; only this target intercepts list touches. */}
       <Pressable
         onPress={props.onPress}
         accessibilityRole="button"
@@ -96,7 +93,6 @@ export function MaterialScrollComposeButton(props: {
           right: 0,
           top: 0,
           bottom: 0,
-          // Release the label area as soon as collapse starts, before native measurements arrive.
           width: props.expanded ? buttonWidth * scale : fabSize,
           borderRadius: 16 * scale,
           overflow: "hidden",

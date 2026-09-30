@@ -52,19 +52,8 @@ function failureToast(title: string, error: unknown) {
   );
 }
 
-/**
- * The per-thread action menu (pin, settle, snooze, rename, copy, delete…) as
- * a self-contained hook, for surfaces other than the sidebar row — today the
- * chat header. Renders through the native context-menu bridge and dispatches
- * through the same mutations the sidebar uses.
- *
- * Unlike the sidebar, settle and snooze here never navigate away: the caller
- * is acting on the thread they are reading, and ChatView's parked-thread
- * banner already offers the way back.
- */
 export function useThreadActionMenu(input: {
   readonly threadRef: ScopedThreadRef | null;
-  /** Fallback for "Copy path" when the thread has no worktree. */
   readonly projectCwd: string | null;
   readonly onStartRename: () => void;
 }) {
@@ -127,8 +116,6 @@ export function useThreadActionMenu(input: {
       void (async () => {
         const api = readLocalApi();
         if (!api) return;
-        // Snapshot at open time — the menu is modal, so state read now is
-        // what the user is looking at.
         const thread = readThreadShell(threadRef);
         if (!thread) return;
         const now = new Date();
@@ -143,8 +130,6 @@ export function useThreadActionMenu(input: {
         const snoozePresets = resolveSnoozePresets(now, timestampFormat);
         const items = buildThreadActionMenuItems({
           branch: thread.branch ?? null,
-          // The chat header has no project-scoped thread list behind the
-          // menu, so the "Filter by project" affordance is sidebar-only.
           projectFilter: null,
           isPinned: thread.pinnedAt != null,
           isSettled: supports.settlement && thread.settledOverride === "settled",
@@ -198,8 +183,6 @@ export function useThreadActionMenu(input: {
             return;
           }
           case "new-thread-on-branch": {
-            // Explicit branch carry-over: reuse the thread's worktree when it
-            // has one, otherwise its branch on the local checkout.
             const result = await settlePromise(() =>
               handleNewThread(scopeProjectRef(threadRef.environmentId, thread.projectId), {
                 branch: thread.branch,
@@ -311,9 +294,6 @@ export function useThreadActionMenu(input: {
             if (
               deleted._tag === "Failure" &&
               !isAtomCommandInterrupted(deleted) &&
-              // A failure with the thread already gone is worktree cleanup
-              // failing after a successful delete — deleteThread has toasted
-              // that itself, and "Failed to delete thread" would be a lie.
               readThreadShell(threadRef) !== null
             ) {
               failureToast("Failed to delete thread", squashAtomCommandFailure(deleted));

@@ -139,7 +139,6 @@ export function QuestionAttachments(props: {
               maxVideoBytes: capabilities?.fileAttachments?.maxUploadBytes,
             });
       const picked = "files" in result ? result.files : result.attachments;
-      // Resolution on another client clears the reservation while the picker is open.
       if (
         !scope?.active ||
         (appAtomRegistry.get(questionAttachmentPreparationAtom)[key] ?? 0) === 0

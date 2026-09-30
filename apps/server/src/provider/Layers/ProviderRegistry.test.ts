@@ -77,8 +77,6 @@ const disabledCodexSettings: CodexSettings = Schema.decodeSync(CodexSettings)({
 
 process.env.T3CODE_CURSOR_ENABLED = "1";
 
-// ── Test helpers ────────────────────────────────────────────────────
-
 const encoder = new TextEncoder();
 const TEST_EPOCH = DateTime.makeUnsafe("1970-01-01T00:00:00.000Z");
 const withBundledCompatibility = (snapshot: ServerProvider) =>
@@ -88,7 +86,6 @@ const withBundledCompatibility = (snapshot: ServerProvider) =>
     ModelManifest.BUNDLED_MODEL_MANIFEST.compatibility,
   );
 
-// Provider metadata checks use a bundled manifest and stubbed HTTP.
 const TestHttpClientLive = Layer.succeed(
   HttpClient.HttpClient,
   HttpClient.make((request) =>
@@ -358,10 +355,6 @@ function makeMutableServerSettingsService(
   });
 }
 
-// The registry writes the status cache and only then publishes the change, so
-// a subscriber that sees `checkedAt` on the stream knows the file is on disk.
-// Subscribed before the publish that triggers it; a spin on the file would
-// race the write and lose on a slow host.
 const awaitPersistedProvider = (
   registry: ProviderRegistry.ProviderRegistry["Service"],
   checkedAt: string,
@@ -1257,7 +1250,6 @@ it.layer(Layer.mergeAll(TestNodeServices, ServerSettingsModule.layerTest(), Test
             models: signedIn.models,
           });
           assert.equal("message" in merged, false);
-          // The next periodic probe reads the merged snapshot as its previous state.
           assert.deepStrictEqual(mergeProviderSnapshot(merged, restartProbe), merged);
         });
 
@@ -1292,7 +1284,6 @@ it.layer(Layer.mergeAll(TestNodeServices, ServerSettingsModule.layerTest(), Test
             { ...restartProbe, status: "disabled", enabled: false },
             { ...restartProbe, status: "error", installed: false },
             { ...restartProbe, driver: ProviderDriverKind.make("codex") },
-            // The instance was rebuilt with another sign-in method.
             { ...restartProbe, auth: { status: "unknown", type: "gemini-api-key" } },
           ] satisfies ReadonlyArray<ServerProvider>;
           for (const next of untouched) {
@@ -2262,17 +2253,6 @@ it.layer(Layer.mergeAll(TestNodeServices, ServerSettingsModule.layerTest(), Test
         }),
       );
 
-      // This test intentionally avoids `mockCommandSpawnerLayer` so the real
-      // `probeCodexAppServerProvider` path runs — including the full
-      // `codex app-server` RPC handshake via `CodexClient.layerChildProcess`.
-      // We point `binaryPath` at a name that cannot exist on any machine so
-      // the real `ChildProcessSpawner` deterministically returns ENOENT; the
-      // probe wraps that as `CodexAppServerSpawnError` and
-      // `checkCodexProviderStatus` turns it into the user-visible "not
-      // installed" error snapshot. If the aggregator's `syncLiveSources`
-      // breaks — the `codex_personal`-never-probes bug we are guarding
-      // against — that snapshot never lands in `getProviders` and the
-      // assertions below fail.
       it.effect("propagates real Codex probe failures to the aggregator at boot", () =>
         Effect.gen(function* () {
           const missingBinary = `t3code_codex_missing_`;
@@ -2280,26 +2260,13 @@ it.layer(Layer.mergeAll(TestNodeServices, ServerSettingsModule.layerTest(), Test
             decodeServerSettings(
               deepMerge(encodedDefaultServerSettings, {
                 providers: {
-                  // Disable every built-in probe that would otherwise spawn
-                  // on the CI host. `enabled: false` short-circuits each
-                  // driver's probe *before* it touches the spawner, so the
-                  // test environment stays isolated from the dev
-                  // machine's PATH.
                   codex: { enabled: false },
                   claudeAgent: { enabled: false },
                   cursor: { enabled: false },
                   grok: { enabled: false },
                   opencode: { enabled: false },
                 },
-                // `providerInstances` keys are branded `ProviderInstanceId`;
-                // the branded index signature rejects plain string literals
-                // at the TS level even though the runtime schema happily
-                // accepts + decodes them. Cast the patch to `unknown` so
-                // the `Schema.decodeSync` below does the real validation.
                 providerInstances: {
-                  // Matches the shape the user had in `.t3/dev/settings.json`
-                  // when the bug was reported: a custom enabled Codex instance
-                  // pointing at a binary the server has to actually spawn.
                   codex_personal: {
                     driver: "codex",
                     displayName: "Codex Personal",
@@ -2337,11 +2304,6 @@ it.layer(Layer.mergeAll(TestNodeServices, ServerSettingsModule.layerTest(), Test
             Layer.provideMerge(ResetCreditCoordinator.layerTest),
             Layer.provideMerge(OpenCodeRuntime.OpenCodeRuntimeLive),
             Layer.provideMerge(BackgroundPolicyAlwaysRunLayer),
-            // NO spawner mock — `ChildProcessSpawner` is supplied by the
-            // outer `NodeServices.layer` on `it.layer(...)` and will
-            // genuinely spawn a subprocess. The missing-binary ENOENT is
-            // what exercises the same failure mode as a misconfigured
-            // production `binaryPath`.
           );
           const runtimeServices = yield* Layer.build(providerRegistryLayer).pipe(
             Scope.provide(scope),
@@ -2382,7 +2344,6 @@ it.layer(Layer.mergeAll(TestNodeServices, ServerSettingsModule.layerTest(), Test
         }),
       );
 
-      // A binary path change must rebuild Codex and publish its new probe result.
       it.effect("re-probes when settings change the codex binaryPath", () =>
         Effect.gen(function* () {
           const firstMissing = `t3code_codex_first_`;
@@ -2485,12 +2446,8 @@ it.layer(Layer.mergeAll(TestNodeServices, ServerSettingsModule.layerTest(), Test
                 codex: { enabled: true, binaryPath: secondMissing },
               },
             });
-            // Start the lazy stream only after publishing. A watcher that did
-            // not subscribe before forking has already lost this update.
             yield* Deferred.succeed(allowLazySettingsStream, undefined);
 
-            // Hold the second probe until the aggregator sees the rebuilt
-            // instance. Its next error must come from the new executable.
             yield* Deferred.await(secondProbeStarted);
             yield* pendingRebuild;
             const rebuiltError = yield* Stream.toPull(
@@ -2684,8 +2641,6 @@ it.layer(Layer.mergeAll(TestNodeServices, ServerSettingsModule.layerTest(), Test
       );
     });
 
-    // ── checkClaudeProviderStatus tests ──────────────────────────
-
     describe("checkClaudeProviderStatus", () => {
       it.effect("returns ready when claude is installed and authenticated", () =>
         Effect.gen(function* () {
@@ -2715,8 +2670,6 @@ it.layer(Layer.mergeAll(TestNodeServices, ServerSettingsModule.layerTest(), Test
 
       it.effect("returns ready and labels Bedrock-backed Claude as authenticated", () =>
         Effect.gen(function* () {
-          // Bedrock authenticates via external AWS credentials, so the SDK init
-          // reports only `apiProvider` with no subscription or token.
           const status = yield* checkClaudeProviderStatus(
             defaultClaudeSettings,
             claudeCapabilities({ apiProvider: "bedrock" }),
@@ -2893,7 +2846,6 @@ it.layer(Layer.mergeAll(TestNodeServices, ServerSettingsModule.layerTest(), Test
             claudeCapabilities(),
           );
           assert.strictEqual(status.status, "ready");
-          // The home is resolved through the host Path before it reaches the env.
           assert.deepStrictEqual(
             recorded.commands.map((command) => command.env?.CLAUDE_CONFIG_DIR),
             [(yield* Path.Path).resolve(claudeConfigDir)],

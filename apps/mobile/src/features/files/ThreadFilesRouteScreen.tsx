@@ -223,14 +223,12 @@ function FileContent(props: {
   readonly truncated: boolean;
   readonly onRefresh?: () => Promise<void> | void;
 }) {
-  // Reopening a mutable host file must not reuse a poster from an earlier visit.
   const thumbnailInstanceId = useId();
   const isMarkdown = isMarkdownPreviewFile(props.relativePath);
   const isBrowserFile = isWorkspaceBrowserPreviewPath(props.relativePath);
   const isImageFile = isWorkspaceImagePreviewPath(props.relativePath);
   const isVideoFile = isVideoPreviewFile(props.relativePath);
   const isAudioFile = isAudioPreviewFile(props.relativePath);
-  // Only the surfaces that wait on a signed asset URL can be blocked by one.
   const needsAssetUrl =
     isVideoFile ||
     isAudioFile ||
@@ -330,11 +328,9 @@ type ThreadFilesRouteScreenProps = StaticScreenProps<{
 
 type ThreadFileRouteScreenProps = StaticScreenProps<{
   readonly environmentId: string;
-  /** Absent for a project draft, which has no thread yet. */
   readonly threadId?: string;
   readonly path: string[];
   readonly line?: string;
-  /** Supplied when there is no thread to resolve the workspace from. */
   readonly cwd?: string;
   readonly projectName?: string;
 }>;
@@ -347,7 +343,6 @@ function useThreadFilesWorkspace(params: {
 }) {
   const routeEnvironmentId = firstRouteParam(params.environmentId);
   const routeThreadId = firstRouteParam(params.threadId);
-  // A project draft has no thread to resolve a workspace from, so it names one itself.
   const routeCwd = firstRouteParam(params.cwd);
   const routeProjectName = firstRouteParam(params.projectName);
   const { selectedThread, selectedThreadProject } = useThreadSelection();
@@ -601,7 +596,6 @@ export function ThreadFileScreen(props: ThreadFileRouteScreenProps) {
     environmentId,
     relativePath: assetPreviewPath,
     threadId,
-    // A project draft names its workspace root explicitly: there is no thread to resolve one.
     draftCwd: threadId === null ? cwd : null,
   });
   const assetPreviewUri = assetPreview._tag === "Success" ? assetPreview.url : null;
@@ -648,7 +642,6 @@ export function ThreadFileScreen(props: ThreadFileRouteScreenProps) {
     assetPreviewUri === null || previewRevision === 0
       ? assetPreviewUri
       : `${assetPreviewUri}${assetPreviewUri.includes("?") ? "&" : "?"}revision=${previewRevision}`;
-  // Remounting the preview after a re-mint is what makes a failed asset URL retryable.
   const handleRetryPreview = () => {
     void assetPreview.refresh().finally(() => setPreviewRevision((current) => current + 1));
   };
@@ -670,8 +663,6 @@ export function ThreadFileScreen(props: ThreadFileRouteScreenProps) {
   const handleSelectFile = useCallback(
     (path: string) => {
       const segments = path.split("/").filter(Boolean);
-      // A draft has no thread. `ThreadFile` would stringify null and then wait forever for a
-      // thread to resolve, so a draft stays on its own route and carries its workspace along.
       if (threadId === null) {
         navigation.dispatch(
           StackActions.push("NewTaskFile", {
@@ -705,13 +696,8 @@ export function ThreadFileScreen(props: ThreadFileRouteScreenProps) {
       ) : undefined,
     [cwd, environmentId, fileInspector.supported, handleSelectFile, projectName, relativePath],
   );
-  // The workspace inspector column spans the full window height. On iOS the
-  // pane brings its own nested native header; elsewhere it pads itself below
-  // the top inset.
   const safeAreaInsets = useSafeAreaInsets();
   const inspectorHeaderInset = Platform.OS === "ios" ? 0 : safeAreaInsets.top;
-  // Hand the file navigator to the workspace so it renders beside the
-  // navigator, outside this screen's native header.
   const renderWorkspaceInspector = useCallback(
     () => renderInspector(inspectorHeaderInset),
     [inspectorHeaderInset, renderInspector],
@@ -740,7 +726,6 @@ export function ThreadFileScreen(props: ThreadFileRouteScreenProps) {
             onPress: () => setModeOverride({ path: relativePath, mode: "source" }),
           } as const)
         : null,
-      // Only the source body wraps; a rendered preview lays itself out.
       resolvedActiveMode === "source"
         ? ({
             id: "word-wrap",
@@ -770,8 +755,6 @@ export function ThreadFileScreen(props: ThreadFileRouteScreenProps) {
               onPress: () => copyTextWithHaptic(relativePath),
             } as const,
           ]),
-      // Selecting a long file by hand is painful on a phone, so copying the whole thing is
-      // the action most readers actually want. The attachment screen already offers it.
       fileData?.contents != null
         ? ({
             id: "copy-contents",
@@ -855,9 +838,6 @@ export function ThreadFileScreen(props: ThreadFileRouteScreenProps) {
     handleReturnToThread();
   }, [handleReturnToThread, navigation]);
 
-  // A file opened from a project draft has no thread, and needs none: the thread only supplies
-  // the workspace to read from and the target to navigate back to, both of which a draft names
-  // for itself. Wait only for what this file actually cannot render without.
   if (environmentId === null || (threadId !== null && selectedThread === null)) {
     return <LoadingScreen message="Opening file..." messagePlacement="above-spinner" />;
   }

@@ -58,7 +58,6 @@ export interface WorkLogEntry {
   id: string;
   createdAt: string;
   turnId?: TurnId | null;
-  /** Stable provider identity across in-progress and completed lifecycle updates. */
   toolCallId?: string;
   label: string;
   detail?: string;
@@ -74,21 +73,11 @@ export interface WorkLogEntry {
   toolData?: unknown;
   itemType?: ToolLifecycleItemType;
   requestKind?: PendingApproval["requestKind"];
-  /** From runtime item / task payload `status` when present (e.g. tool.updated). */
   toolLifecycleStatus?: WorkLogToolLifecycleStatus;
-  /** Originating orchestration activity kind (e.g. `user-input.requested`) for row chrome. */
   sourceActivityKind?: OrchestrationThreadActivity["kind"];
-  /** Grouping key for subagent lifecycle rows (one row per agent). */
   taskId?: string;
-  /** Agent role (subagent_type) for labeled timeline rows. */
   agentRole?: string;
-  /**
-   * Present on agent-spawn rows: one per workflow run or per-turn batch of
-   * direct spawns. The row ("Kicked off N subagents") derives its live
-   * status and member list from the agent panel model at render time.
-   */
   agentSpawn?: {
-    /** Workflow coordinator taskId, or null for a direct-spawn batch. */
     workflowId: string | null;
     agentTaskIds: ReadonlyArray<string>;
   };
@@ -101,7 +90,6 @@ interface DerivedWorkLogEntry extends WorkLogEntry {
   [workLogCollapseKey]?: string;
   toolCallId?: string;
   isWorkflowCoordinator?: boolean;
-  /** Shell/monitor/plan tasks: ordinary work-log rows, never spawn CTAs. */
   isBackgroundTask?: boolean;
 }
 
@@ -158,10 +146,6 @@ export interface TimelineEntriesProjection {
   readonly entries: TimelineEntry[];
 }
 
-/** Severe failures keep the red treatment ordinary tool failures lost: runtime
- *  errors and orchestration `*.failed` activities (provider.turn.start.failed,
- *  checkpoint.capture.failed, ...) mean the turn or a core side effect broke,
- *  not that a command exited nonzero. */
 export function workEntrySignalsSevereFailure(entry: WorkLogEntry): boolean {
   return (
     entry.sourceActivityKind === "runtime.error" ||
@@ -169,11 +153,7 @@ export function workEntrySignalsSevereFailure(entry: WorkLogEntry): boolean {
   );
 }
 
-/** Tool-like row with neither clear success nor failure (empty, incomplete, in progress, etc.). */
 export function workEntryIndicatesToolNeutralStatus(entry: WorkLogEntry): boolean {
-  // Spawn CTA rows are never neutral-hidden: mid-run they derive from
-  // task.progress (tone "thinking") and the neutral filter was swallowing
-  // them exactly while the fleet ran — the one moment they matter most.
   if (entry.agentSpawn !== undefined) {
     return false;
   }
@@ -328,8 +308,6 @@ export function deriveActivePlanState(
   const allPlanActivities = activities
     .filter((activity) => activity.kind === "turn.plan.updated")
     .sort(compareActivitiesByOrder);
-  // Prefer plan from the current turn; fall back to the most recent plan from any turn
-  // so that TodoWrite tasks persist across follow-up messages.
   const latest = Option.firstSomeOf([
     ...(latestTurnId
       ? Arr.findLast(allPlanActivities, (activity) => activity.turnId === latestTurnId)
@@ -386,18 +364,6 @@ export function hasActionableProposedPlan(
   return proposedPlan !== null && proposedPlan.implementedAt === null;
 }
 
-/**
- * Quiet-timeline guarantee: the work log carries the parent's narrative plus
- * at most one row per agent. Everything an agent does internally lives in the
- * Agents surface:
- * - timelineBypass rows (Codex children, workflow members) never render here;
- * - tool rows attributed to an owning agent (payload.agentId) are re-homed;
- * - task.progress ticks collapse into one row per taskId;
- * - task.updated is fold input only (status patches are not narrative).
- * Unattributed rows stay unless a linked agent row replaces their launch;
- * failed launches stay so the only terminal signal cannot disappear.
- */
-/** Agent (non-background) task.started rows seed spawn CTA batches. */
 function isAgentTaskStartedActivity(activity: OrchestrationThreadActivity): boolean {
   const payload =
     activity.payload && typeof activity.payload === "object"
@@ -422,14 +388,6 @@ function isAgentInternalActivity(activity: OrchestrationThreadActivity): boolean
     activity.kind === "task.progress" ||
     activity.kind === "task.updated" ||
     activity.kind === "task.completed";
-  // Task rows classify by the server stamp: a subagent's own background
-  // shell (agentId + "background") is agent-internal, but a nested AGENT
-  // (agentId + "agent") stays visible so its rows can anchor a spawn row
-  // (review finding: hiding on agentId alone removed nested agents and
-  // their anchors). Bypassed agent lifecycle rows also pass — collapse
-  // folds every such row into its batch's single CTA row, which is how
-  // Codex children (whose rows are ALL bypassed) get an anchor at the
-  // spawn point.
   if (isTaskRow) {
     const ownedByAgent = typeof payload.agentId === "string" && payload.agentId.trim().length > 0;
     if (ownedByAgent || payload.timelineBypass === true) {
@@ -444,7 +402,6 @@ function isAgentInternalActivity(activity: OrchestrationThreadActivity): boolean
   if (payload.timelineBypass === true) {
     return true;
   }
-  // Non-task rows (attributed tool activity) owned by an agent are internal.
   return typeof payload.agentId === "string" && payload.agentId.trim().length > 0;
 }
 
@@ -452,8 +409,6 @@ export function deriveWorkLogEntries(
   activities: ReadonlyArray<OrchestrationThreadActivity>,
 ): WorkLogEntry[] {
   const ordered = [...activities].toSorted(compareActivitiesByOrder);
-  // A launch tool and its task lifecycle describe the same run. Only hide
-  // launch rows once their tool-use id has an agent row to replace them.
   const agentLaunchToolIds = new Set<string>();
   for (const activity of ordered) {
     if (
@@ -475,10 +430,6 @@ export function deriveWorkLogEntries(
       continue;
     }
     if (activity.kind === "tool.started") continue;
-    // Agent task.started rows are CTA seeds: they carry the true spawn turn,
-    // which is the batch key (completions of background subagents arrive
-    // under later synthetic turns and must not start new batches). They
-    // collapse into the batch's single CTA row, never render standalone.
     if (activity.kind === "task.started" && !isAgentTaskStartedActivity(activity)) continue;
     if (activity.kind === "task.updated") continue;
     if (activity.kind === "tool.progress") continue;
@@ -489,8 +440,6 @@ export function deriveWorkLogEntries(
     if (isPlanBoundaryToolActivity(activity)) continue;
     if (isAgentInternalActivity(activity)) continue;
     const entry = toDerivedWorkLogEntry(activity);
-    // Native agent launches get their visible row from task.started. Defer
-    // their active tool row so another launch cannot duplicate the batch.
     if (
       activity.kind === "tool.updated" &&
       entry.itemType === "collab_agent_tool_call" &&
@@ -514,10 +463,6 @@ export function deriveWorkLogEntries(
   return collapseDerivedWorkLogEntries(entries);
 }
 
-/** Adapters forward unknown wire-only SDK messages (background_tasks_changed,
- *  commands_changed, ...) as runtime warnings. The suffix comes from
- *  describeUnknownSdkMessage in the Claude adapter; a row with no displayable
- *  text carries nothing a user can act on, so it does not render. */
 function isNoContentRuntimeWarning(activity: OrchestrationThreadActivity): boolean {
   return (
     activity.kind === "runtime.warning" &&
@@ -679,11 +624,6 @@ function toDerivedWorkLogEntry(activity: OrchestrationThreadActivity): DerivedWo
   return entry;
 }
 
-/**
- * Spawn-group key for a subagent lifecycle row. Workflow members and their
- * coordinator share the coordinator's group; direct spawns batch per turn.
- * One CTA row per group (A1 design): "Kicked off N subagents".
- */
 function agentSpawnGroupKey(entry: DerivedWorkLogEntry): string {
   const taskId = entry.taskId ?? "";
   const workflowSlot = taskId.indexOf(":wf:");
@@ -696,12 +636,6 @@ function agentSpawnGroupKey(entry: DerivedWorkLogEntry): string {
   if (entry.isWorkflowCoordinator) {
     return `wf:${taskId}`;
   }
-  // No turn id means no batch signal at all: fall back to one group per
-  // task. Unrelated turn-less spawns (separate fleets whose rows lost their
-  // turn) must not collapse into one immortal "direct:no-turn" CTA
-  // accumulating every agent the thread ever ran (review finding). Adapters
-  // stamp spawn turns (Codex spawnTurnId; Claude rows ride real turns), so
-  // this path is defensive.
   return entry.turnId ? `direct:${entry.turnId}` : `direct:task:${taskId}`;
 }
 
@@ -719,17 +653,7 @@ function collapseDerivedWorkLogEntries(
   entries: ReadonlyArray<DerivedWorkLogEntry>,
 ): DerivedWorkLogEntry[] {
   const collapsed: DerivedWorkLogEntry[] = [];
-  // Subagent rows collapse by spawn group, not adjacency: a workflow run (or
-  // a turn's batch of direct spawns) is ONE narrative event in the chat — a
-  // spawn row in the timeline — no matter how many agents it
-  // contains or how their progress rows interleave (quiet-timeline
-  // guarantee).
   const spawnRowIndex = new Map<string, number>();
-  // Batch membership is decided once, at the FIRST row seen for a taskId.
-  // Claude background subagents settle between turns, so their completion
-  // rows carry fresh synthetic turn ids (or none) — keying each row by its
-  // own turn splintered one batch into a stream of "Kicked off N subagents"
-  // rows (live-test finding, thread 7ac7ef05).
   const groupKeyByTaskId = new Map<string, string>();
   const toolLifecycleRowIndex = new Map<string, number>();
   for (const entry of entries) {
@@ -754,12 +678,6 @@ function collapseDerivedWorkLogEntries(
           : [...(existing.agentSpawn?.agentTaskIds ?? []), entry.taskId];
         collapsed[existingIndex] = {
           ...mergeDerivedWorkLogEntries(existing, entry),
-          // The CTA row keeps the group's ANCHOR identity, not the last
-          // agent's: id/createdAt/turnId stay pinned to the spawn point so
-          // the row renders where the run launched instead of drifting to
-          // the newest progress tick (mid-run it drifted below the whole
-          // conversation, reading as "no visualization"), and the stable id
-          // keeps React state/virtualization sane.
           id: existing.id,
           createdAt: existing.createdAt,
           turnId: existing.turnId ?? null,
@@ -896,8 +814,6 @@ function mergeChangedFiles(
 }
 
 function deriveToolLifecycleCollapseKey(entry: DerivedWorkLogEntry): string | undefined {
-  // Subagent lifecycle rows collapse by agent identity: one row per agent,
-  // progress ticks fold into it, the terminal row wins the label.
   if (
     entry.taskId &&
     (entry.sourceActivityKind === "task.progress" || entry.sourceActivityKind === "task.completed")
@@ -1474,9 +1390,6 @@ function timelineEntrySourceOrder(entry: TimelineEntry): number {
 function shouldTakePreviousTimelineEntry(previous: TimelineEntry, suffix: TimelineEntry): boolean {
   const createdAtComparison = compareTimelineEntriesByCreatedAt(previous, suffix);
   if (createdAtComparison !== 0) return createdAtComparison < 0;
-  // The original full derivation sorts a source-ordered array with a stable
-  // comparator. On a tie, messages precede plans, plans precede work, and an
-  // older item in the same source array precedes a newly appended item.
   return timelineEntrySourceOrder(previous) <= timelineEntrySourceOrder(suffix);
 }
 
@@ -1532,7 +1445,6 @@ function mergeTimelineEntrySuffix(
 type AttachmentResource = Extract<AssetResource, { readonly _tag: "attachment" }>;
 const EMPTY_IMAGE_RESOURCES = Object.freeze<ReadonlyArray<AttachmentResource>>([]);
 
-/** A mounted row requests its stored images. Local previews keep their existing URLs. */
 export function selectMessageImageResources(
   attachments: ChatMessage["attachments"],
 ): ReadonlyArray<AttachmentResource> {
@@ -1548,7 +1460,6 @@ export function selectMessageImageResources(
     : Array.from(attachmentIds, (attachmentId) => ({ _tag: "attachment", attachmentId }));
 }
 
-/** Handoffs need server URLs even while their message rows are unmounted. */
 export function selectHandoffImageResources(
   messages: ReadonlyArray<ChatMessage> | undefined,
   handoffs: Readonly<Record<string, ReadonlyArray<string>>>,
@@ -1566,7 +1477,6 @@ export function selectHandoffImageResources(
     : Array.from(attachmentIds, (attachmentId) => ({ _tag: "attachment", attachmentId }));
 }
 
-/** Own one mapper per preview stage. Immutable messages retain unchanged preview objects. */
 export function createMessageAttachmentPreviewProjector() {
   const attachmentsBySource = new WeakMap<
     ReadonlyArray<ChatAttachment>,
@@ -1616,7 +1526,6 @@ export function createMessageAttachmentPreviewProjector() {
 
 const streamsText = (role: ChatMessage["role"]) => role === "assistant" || role === "reasoning";
 
-/** Text and update time do not change a streaming message's timeline structure. */
 export function isStreamingMessageTextUpdate(previous: ChatMessage, next: ChatMessage): boolean {
   if (
     !streamsText(previous.role) ||
@@ -1650,7 +1559,6 @@ function replaceStreamingTimelineMessages(
   });
 }
 
-/** Reuse ordered entries across immutable stream updates. Other changes keep the full sort. */
 export function deriveTimelineEntriesWithState(
   messages: ReadonlyArray<ChatMessage>,
   proposedPlans: ReadonlyArray<ProposedPlan>,

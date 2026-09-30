@@ -73,12 +73,6 @@ function loadHighlightedCode(
   return promise;
 }
 
-/**
- * Tokens for a code block, or null while nothing usable exists yet. A cached or
- * synchronous result renders in the same pass. Otherwise the most recent
- * completed result seeds `pendingCodeHighlight` so finished lines keep their
- * colors while the asynchronous highlighter catches up.
- */
 export function useHighlightedCode(
   code: string,
   language: string | undefined,
@@ -98,9 +92,6 @@ export function useHighlightedCode(
     key,
     tokens: highlightedCodeCache.get(key) ?? null,
   }));
-  // Synchronous reads never touch state, so each append costs one render. The
-  // ref remembers the newest of them, and is cleared whenever an asynchronous
-  // result commits so `highlighted` is the baseline again from then on.
   const latestRead = useRef<HighlightedCodeResult | null>(null);
 
   useEffect(() => {

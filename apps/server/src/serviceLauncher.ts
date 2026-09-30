@@ -1,9 +1,5 @@
 // @effect-diagnostics nodeBuiltinImport:off
 // @effect-diagnostics globalTimers:off
-// The launcher supervises the server child for the boot service and must keep
-// working across server versions, so it stays on Node built-ins with no Effect
-// runtime: it is the one part of the executable that cannot depend on the
-// rest of it being loadable.
 import * as NodeChildProcess from "node:child_process";
 import * as NodeCrypto from "node:crypto";
 import * as NodeFS from "node:fs";
@@ -43,9 +39,6 @@ interface ManagedChild {
   readonly process: NodeChildProcess.ChildProcess;
 }
 
-// Mirrors pinnedRuntimePaths: a runtime is an unpacked release archive whose
-// executable runs on its own. Kept inline so this file stays on Node
-// built-ins only.
 const runtimePaths = (baseDir: string, version: string) => {
   const versionDir = NodePath.join(baseDir, "runtime", "versions", version);
   // oxlint-disable-next-line t3code/no-global-process-runtime -- Standalone launcher has no Effect runtime.
@@ -62,7 +55,6 @@ const runtimeSpawnArguments = (paths: ReturnType<typeof runtimePaths>) => ({
   args: ["serve"],
 });
 
-/** SQLite persists across the main file plus its WAL and shared-memory sidecars. */
 const DB_FILE_SUFFIXES = ["", "-wal", "-shm"] as const;
 const RESTORE_MARKER = ".restore-pending";
 
@@ -82,7 +74,6 @@ async function pathExists(target: string): Promise<boolean> {
   }
 }
 
-// Opened read-write: Windows refuses to flush a handle without write access.
 async function syncFile(filePath: string): Promise<void> {
   const handle = await NodeFSP.open(filePath, "r+");
   try {
@@ -92,9 +83,6 @@ async function syncFile(filePath: string): Promise<void> {
   }
 }
 
-// Flushes a directory entry so a rename into it survives power loss. Windows
-// has no directory fsync: the handle opens but sync fails with EPERM, and
-// NTFS journals the rename on its own.
 async function syncDirectory(directory: string): Promise<void> {
   const handle = await NodeFSP.open(directory, "r");
   try {
@@ -106,11 +94,6 @@ async function syncDirectory(directory: string): Promise<void> {
   }
 }
 
-/**
- * Snapshots the database once per update before the first trial. A completed
- * backup is never overwritten because a restarted launcher may be looking at
- * database writes from an earlier attempt by the same trial.
- */
 async function backupDatabaseOnce(baseDir: string, pending: PendingServiceUpdate): Promise<void> {
   const backupDir = databaseBackupDir(baseDir, pending.id);
   if (await pathExists(backupDir)) return;
@@ -140,7 +123,6 @@ const restoreMarkerPath = (baseDir: string, updateId: string) =>
 const databaseRestorePending = (baseDir: string, pending: PendingServiceUpdate) =>
   pathExists(restoreMarkerPath(baseDir, pending.id));
 
-/** Mark rollback before changing live files so launcher recovery cannot boot a partial restore. */
 async function markDatabaseRestorePending(backupDir: string): Promise<void> {
   const markerPath = NodePath.join(backupDir, RESTORE_MARKER);
   if (!(await pathExists(markerPath))) {
@@ -154,7 +136,6 @@ async function markDatabaseRestorePending(backupDir: string): Promise<void> {
   }
 }
 
-/** Restore is retryable after any process crash while the backup directory remains. */
 async function restoreDatabaseBackup(
   baseDir: string,
   pending: PendingServiceUpdate,
@@ -190,7 +171,6 @@ export async function readServiceState(filePath: string): Promise<ServiceState> 
   return state;
 }
 
-/** Durable same-directory replacement used for every runtime state transition. */
 export async function writeServiceState(filePath: string, state: ServiceState): Promise<void> {
   const directory = NodePath.dirname(filePath);
   await NodeFSP.mkdir(directory, { recursive: true, mode: 0o700 });
@@ -329,17 +309,9 @@ export class Launcher {
   }
 
   async stop(signal: NodeJS.Signals): Promise<void> {
-    // This must happen synchronously at signal receipt. A queued update
-    // transition may already be terminating the active child, and that child
-    // needs to see the marker in its shutdown finalizer. KillMode=mixed also
-    // ensures systemd signals the launcher before the rest of the cgroup, and
-    // launchd signals only the job's main process (this launcher), so the
-    // marker lands before the child sees any signal on both platforms.
     try {
       NodeFS.writeFileSync(stopMarkerPath(this.#baseDir), "", { mode: 0o600 });
-    } catch {
-      // Err toward keeping the tunnel; the next link or unlink reconciles it.
-    }
+    } catch {}
     if (this.#stopRequested || this.#stopping) {
       await this.#completion.promise.catch(() => undefined);
       return;
@@ -347,9 +319,6 @@ export class Launcher {
     this.#stopRequested = true;
     this.#clearTimer();
     this.#enqueue(async () => {
-      // Let an update transition already in progress start its replacement
-      // before this queued stop tears it down. That replacement owns the
-      // pre-activation tunnel cleanup path and observes the marker above.
       this.#stopping = true;
       const child = this.#child?.process;
       this.#child = null;
@@ -366,13 +335,6 @@ export class Launcher {
   }
 
   async #recover(): Promise<void> {
-    // A fresh launcher means servers are running again: any stop marker from
-    // a previous explicit stop is stale and must not make a future update
-    // handoff release its tunnel. A restart deferred by `t3 update` is done
-    // no matter who restarted the service, but only once this launcher is
-    // the version the marker waits for: a launcher that came up between the
-    // CLI writing the marker and writing the new state still runs the old
-    // version, and the marker has to outlive it.
     await NodeFSP.rm(stopMarkerPath(this.#baseDir), { force: true }).catch(() => undefined);
     const restartPending = restartPendingPath(this.#baseDir);
     const awaitedVersion = await NodeFSP.readFile(restartPending, "utf8").catch(() => undefined);
@@ -399,7 +361,6 @@ export class Launcher {
   }
 
   async #startTrial(pending: PendingServiceUpdate): Promise<void> {
-    // The previous child is dead here, so all three SQLite files are quiescent.
     try {
       await backupDatabaseOnce(this.#baseDir, pending);
     } catch {

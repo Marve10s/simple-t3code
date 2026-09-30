@@ -21,7 +21,6 @@ type NewTaskDraftRouteParams = {
   readonly branch?: string | null;
   readonly worktreePath?: string | null;
   readonly title?: string | string[];
-  /** Set by Add Project when this draft opens while the project's clone runs. */
   readonly cloning?: string | string[];
   readonly pendingTaskId?: string | string[];
   readonly draftId?: string | string[];
@@ -39,9 +38,6 @@ export function NewTaskDraftRouteScreen({ route }: StaticScreenProps<NewTaskDraf
   const navigation = useNavigation();
   const switchRef = useAtomCommand(vcsEnvironment.switchRef, { reportFailure: false });
 
-  // Keyed on the params object so a fresh navigation to this (already
-  // mounted) screen produces a new reference, letting the draft screen
-  // re-apply the requested project.
   const initialProjectRef = useMemo(
     () => ({
       environmentId: Array.isArray(params.environmentId)
@@ -83,15 +79,12 @@ export function NewTaskDraftRouteScreen({ route }: StaticScreenProps<NewTaskDraf
     const branchName = initialProjectRef.branch;
     let active = true;
     setPendingCheckouts((count) => count + 1);
-    // Serialize replacements: ignoring a stale result cannot undo its Git mutation.
     checkoutTail.current = checkoutTail.current.then(async () => {
       if (!active) {
         setPendingCheckouts((count) => count - 1);
         return;
       }
       const result = await checkoutNewTaskBranch({
-        // A thread's branch is historical; only switchRef can establish that
-        // the shared project checkout now matches it.
         branch: {
           name: branchName,
           current: false,
@@ -121,8 +114,6 @@ export function NewTaskDraftRouteScreen({ route }: StaticScreenProps<NewTaskDraf
     preparation?.request === initialProjectRef && preparation.workspaceRoot === workspaceRoot
       ? preparation.result
       : null;
-  // The native-stack guard covers iOS swipe dismissal as well as back actions.
-  // A replaced request must settle too before the shared checkout is left behind.
   const checkoutPending = pendingCheckouts > 0 || (needsPreparation && result === null);
   usePreventRemove(checkoutPending, () => undefined);
   useEffect(() => {
@@ -144,7 +135,6 @@ export function NewTaskDraftRouteScreen({ route }: StaticScreenProps<NewTaskDraf
         : initialProjectRef,
     [initialProjectRef, result],
   );
-  // Send/queue remain unavailable on failure while the unlocked route closes.
   const preparingBranch = checkoutPending || (needsPreparation && result?._tag !== "Success");
 
   return (

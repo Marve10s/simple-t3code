@@ -31,16 +31,6 @@ import {
 import { imageMimeType } from "@t3tools/shared/image";
 import { uuidv4 } from "./uuid";
 
-/**
- * This module owns the server side of a composer attachment's lifecycle.
- * `prepareTurnAttachments` acquires pending uploads (verifying and reusing
- * persisted ones), hands the uploaded ids back to the attachment's durable
- * owner (queued outbox message or composer draft), and leaves their cleanup
- * to that owner after it checks shared references. Nothing outside this module
- * mints or deletes pending uploads. The local-file side of the lifecycle is
- * owned by `removeThreadOutboxMessage` / the composer draft mutators, which
- * release files through `releaseUnusedComposerAttachmentFiles`.
- */
 export type UploadedMobileAttachment =
   | UploadChatImageAttachment
   | ChatImageAttachment
@@ -69,7 +59,6 @@ export function validateDraftFileAttachments(input: {
   return oversized ? fileAttachmentTooLargeMessage(oversized.name, maxBytes) : null;
 }
 
-/** Keep uploaded ids alongside the local bytes so a later send can reuse them. */
 export function withUploadedMobileAttachmentReferences(input: {
   readonly environmentId: EnvironmentId;
   readonly attachments: ReadonlyArray<DraftComposerAttachment>;
@@ -77,9 +66,6 @@ export function withUploadedMobileAttachmentReferences(input: {
 }): ReadonlyArray<DraftComposerAttachment> {
   return input.attachments.map((attachment, index) => {
     const uploaded = input.uploadedAttachments[index];
-    // A picture picked through Files stays `type: "file"` in the draft while it uploads as an
-    // image, so compare against the type it was actually sent under: comparing draft types
-    // drops the id, and the next send re-uploads bytes the server already holds.
     const uploadedAs = isComposerImageAttachment(attachment) ? "image" : attachment.type;
     if (
       !uploaded ||
@@ -98,12 +84,6 @@ export function withUploadedMobileAttachmentReferences(input: {
   });
 }
 
-/**
- * Deletes pending uploads the client no longer references. Every delete result
- * is inspected; failed deletes are retried once and a persistent failure
- * throws, so a caller can never silently leak the outcome. (The server also
- * expires pending uploads, so a leaked id self-heals eventually.)
- */
 export async function releasePendingAttachmentUploads(
   environmentId: EnvironmentId,
   attachmentIds: ReadonlyArray<string>,
@@ -141,19 +121,14 @@ async function releaseCreatedUploadsQuietly(
   try {
     await releasePendingAttachmentUploads(environmentId, attachmentIds);
   } catch (error) {
-    // The original failure must propagate; the leaked pending uploads expire
-    // on the server.
     console.warn("[attachments] could not delete abandoned pending uploads", error);
   }
 }
 
 export interface PreparedTurnAttachments {
   readonly status: "ready";
-  /** Wire attachments for `startTurn`, in the original composer order. */
   readonly attachments: ReadonlyArray<UploadedMobileAttachment>;
-  /** Composer attachments annotated with the uploaded pending ids. */
   readonly draftAttachments: ReadonlyArray<DraftComposerAttachment>;
-  /** Every pending upload backing this turn (reused and newly minted). */
   readonly pendingAttachmentIds: ReadonlyArray<string>;
 }
 
@@ -161,13 +136,6 @@ export type PrepareTurnAttachmentsResult =
   | PreparedTurnAttachments
   | { readonly status: "abandoned" };
 
-/**
- * The mime an attachment travels under. A picture picked through Files arrives typed as a plain
- * file, often with no usable mime, so it is promoted to the type the provider accepts. Every
- * place that names the attachment on the wire — the upload header, the upload input, and the
- * message reference — has to agree on this one value, or the turn describes bytes that are not
- * what was actually sent and `ChatImageAttachment` rejects it.
- */
 export function composerAttachmentWireMimeType(attachment: DraftComposerAttachment): string {
   if (!isComposerImageAttachment(attachment)) return attachment.mimeType;
   return supportedImageWireMimeType(attachment);
@@ -194,8 +162,6 @@ function uploadedReference(
     mimeType: composerAttachmentWireMimeType(attachment),
     sizeBytes: attachment.sizeBytes,
   };
-  // A picture picked through Files is typed as a plain file; uploading it as one leaves the
-  // chat view with nothing to show a thumbnail from, on every client.
   return isComposerImageAttachment(attachment)
     ? { type: "image", ...fields }
     : {
@@ -212,11 +178,6 @@ function attachmentUploadInput(attachment: DraftComposerAttachment) {
     : { type: "file" as const, ...fields, mimeType: attachment.mimeType };
 }
 
-/**
- * Wire shape for startTurn on servers without attachment uploads: pure inline
- * uploads without client draft id / previewUri. File-backed images read their
- * base64 from disk lazily, only when this legacy path is actually taken.
- */
 async function toUploadChatImageAttachments(
   attachments: ReadonlyArray<DraftComposerImageAttachment>,
 ): Promise<ReadonlyArray<UploadChatImageAttachment>> {
@@ -231,7 +192,6 @@ async function toUploadChatImageAttachments(
   );
 }
 
-/** Inline bytes for one image: legacy drafts carry them, file-backed ones read them from disk. */
 async function composerImageAttachmentDataUrl(
   attachment: DraftComposerImageAttachment,
 ): Promise<string> {
@@ -262,8 +222,6 @@ async function uploadFileBytes(
 ): Promise<void> {
   const { File, Paths, UploadType } = await import("expo-file-system");
   if (signal.aborted) throw new Error("Upload cancelled.");
-  // Legacy image drafts persisted inline bytes and stage them in a temp cache
-  // file for the native uploader. Everything else uploads its owned copy.
   const fileUri = attachment.fileUri;
   const inlineDataUrl = attachment.type === "image" ? attachment.dataUrl : undefined;
   if (fileUri === undefined && inlineDataUrl === undefined) {
@@ -301,20 +259,9 @@ async function uploadFileBytes(
   }
 }
 
-/**
- * Acquires server-side uploads for one turn's attachments and persists the
- * uploaded ids into the attachments' durable owner.
- *
- * `persistUploadedReferences` runs once the bytes are on the server and only
- * when new ids appeared. It must write the annotated attachments into the
- * owner (queued message or draft) so a retry after a crash reuses the bytes.
- * Returning `"abandon"` (owner no longer wants the send) or throwing deletes
- * the pending uploads this call minted, so the owner cannot leak them.
- */
 export async function prepareTurnAttachments(input: {
   readonly environmentId: EnvironmentId;
   readonly attachments: ReadonlyArray<DraftComposerAttachment>;
-  /** Older environments continue to receive inline images. */
   readonly supportsImageUploads?: boolean;
   readonly signal?: AbortSignal;
   readonly onUploadProgress?: (attachmentId: string, progress: number) => void;
@@ -370,8 +317,6 @@ export async function prepareTurnAttachments(input: {
         continue;
       }
 
-      // Reuse the bytes from a previous attempt when their pending upload is
-      // still alive on this environment.
       if (
         attachment.uploadEnvironmentId === environmentId &&
         attachment.uploadedAttachmentId !== undefined
@@ -390,7 +335,6 @@ export async function prepareTurnAttachments(input: {
           uploadedAttachments.push(uploadedReference(attachment, attachment.uploadedAttachmentId));
           continue;
         }
-        // "missing": the pending upload expired, upload the bytes again.
       }
 
       const result = await runAttachmentUploadCycle({
@@ -399,8 +343,6 @@ export async function prepareTurnAttachments(input: {
         remove: attachmentEnvironment.remove,
         environmentId,
         upload: attachmentUploadInput(attachment),
-        // Read the connection at transfer time: the environment may have
-        // reconnected on a new base URL since this cycle started.
         resolveUploadUrl: (relativeUrl) => {
           const currentConnection = appAtomRegistry.get(
             environmentSession.preparedConnectionValueAtom(environmentId),
