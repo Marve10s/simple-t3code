@@ -4,6 +4,7 @@ import { AnimatePresence, LayoutGroup, MotionConfig, motion } from "motion/react
 import { useEffect } from "react";
 
 import { CodexNewTabButton, CodexTabContents, useCodexTabStrip } from "../CodexTabStrip";
+import { codexTabRenderKey } from "../codexTabs";
 import { setCodexHeroTransitionTiming } from "../codexMotionTiming";
 import { useCodexView } from "../codexView";
 
@@ -42,7 +43,7 @@ export function MotionTabStrip() {
               const active = tab.key === strip.activeKey;
               return (
                 <motion.div
-                  key={tab.key}
+                  key={codexTabRenderKey(tab)}
                   layout="position"
                   initial={{ opacity: 0, scale: 0.94 }}
                   animate={{ opacity: 1, scale: 1 }}

@@ -5,7 +5,7 @@ import { createJSONStorage, persist } from "zustand/middleware";
 import type { DraftId } from "../../composerDraftStore";
 import { resolveStorage } from "../../lib/storage";
 
-export type CodexTab =
+export type CodexTab = { readonly renderKey?: string } & (
   | {
       readonly kind: "thread";
       readonly key: string;
@@ -17,7 +17,11 @@ export type CodexTab =
       readonly key: string;
       readonly draftId: DraftId;
       readonly threadId: ThreadId;
-    };
+      readonly environmentId?: EnvironmentId;
+    }
+);
+
+export const codexTabRenderKey = (tab: CodexTab) => tab.renderKey ?? tab.key;
 
 export function openCodexTab(
   tabs: ReadonlyArray<CodexTab>,
@@ -27,9 +31,13 @@ export function openCodexTab(
   if (tabs.some((existing) => existing.key === tab.key)) return tabs;
   if (tab.kind === "thread") {
     const draftIndex = tabs.findIndex(
-      (existing) => existing.kind === "draft" && existing.threadId === tab.threadId,
+      (existing) =>
+        existing.kind === "draft" &&
+        existing.threadId === tab.threadId &&
+        (existing.environmentId === undefined || existing.environmentId === tab.environmentId),
     );
-    if (draftIndex !== -1) return tabs.with(draftIndex, tab);
+    const draft = tabs[draftIndex];
+    if (draft) return tabs.with(draftIndex, { ...tab, renderKey: codexTabRenderKey(draft) });
   }
   const activeIndex =
     activeKey === null ? -1 : tabs.findIndex((existing) => existing.key === activeKey);

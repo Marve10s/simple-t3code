@@ -713,6 +713,27 @@ main[data-slot="sidebar-inset"]:has([data-draft-hero="true"]) [data-chat-header]
     opacity: 0;
   }
 
+  [data-codex-part="tab-warning"] {
+    display: inline-flex;
+    width: 16px;
+    height: 20px;
+    flex-shrink: 0;
+    align-items: center;
+    justify-content: center;
+    margin-right: 4px;
+    color: var(--warning-foreground);
+  }
+
+  [data-codex-part="tab-warning"] svg {
+    width: 13px;
+    height: 13px;
+  }
+
+  [data-codex-part="tab-close"]:disabled {
+    cursor: wait;
+    opacity: 0.5;
+  }
+
   [data-codex-part="tab"]:hover [data-codex-part="tab-close"],
   [data-codex-part="tab"][data-active="true"] [data-codex-part="tab-close"],
   [data-codex-part="tab-close"]:focus-visible {

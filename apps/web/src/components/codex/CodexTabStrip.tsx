@@ -7,7 +7,7 @@ import {
 import type { EnvironmentProject } from "@t3tools/client-runtime/state/shell";
 import { isProjectFaviconFallbackUrl } from "@t3tools/shared/projectFavicon";
 import { useNavigate, useParams } from "@tanstack/react-router";
-import { EllipsisIcon, PlusIcon, XIcon } from "lucide-react";
+import { EllipsisIcon, PlusIcon, TriangleAlertIcon, XIcon } from "lucide-react";
 import { type MouseEvent, useEffect, useMemo, useRef } from "react";
 
 import { composerDraftHasUserContent, useComposerDraftStore } from "../../composerDraftStore";
@@ -21,10 +21,19 @@ import {
 } from "../../state/entities";
 import { ProjectFavicon } from "../ProjectFavicon";
 import { Menu, MenuGroup, MenuGroupLabel, MenuItem, MenuPopup, MenuTrigger } from "../ui/menu";
+import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
 import { resolveThreadRouteTarget } from "../../threadRoutes";
-import { type CodexTab, closeCodexTab, openCodexTab, useCodexTabsStore } from "./codexTabs";
+import {
+  type CodexTab,
+  closeCodexTab,
+  codexTabRenderKey,
+  openCodexTab,
+  useCodexTabsStore,
+} from "./codexTabs";
+import { useCodexTabCloseWarning } from "./codexTabActivity";
 import { ThreadMark, useThreadMarkTones } from "./CodexThreadStatus";
 import { useCodexTabShortcuts } from "./useCodexTabShortcuts";
+import { useCodexTabClose } from "./useCodexTabClose";
 
 export function useCodexTabStrip() {
   const navigate = useNavigate();
@@ -33,6 +42,7 @@ export function useCodexTabStrip() {
   const threads = useThreadShells();
   const shellsBootstrapped = useAllEnvironmentShellsBootstrapped();
   const tones = useThreadMarkTones();
+  const { closingKeys, stopTab } = useCodexTabClose();
   const getDraftSession = useComposerDraftStore((store) => store.getDraftSession);
   const projects = useProjects();
   const { activeDraftThread, activeThread, defaultProjectRef, handleNewThread, orderedProjects } =
@@ -42,11 +52,11 @@ export function useCodexTabStrip() {
     strict: false,
     select: (params) => resolveThreadRouteTarget(params),
   });
-  const routeDraftThreadId = useComposerDraftStore((store) =>
-    routeTarget?.kind === "draft"
-      ? (store.getDraftSession(routeTarget.draftId)?.threadId ?? null)
-      : null,
+  const routeDraftSession = useComposerDraftStore((store) =>
+    routeTarget?.kind === "draft" ? store.getDraftSession(routeTarget.draftId) : null,
   );
+  const routeDraftThreadId = routeDraftSession?.threadId ?? null;
+  const routeDraftEnvironmentId = routeDraftSession?.environmentId;
   const routeTab = useMemo<CodexTab | null>(() => {
     if (routeTarget?.kind === "server") {
       return {
@@ -62,11 +72,16 @@ export function useCodexTabStrip() {
         key: `draft:${routeTarget.draftId}`,
         draftId: routeTarget.draftId,
         threadId: routeDraftThreadId,
+        ...(routeDraftEnvironmentId ? { environmentId: routeDraftEnvironmentId } : {}),
       };
     }
     return null;
-  }, [routeDraftThreadId, routeTarget]);
+  }, [routeDraftEnvironmentId, routeDraftThreadId, routeTarget]);
   const activeKey = routeTab?.key ?? null;
+  const activeKeyRef = useRef(activeKey);
+  useEffect(() => {
+    activeKeyRef.current = activeKey;
+  }, [activeKey]);
 
   const previousActiveKeyRef = useRef<string | null>(null);
   useEffect(() => {
@@ -114,18 +129,24 @@ export function useCodexTabStrip() {
   const closeTab = async (event: MouseEvent, tab: CodexTab) => {
     event.stopPropagation();
     event.preventDefault();
-    const { tabs: next, neighbor } = closeCodexTab(useCodexTabsStore.getState().tabs, tab.key);
-    setTabs(next);
-    if (tab.key === activeKey) {
-      if (neighbor) await openTab(neighbor);
-      else await navigate({ to: "/", state: { codexTabsClosed: true } });
-    }
-    if (tab.kind === "draft") {
-      const { getComposerDraft, clearDraftThread } = useComposerDraftStore.getState();
-      if (!composerDraftHasUserContent(getComposerDraft(tab.draftId))) {
-        clearDraftThread(tab.draftId);
+    await stopTab(tab, async () => {
+      const current = useCodexTabsStore
+        .getState()
+        .tabs.find((entry) => codexTabRenderKey(entry) === codexTabRenderKey(tab));
+      if (!current) return;
+      const { neighbor } = closeCodexTab(useCodexTabsStore.getState().tabs, current.key);
+      if (current.key === activeKeyRef.current) {
+        if (neighbor) await openTab(neighbor);
+        else await navigate({ to: "/", state: { codexTabsClosed: true } });
       }
-    }
+      setTabs(closeCodexTab(useCodexTabsStore.getState().tabs, current.key).tabs);
+      if (current.kind === "draft") {
+        const { getComposerDraft, clearDraftThread } = useComposerDraftStore.getState();
+        if (!composerDraftHasUserContent(getComposerDraft(current.draftId))) {
+          clearDraftThread(current.draftId);
+        }
+      }
+    });
   };
 
   useCodexTabShortcuts(activeKey, openTab);
@@ -158,6 +179,7 @@ export function useCodexTabStrip() {
     tabs,
     activeKey,
     tones,
+    closingKeys,
     projects: orderedProjects,
     titleFor,
     projectFor,
@@ -226,6 +248,8 @@ export function CodexNewTabButton({ strip }: { strip: CodexTabStripState }) {
 export function CodexTabContents({ strip, tab }: { strip: CodexTabStripState; tab: CodexTab }) {
   const title = strip.titleFor(tab);
   const project = strip.projectFor(tab);
+  const warning = useCodexTabCloseWarning(tab);
+  const closing = strip.closingKeys.has(codexTabRenderKey(tab));
   return (
     <>
       <button type="button" data-codex-part="tab-main" onClick={() => strip.openTab(tab)}>
@@ -233,9 +257,22 @@ export function CodexTabContents({ strip, tab }: { strip: CodexTabStripState; ta
         {project ? <TabProjectLabel project={project} /> : null}
         <span data-codex-part="tab-title">{title}</span>
       </button>
+      {warning ? (
+        <Tooltip>
+          <TooltipTrigger
+            render={
+              <span data-codex-part="tab-warning" tabIndex={0} role="img" aria-label={warning} />
+            }
+          >
+            <TriangleAlertIcon />
+          </TooltipTrigger>
+          <TooltipPopup>{warning}</TooltipPopup>
+        </Tooltip>
+      ) : null}
       <button
         type="button"
-        aria-label={`Close ${title}`}
+        aria-label={closing ? `Stopping ${title}` : `Close ${title}`}
+        disabled={closing}
         data-codex-part="tab-close"
         onClick={(event) => strip.closeTab(event, tab)}
       >
@@ -253,7 +290,7 @@ export function CodexTabStrip() {
         const active = tab.key === strip.activeKey;
         return (
           <div
-            key={tab.key}
+            key={codexTabRenderKey(tab)}
             role="tab"
             aria-selected={active}
             data-codex-part="tab"
